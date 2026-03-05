@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# Environment
+.env
+.env.local
+
+# Data files (large CSVs)
+data/raw/
+data/processed/
+
+# Trained models
+models/
+
+# Database
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# API cache (large, ephemeral)
+data/cache/
+
+# Frontend build
+frontend/node_modules/
+frontend/dist/
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
