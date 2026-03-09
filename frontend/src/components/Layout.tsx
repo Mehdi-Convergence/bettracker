@@ -49,7 +49,6 @@ const NAV_SECTIONS = [
   {
     label: "Suivi",
     items: [
-      { to: "/portfolio?view=history", label: "Historique", icon: History },
       { to: "/backtest", label: "Backtest", icon: FlaskConical },
     ],
   },
