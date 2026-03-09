@@ -298,7 +298,7 @@ export default function Layout() {
         </div>
 
         {/* Content */}
-        <main className="flex-1 overflow-y-auto p-7">
+        <main className="flex-1 overflow-y-auto px-6 py-5">
           <Outlet />
         </main>
       </div>
