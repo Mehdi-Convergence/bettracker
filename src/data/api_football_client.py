@@ -43,6 +43,7 @@ TTL = {
 
 # BetTracker league codes → API-Football league IDs
 LEAGUE_ID_MAP: dict[str, int] = {
+    # --- Ligues (16) ---
     "E0": 39,   # Premier League
     "F1": 61,   # Ligue 1
     "D1": 78,   # Bundesliga
@@ -59,6 +60,23 @@ LEAGUE_ID_MAP: dict[str, int] = {
     "T1": 203,  # Super Lig (Turquie)
     "G1": 197,  # Super League (Grece)
     "SC0": 179, # Scottish Premiership
+    # --- Coupes domestiques ---
+    "EFA": 45,  # FA Cup (Angleterre)
+    "EFLC": 48, # Carabao Cup (Angleterre)
+    "FCF": 66,  # Coupe de France
+    "DDFB": 81, # DFB Pokal (Allemagne)
+    "SPDR": 143,# Copa del Rey (Espagne)
+    "ICI": 137, # Coppa Italia
+    "NKNVB": 90,# KNVB Cup (Pays-Bas)
+    "PTP": 96,  # Taca de Portugal
+    "BCB": 148, # Coupe de Belgique
+    "TTC": 209, # Coupe de Turquie
+    "GGC": 200, # Coupe de Grece
+    "SCFA": 182,# Scottish FA Cup
+    # --- Coupes europeennes ---
+    "UCL": 2,   # UEFA Champions League
+    "UEL": 3,   # UEFA Europa League
+    "UECL": 848,# UEFA Conference League
 }
 LEAGUE_ID_TO_CODE = {v: k for k, v in LEAGUE_ID_MAP.items()}
 

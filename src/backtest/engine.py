@@ -5,7 +5,7 @@ import pandas as pd
 from rich.console import Console
 
 from src.config import settings
-from src.ml.combo_engine import ComboEngine, ComboLeg, Combo
+from src.ml.combo_engine import ComboEngine, ComboLeg
 from src.ml.football_model import FootballModel, MODEL_FEATURES, LABEL_MAP
 
 console = Console()
@@ -49,6 +49,8 @@ class BacktestEngine:
         self.combo_min_odds = combo_min_odds
         self.combo_max_odds = combo_max_odds
         self.combo_top_n = combo_top_n
+        # CLV filter: only bet when opening odds >= closing odds (bookmaker confirms our view)
+        self.require_positive_clv = False
 
     def run(self, features_df: pd.DataFrame, test_seasons: list[str]) -> dict:
         """Run walk-forward backtest: train on past, predict and bet on test seasons."""
@@ -155,6 +157,13 @@ class BacktestEngine:
                     continue
 
                 edge = model_prob - implied_prob
+
+                # CLV filter: skip if bookmaker moved odds against us (open < close)
+                if self.require_positive_clv:
+                    close_odds = row.get(close_col)
+                    if close_odds is not None and not (isinstance(close_odds, float) and np.isnan(close_odds)) and close_odds > 1:
+                        if market_odds < close_odds:
+                            continue
 
                 if edge > self.min_edge and edge > best_edge:
                     best_edge = edge

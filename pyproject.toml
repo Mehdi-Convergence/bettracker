@@ -7,18 +7,16 @@ requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.18.4",
     "beautifulsoup4>=4.14.3",
-    "curl-cffi>=0.14.0",
     "fastapi>=0.135.1",
     "httpx>=0.28.1",
     "joblib>=1.5.3",
-    "lxml>=6.0.2",
+    "lightgbm>=4.6.0",
     "numpy>=2.4.2",
     "openpyxl>=3.1.5",
     "optuna>=4.7.0",
     "pandas>=3.0.1",
-    "playwright>=1.58.0",
     "pyarrow>=23.0.1",
-    "pydantic>=2.12.5",
+    "pydantic[email]>=2.12.5",
     "pydantic-settings>=2.13.1",
     "python-dotenv>=1.2.2",
     "requests>=2.32.5",
@@ -30,6 +28,26 @@ dependencies = [
     "typer>=0.24.1",
     "uvicorn[standard]>=0.41.0",
     "xgboost>=3.2.0",
+    "python-jose[cryptography]>=3.3.0",
+    "bcrypt>=4.0.0",
+    "redis>=5.0.0",
+    "slowapi>=0.1.9",
+    "psycopg2-binary>=2.9.0",
+]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+ignore = [
+    "E711",  # comparison to None (SQLAlchemy filters)
+    "E712",  # comparison to False (SQLAlchemy filters)
+    "E741",  # ambiguous variable name (legacy code)
+    "E701",  # multiple statements on one line (legacy)
+    "E702",  # multiple statements on one line semicolon (legacy)
+    "E402",  # module level import not at top (lazy imports)
+    "F841",  # local variable assigned but unused (legacy)
+    "F541",  # f-string without placeholders (legacy)
 ]
 
 [dependency-groups]

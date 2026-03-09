@@ -1,10 +1,59 @@
 const BASE = "/api";
 
+let isRefreshing = false;
+
+async function tryRefreshToken(): Promise<boolean> {
+  if (isRefreshing) return false;
+  const refreshToken = localStorage.getItem("refresh_token");
+  if (!refreshToken) return false;
+
+  isRefreshing = true;
+  try {
+    const res = await fetch(`${BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    localStorage.setItem("access_token", data.access_token);
+    localStorage.setItem("refresh_token", data.refresh_token);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    isRefreshing = false;
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+  const token = localStorage.getItem("access_token");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  let res = await fetch(`${BASE}${path}`, {
+    headers,
     ...options,
   });
+
+  // 401 → try refresh, then retry once
+  if (res.status === 401) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      const newToken = localStorage.getItem("access_token");
+      headers["Authorization"] = `Bearer ${newToken}`;
+      res = await fetch(`${BASE}${path}`, { headers, ...options });
+    }
+    if (res.status === 401) {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+      throw new Error("Session expirée");
+    }
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     const detail = err.detail;
@@ -14,22 +63,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(msg);
   }
   return res.json();
-}
-
-// Scanner
-export function scanValueBets(params?: Record<string, string>) {
-  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-  return request<import("../types").ScanResponse>(`/scanner/value-bets${qs}`);
-}
-
-// Multi-Market Scanner (Betclic)
-export function scanMultiMarket(params?: Record<string, string>) {
-  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-  return request<import("../types").MultiMarketScanResponse>(`/scanner/matches${qs}`);
-}
-
-export function scanLiveMatches() {
-  return request<import("../types").MultiMarketScanResponse>("/scanner/live");
 }
 
 // Combos
@@ -81,21 +114,6 @@ export function searchTeams(q: string) {
   return request<string[]>(`/teams/search?q=${encodeURIComponent(q)}`);
 }
 
-// Team players (scraped data)
-export function getTeamPlayers(team: string, league: string, force = false) {
-  const params = new URLSearchParams({ team, league });
-  if (force) params.set("force", "true");
-  return request<import("../types").TeamPlayersResponse>(`/scanner/team-players?${params}`);
-}
-
-// Match details
-export function getMatchDetails(body: { home_team: string; away_team: string; league: string; date: string }) {
-  return request<import("../types").MatchDetail>("/scanner/match-details", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
 // Matches
 export function getMatches(params?: Record<string, string>) {
   const qs = params ? "?" + new URLSearchParams(params).toString() : "";
@@ -143,6 +161,21 @@ export function getCampaignHistory(id: number) {
   return request<import("../types").BankrollPoint[]>(`/campaigns/${id}/history`);
 }
 
+export function getCampaignBets(id: number) {
+  return request<import("../types").Bet[]>(`/campaigns/${id}/bets`);
+}
+
+export function updateCampaignBet(campaignId: number, betId: number, result: string) {
+  return request<import("../types").Bet>(`/campaigns/${campaignId}/bets/${betId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ result }),
+  });
+}
+
+export function deleteCampaignBet(campaignId: number, betId: number) {
+  return request<void>(`/campaigns/${campaignId}/bets/${betId}`, { method: "DELETE" });
+}
+
 // AI Research (Claude Code powered)
 export function aiScan(params: { sport: string; leagues?: string; timeframe?: string; force?: boolean; cacheOnly?: boolean }) {
   const qs = new URLSearchParams();
@@ -163,4 +196,42 @@ export function aiResearch(params: { sport: string; home: string; away: string; 
   qs.set("date", params.date);
   if (params.force) qs.set("force", "true");
   return request<import("../types").AIResearchResponse>(`/scanner/ai-research?${qs}`);
+}
+
+// User stats
+export function getUserStats() {
+  return request<import("../types").UserStats>("/auth/stats");
+}
+
+// Account management
+export function updateProfile(body: { display_name?: string; email?: string }) {
+  return request<{ id: number; email: string; display_name: string; tier: string }>("/auth/me", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export function changePassword(body: { current_password: string; new_password: string }) {
+  return request<{ message: string }>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function forgotPassword(email: string) {
+  return request<{ message: string }>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPassword(token: string, newPassword: string) {
+  return request<{ message: string }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+}
+
+export function deleteAccount() {
+  return request<{ message: string }>("/auth/me", { method: "DELETE" });
 }

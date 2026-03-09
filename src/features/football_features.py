@@ -34,6 +34,8 @@ class FootballFeatureBuilder:
         team_away_history = defaultdict(list)
         standings = defaultdict(lambda: defaultdict(lambda: {"points": 0, "gd": 0, "gf": 0}))
         # standings[league_season][team] = {"points": ..., "gd": ..., "gf": ...}
+        league_draws = defaultdict(lambda: {"draws": 0, "total": 0})
+        league_match_count = defaultdict(int)
 
         total = len(matches_sorted)
         log_interval = total // 20 if total > 20 else 1
@@ -48,12 +50,13 @@ class FootballFeatureBuilder:
 
             # Skip first matches (not enough history)
             if len(team_history[home]) < 3 or len(team_history[away]) < 3:
-                self._update_caches(match, team_history, team_home_history, team_away_history, standings, result_map)
+                self._update_caches(match, team_history, team_home_history, team_away_history, standings, result_map, league_draws, league_match_count)
                 continue
 
             features = self._build_features_from_cache(
                 match, home, away, league_season,
-                team_history, team_home_history, team_away_history, standings
+                team_history, team_home_history, team_away_history, standings,
+                league_draws, league_match_count
             )
 
             features["ftr"] = match["ftr"]
@@ -78,14 +81,15 @@ class FootballFeatureBuilder:
             features_list.append(features)
 
             # Update caches AFTER feature extraction
-            self._update_caches(match, team_history, team_home_history, team_away_history, standings, result_map)
+            self._update_caches(match, team_history, team_home_history, team_away_history, standings, result_map, league_draws, league_match_count)
 
         if progress:
             print(f"  Processing complete: {len(features_list)} feature vectors built")
 
         return pd.DataFrame(features_list)
 
-    def _update_caches(self, match, team_history, team_home_history, team_away_history, standings, result_map):
+    def _update_caches(self, match, team_history, team_home_history, team_away_history, standings, result_map,
+                       league_draws, league_match_count):
         """Update all incremental caches after processing a match."""
         home = match["home_team"]
         away = match["away_team"]
@@ -93,6 +97,10 @@ class FootballFeatureBuilder:
         ftag = int(match["ftag"])
         ftr = match["ftr"]
         league_season = f"{match['league']}_{match['season']}"
+
+        # Read pre-match ELO before updating (needed for opponent-strength features)
+        home_elo_pre = self.elo.get_rating(home)
+        away_elo_pre = self.elo.get_rating(away)
 
         match_dict = {
             "date": match["date"],
@@ -104,6 +112,12 @@ class FootballFeatureBuilder:
             "away_shots_target": match.get("away_shots_target"),
             "home_xg": match.get("home_xg"),
             "away_xg": match.get("away_xg"),
+            # Pre-match ELO of each team (used as opponent strength by the other team)
+            "opp_elo_for_home": away_elo_pre,
+            "opp_elo_for_away": home_elo_pre,
+            # Team's own pre-match ELO (used for momentum/trajectory features)
+            "home_elo_at_match": home_elo_pre,
+            "away_elo_at_match": away_elo_pre,
         }
 
         team_history[home].append(match_dict)
@@ -126,9 +140,16 @@ class FootballFeatureBuilder:
         goal_diff = abs(fthg - ftag)
         self.elo.update(home, away, result, goal_diff)
 
+        # Update league draw rate and match count
+        league_draws[league_season]["total"] += 1
+        if ftr == "D":
+            league_draws[league_season]["draws"] += 1
+        league_match_count[league_season] += 1
+
     def _build_features_from_cache(
         self, match, home, away, league_season,
-        team_history, team_home_history, team_away_history, standings
+        team_history, team_home_history, team_away_history, standings,
+        league_draws, league_match_count
     ) -> dict:
         """Build features using cached data (fast)."""
         features = {}
@@ -192,6 +213,54 @@ class FootballFeatureBuilder:
         else:
             features["home_xg_diff_5"] = np.nan
 
+        # 10. LAMBDA FEATURES (Poisson attack x defense matchup)
+        # lambda_home = home_attack * away_defense (predicts home goals)
+        # lambda_away = away_attack * home_defense (predicts away goals)
+        hgs5 = features.get("home_goals_scored_5")
+        hgc5 = features.get("home_goals_conceded_5")
+        ags5 = features.get("away_goals_scored_5")
+        agc5 = features.get("away_goals_conceded_5")
+        if all(v is not None and not (isinstance(v, float) and np.isnan(v)) for v in [hgs5, agc5, ags5, hgc5]):
+            features["lambda_home_5"] = hgs5 * agc5
+            features["lambda_away_5"] = ags5 * hgc5
+            features["lambda_ratio_5"] = features["lambda_home_5"] / max(0.01, features["lambda_away_5"])
+        else:
+            features["lambda_home_5"] = np.nan
+            features["lambda_away_5"] = np.nan
+            features["lambda_ratio_5"] = np.nan
+
+        # Home-specific lambda (home goals at home × away goals conceded away)
+        hf5 = self._form_from_cache(home, team_home_history[home], 5)
+        af5 = self._form_from_cache(away, team_away_history[away], 5)
+        hgs_home = hf5["gs_avg"]
+        agc_away = af5["gc_avg"]
+        ags_away = af5["gs_avg"]
+        hgc_home = hf5["gc_avg"]
+        if all(v is not None and not (isinstance(v, float) and np.isnan(v)) for v in [hgs_home, agc_away, ags_away, hgc_home]):
+            features["lambda_home_venue"] = hgs_home * agc_away
+            features["lambda_away_venue"] = ags_away * hgc_home
+        else:
+            features["lambda_home_venue"] = np.nan
+            features["lambda_away_venue"] = np.nan
+
+        # 11. WEIGHTED LAMBDA (exponential decay: recent matches count more)
+        # Weights for last 5 matches: oldest→newest = [0.05, 0.075, 0.125, 0.25, 0.50]
+        WEIGHTS_5 = [0.05, 0.075, 0.125, 0.25, 0.50]
+        wf_home = self._weighted_form_from_cache(home, team_history[home], 5, WEIGHTS_5)
+        wf_away = self._weighted_form_from_cache(away, team_history[away], 5, WEIGHTS_5)
+        hgs5w = wf_home["gs_avg"]
+        hgc5w = wf_home["gc_avg"]
+        ags5w = wf_away["gs_avg"]
+        agc5w = wf_away["gc_avg"]
+        if all(v is not None and not (isinstance(v, float) and np.isnan(v)) for v in [hgs5w, agc5w, ags5w, hgc5w]):
+            features["lambda_home_weighted"] = hgs5w * agc5w
+            features["lambda_away_weighted"] = ags5w * hgc5w
+            features["lambda_ratio_weighted"] = features["lambda_home_weighted"] / max(0.01, features["lambda_away_weighted"])
+        else:
+            features["lambda_home_weighted"] = np.nan
+            features["lambda_away_weighted"] = np.nan
+            features["lambda_ratio_weighted"] = np.nan
+
         # 9. IMPLIED PROBABILITIES
         odds_h = match.get("odds_home")
         odds_d = match.get("odds_draw")
@@ -205,6 +274,66 @@ class FootballFeatureBuilder:
             features["implied_home"] = np.nan
             features["implied_draw"] = np.nan
             features["implied_away"] = np.nan
+
+        # 12. CLV FEATURES (odds movement: closing vs opening)
+        # Positive = bookmaker increased odds = market moved against this outcome
+        # Negative = bookmaker decreased odds = market confirmed this outcome
+        odds_h_close = match.get("odds_home_close")
+        odds_d_close = match.get("odds_draw_close")
+        odds_a_close = match.get("odds_away_close")
+        def _clv(open_o, close_o):
+            if open_o and close_o and open_o > 1 and close_o > 1:
+                return close_o / open_o - 1.0
+            return np.nan
+        features["clv_home"] = _clv(odds_h, odds_h_close)
+        features["clv_draw"] = _clv(odds_d, odds_d_close)
+        features["clv_away"] = _clv(odds_a, odds_a_close)
+
+        # 13. OPPONENT-STRENGTH ADJUSTED GOALS (last 5 matches)
+        # Goals weighted by opponent ELO — scoring vs a strong team is worth more
+        INITIAL_ELO = 1500.0
+        adj_home = self._adj_goals_from_cache(home, team_history[home], 5, INITIAL_ELO)
+        adj_away = self._adj_goals_from_cache(away, team_history[away], 5, INITIAL_ELO)
+        features["home_adj_gs_5"] = adj_home["adj_gs"]
+        features["home_adj_gc_5"] = adj_home["adj_gc"]
+        features["away_adj_gs_5"] = adj_away["adj_gs"]
+        features["away_adj_gc_5"] = adj_away["adj_gc"]
+        # Quality-adjusted lambda (attack strength vs defense quality)
+        adj_h_gs = adj_home["adj_gs"]
+        adj_a_gc = adj_away["adj_gc"]
+        adj_a_gs = adj_away["adj_gs"]
+        adj_h_gc = adj_home["adj_gc"]
+        if all(v is not None and not (isinstance(v, float) and np.isnan(v)) for v in [adj_h_gs, adj_a_gc, adj_a_gs, adj_h_gc]):
+            features["lambda_adj_home"] = adj_h_gs * adj_a_gc
+            features["lambda_adj_away"] = adj_a_gs * adj_h_gc
+        else:
+            features["lambda_adj_home"] = np.nan
+            features["lambda_adj_away"] = np.nan
+
+        # 14. LEAGUE & SEASON CONTEXT
+        ld = league_draws[league_season]
+        features["league_draw_rate"] = ld["draws"] / max(1, ld["total"])
+        n_teams = max(len(standings[league_season]), 10)
+        expected_season_matches = n_teams * (n_teams - 1)
+        features["season_progress"] = league_match_count[league_season] / max(1, expected_season_matches)
+
+        # 15. ELO MOMENTUM (rate of ELO change over last 5 matches)
+        features["home_elo_change_5"] = self._elo_change_from_cache(home, team_history[home], 5)
+        features["away_elo_change_5"] = self._elo_change_from_cache(away, team_history[away], 5)
+
+        # 16. WIN/LOSS STREAK (consecutive wins = positive, losses = negative)
+        features["home_streak"] = self._streak_from_cache(home, team_history[home], 10)
+        features["away_streak"] = self._streak_from_cache(away, team_history[away], 10)
+
+        # 17. CLEAN SHEET RATE (last 5 matches)
+        features["home_clean_sheet_5"] = self._clean_sheet_rate_from_cache(home, team_history[home], 5)
+        features["away_clean_sheet_5"] = self._clean_sheet_rate_from_cache(away, team_history[away], 5)
+
+        # 18. BOOKMAKER VIG (market confidence: higher vig = bookmaker more certain = harder to beat)
+        if odds_h and odds_d and odds_a and odds_h > 1 and odds_d > 1 and odds_a > 1:
+            features["bookmaker_vig"] = (1.0/odds_h + 1.0/odds_d + 1.0/odds_a) - 1.0
+        else:
+            features["bookmaker_vig"] = np.nan
 
         return features
 
@@ -233,6 +362,103 @@ class FootballFeatureBuilder:
             "gc_avg": np.mean(conceded),
             "gd_avg": np.mean([s - c for s, c in zip(scored, conceded)]),
         }
+
+    def _weighted_form_from_cache(self, team: str, history: list[dict], n: int, weights: list[float]) -> dict:
+        """Weighted form stats — recent matches weighted more heavily."""
+        recent = history[-n:] if len(history) >= n else history
+        if not recent:
+            return {"gs_avg": np.nan, "gc_avg": np.nan}
+        w = weights[-len(recent):]
+        total_w = sum(w)
+        if total_w <= 0:
+            return {"gs_avg": np.nan, "gc_avg": np.nan}
+        scored_w = []
+        conceded_w = []
+        for i, m in enumerate(recent):
+            if m["home_team"] == team:
+                scored_w.append(m["fthg"] * w[i])
+                conceded_w.append(m["ftag"] * w[i])
+            else:
+                scored_w.append(m["ftag"] * w[i])
+                conceded_w.append(m["fthg"] * w[i])
+        return {
+            "gs_avg": sum(scored_w) / total_w,
+            "gc_avg": sum(conceded_w) / total_w,
+        }
+
+    def _adj_goals_from_cache(self, team: str, history: list[dict], n: int, initial_elo: float) -> dict:
+        """Goals scored/conceded weighted by opponent ELO strength."""
+        recent = history[-n:] if len(history) >= n else history
+        if not recent:
+            return {"adj_gs": np.nan, "adj_gc": np.nan}
+        scored_vals = []
+        conceded_vals = []
+        for m in recent:
+            if m["home_team"] == team:
+                opp_elo = m.get("opp_elo_for_home", initial_elo)
+                gs = m["fthg"]
+                gc = m["ftag"]
+            else:
+                opp_elo = m.get("opp_elo_for_away", initial_elo)
+                gs = m["ftag"]
+                gc = m["fthg"]
+            strength = opp_elo / initial_elo
+            scored_vals.append(gs * strength)
+            conceded_vals.append(gc * strength)
+        return {
+            "adj_gs": float(np.mean(scored_vals)),
+            "adj_gc": float(np.mean(conceded_vals)),
+        }
+
+    def _elo_change_from_cache(self, team: str, history: list[dict], n: int) -> float:
+        """ELO change over last n matches (current_elo - elo_n_games_ago)."""
+        recent = history[-n:] if len(history) >= n else history
+        if not recent:
+            return np.nan
+        oldest = recent[0]
+        if oldest["home_team"] == team:
+            old_elo = oldest.get("home_elo_at_match", 1500.0)
+        else:
+            old_elo = oldest.get("away_elo_at_match", 1500.0)
+        if old_elo is None:
+            return np.nan
+        return self.elo.get_rating(team) - old_elo
+
+    def _streak_from_cache(self, team: str, history: list[dict], n: int) -> int:
+        """Consecutive win (+) or loss (-) streak. 0 if latest result is draw."""
+        recent = history[-n:] if len(history) >= n else history
+        if not recent:
+            return 0
+        streak = 0
+        expected = None  # "W" or "L"
+        for m in reversed(recent):
+            won = (m["ftr"] == "H") if m["home_team"] == team else (m["ftr"] == "A")
+            lost = (m["ftr"] == "A") if m["home_team"] == team else (m["ftr"] == "H")
+            if expected is None:
+                if won:
+                    streak = 1; expected = "W"
+                elif lost:
+                    streak = -1; expected = "L"
+                else:
+                    break  # draw as latest result → streak = 0
+            elif expected == "W" and won:
+                streak += 1
+            elif expected == "L" and lost:
+                streak -= 1
+            else:
+                break
+        return streak
+
+    def _clean_sheet_rate_from_cache(self, team: str, history: list[dict], n: int) -> float:
+        """Proportion of last n matches where team conceded 0 goals."""
+        recent = history[-n:] if len(history) >= n else history
+        if not recent:
+            return np.nan
+        clean = sum(
+            1 for m in recent
+            if (m["ftag"] == 0 if m["home_team"] == team else m["fthg"] == 0)
+        )
+        return clean / len(recent)
 
     def _avg_stat_cache(self, team: str, history: list[dict], n: int, stat: str) -> float | None:
         """Average stat from cache."""
@@ -342,8 +568,11 @@ FEATURE_COLUMNS = [
     "home_form_3", "away_form_3",
     "home_form_5", "away_form_5",
     "home_form_10", "away_form_10",
+    # Goals scored/conceded (individual, not just diff)
     "home_goals_scored_3", "home_goals_conceded_3",
     "away_goals_scored_3", "away_goals_conceded_3",
+    "home_goals_scored_5", "home_goals_conceded_5",
+    "away_goals_scored_5", "away_goals_conceded_5",
     "home_goal_diff_3", "away_goal_diff_3",
     "home_goal_diff_5", "away_goal_diff_5",
     "home_home_form_5", "away_away_form_5",
@@ -354,5 +583,26 @@ FEATURE_COLUMNS = [
     "home_rest_days", "away_rest_days", "rest_diff",
     "home_position", "away_position", "position_diff",
     "home_xg_avg_5", "away_xg_avg_5", "home_xg_diff_5",
+    # Poisson λ features (attack × defense matchup)
+    "lambda_home_5", "lambda_away_5", "lambda_ratio_5",
+    "lambda_home_venue", "lambda_away_venue",
+    # Weighted λ (exponential decay — recent matches count more)
+    "lambda_home_weighted", "lambda_away_weighted", "lambda_ratio_weighted",
     "implied_home", "implied_draw", "implied_away",
+    # CLV features (odds movement: closing/opening - 1)
+    "clv_home", "clv_draw", "clv_away",
+    # Opponent-strength adjusted goals (ELO-weighted, last 5)
+    "home_adj_gs_5", "home_adj_gc_5",
+    "away_adj_gs_5", "away_adj_gc_5",
+    "lambda_adj_home", "lambda_adj_away",
+    # League & season context
+    "league_draw_rate", "season_progress",
+    # ELO momentum (trajectory over last 5 matches)
+    "home_elo_change_5", "away_elo_change_5",
+    # Win/loss streak (consecutive wins = +, losses = -)
+    "home_streak", "away_streak",
+    # Clean sheet rate (proportion of last 5 matches with 0 goals conceded)
+    "home_clean_sheet_5", "away_clean_sheet_5",
+    # Bookmaker vig (market overround: higher = bookmaker more confident)
+    "bookmaker_vig",
 ]

@@ -10,10 +10,11 @@ from src.api.schemas import (
     BetResponse,
     PortfolioStatsResponse,
 )
+from src.api.deps import require_tier
 from src.database import get_db
 from src.models.bet import Bet
 
-router = APIRouter(tags=["portfolio"])
+router = APIRouter(tags=["portfolio"], dependencies=[Depends(require_tier("pro"))])
 
 
 @router.get("/portfolio/bets", response_model=list[BetResponse])

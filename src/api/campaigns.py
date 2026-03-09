@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from src.api.schemas import (
     BankrollPointResponse,
     BetResponse,
+    BetUpdateRequest,
     CampaignAcceptRequest,
     CampaignCreateRequest,
     CampaignDetailResponse,
@@ -17,11 +18,12 @@ from src.api.schemas import (
     CampaignStatsResponse,
     CampaignUpdateRequest,
 )
+from src.api.deps import require_tier
 from src.database import get_db
 from src.models.bet import Bet
 from src.models.campaign import Campaign
 
-router = APIRouter(tags=["campaigns"])
+router = APIRouter(tags=["campaigns"], dependencies=[Depends(require_tier("premium"))])
 
 
 # ---------------------------------------------------------------------------
@@ -254,39 +256,64 @@ def get_campaign_recommendations(
     recommendations: list[CampaignRecommendation] = []
 
     for m in filtered_matches:
-        # Find best value outcome
-        best_o = None
-        best_edge = 0.0
-        for o in m.outcomes.values():
-            if not o.is_value:
-                continue
-            if allowed and o.outcome not in allowed:
-                continue
-            if campaign.min_odds and o.best_odds < campaign.min_odds:
-                continue
-            if campaign.max_odds and o.best_odds > campaign.max_odds:
-                continue
-            if campaign.min_model_prob and o.model_prob < campaign.min_model_prob:
-                continue
-            if o.edge > best_edge:
-                best_edge = o.edge
-                best_o = o
+        # Find best value outcome from AIScanMatch fields
+        edges = m.edges or {}
+        odds_1x2 = m.odds.get("1x2", {}) if isinstance(m.odds, dict) else {}
+        prob_map = {"H": m.model_prob_home, "D": m.model_prob_draw, "A": m.model_prob_away}
 
-        if best_o is None:
+        best_outcome = None
+        best_edge = 0.0
+        best_odds_val = 0.0
+        best_prob = 0.0
+        best_bookmaker = ""
+
+        for key in (allowed or ["H", "D", "A"]):
+            edge = edges.get(key, 0)
+            if edge <= 0:
+                continue
+            prob = prob_map.get(key, 0) or 0
+            if campaign.min_model_prob and prob < campaign.min_model_prob:
+                continue
+            bk_odds = odds_1x2.get(key, {})
+            if not isinstance(bk_odds, dict):
+                continue
+            # Find best bookmaker odds
+            best_bk = ""
+            best_o_val = 0.0
+            for bk, val in bk_odds.items():
+                fval = float(val) if val else 0
+                if fval > best_o_val:
+                    best_o_val = fval
+                    best_bk = bk
+            if best_o_val <= 1:
+                continue
+            if campaign.min_odds and best_o_val < campaign.min_odds:
+                continue
+            if campaign.max_odds and best_o_val > campaign.max_odds:
+                continue
+            if edge > best_edge:
+                best_edge = edge
+                best_outcome = key
+                best_odds_val = best_o_val
+                best_prob = prob
+                best_bookmaker = best_bk
+
+        if best_outcome is None:
             continue
 
+        implied = round(1 / best_odds_val, 4) if best_odds_val > 0 else 0
         recommendations.append(
             CampaignRecommendation(
-                home_team=m.home_team,
-                away_team=m.away_team,
+                home_team=m.home_team or "",
+                away_team=m.away_team or "",
                 league=m.league,
                 date=m.date,
-                outcome=best_o.outcome,
-                model_prob=best_o.model_prob,
-                implied_prob=best_o.implied_prob,
-                edge=best_o.edge,
-                best_odds=best_o.best_odds,
-                bookmaker=best_o.best_bookmaker,
+                outcome=best_outcome,
+                model_prob=best_prob,
+                implied_prob=implied,
+                edge=best_edge,
+                best_odds=best_odds_val,
+                bookmaker=best_bookmaker,
                 suggested_stake=suggested_stake,
             )
         )
@@ -331,6 +358,73 @@ def accept_recommendation(
     db.commit()
     db.refresh(bet)
     return _bet_to_response(bet)
+
+
+@router.get("/campaigns/{campaign_id}/bets", response_model=list[BetResponse])
+def list_campaign_bets(campaign_id: int, db: Session = Depends(get_db)):
+    """List all bets for a campaign: pending first, then settled (newest first)."""
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    bets = (
+        db.query(Bet)
+        .filter(Bet.campaign_id == campaign_id, Bet.is_backtest == False)
+        .order_by(Bet.match_date.desc())
+        .all()
+    )
+    # pending first
+    bets.sort(key=lambda b: (0 if b.result == "pending" else 1, b.match_date))
+    return [_bet_to_response(b) for b in bets]
+
+
+@router.patch("/campaigns/{campaign_id}/bets/{bet_id}", response_model=BetResponse)
+def update_bet_result(
+    campaign_id: int,
+    bet_id: int,
+    request: BetUpdateRequest,
+    db: Session = Depends(get_db),
+):
+    """Update the result of a bet and recompute profit/loss."""
+    bet = (
+        db.query(Bet)
+        .filter(Bet.id == bet_id, Bet.campaign_id == campaign_id, Bet.is_backtest == False)
+        .first()
+    )
+    if not bet:
+        raise HTTPException(status_code=404, detail="Bet not found")
+
+    valid = {"won", "lost", "void", "pending"}
+    if request.result not in valid:
+        raise HTTPException(status_code=400, detail=f"result must be one of {valid}")
+
+    bet.result = request.result
+    if request.result == "won":
+        bet.profit_loss = round(bet.stake * (bet.odds_at_bet - 1), 2)
+    elif request.result == "lost":
+        bet.profit_loss = round(-bet.stake, 2)
+    elif request.result == "void":
+        bet.profit_loss = 0.0
+    else:  # pending
+        bet.profit_loss = None
+
+    db.commit()
+    db.refresh(bet)
+    return _bet_to_response(bet)
+
+
+@router.delete("/campaigns/{campaign_id}/bets/{bet_id}", status_code=204)
+def delete_bet(campaign_id: int, bet_id: int, db: Session = Depends(get_db)):
+    """Delete a bet from a campaign."""
+    bet = (
+        db.query(Bet)
+        .filter(Bet.id == bet_id, Bet.campaign_id == campaign_id, Bet.is_backtest == False)
+        .first()
+    )
+    if not bet:
+        raise HTTPException(status_code=404, detail="Bet not found")
+    db.delete(bet)
+    db.commit()
 
 
 @router.get("/campaigns/{campaign_id}/history", response_model=list[BankrollPointResponse])

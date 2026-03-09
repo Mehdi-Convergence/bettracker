@@ -57,24 +57,10 @@ def train(
 def scan(
     sport: str = typer.Option("football", help="Sport to scan for value bets"),
 ):
-    """Scan upcoming matches for value bets using trained model + live odds."""
-    from pathlib import Path
-
-    model_path = Path("models/football")
-    if not (model_path / "model.joblib").exists():
-        console.print("[red]No trained model found. Run 'train' first.[/red]")
-        raise typer.Exit(1)
-
-    from src.services.scanner import Scanner, print_scan_results
-
-    scanner = Scanner(model_path=model_path)
-    value_bets = scanner.scan()
-    print_scan_results(value_bets)
-
-    if value_bets:
-        console.print(f"\n[bold green]{len(value_bets)} value bet(s) detected![/bold green]")
-    else:
-        console.print("\n[dim]No value bets at the moment. Check back later.[/dim]")
+    """Scan upcoming matches for value bets. Use the web UI or API instead."""
+    console.print("[yellow]CLI scan is deprecated. Use the API endpoint instead:[/yellow]")
+    console.print("  curl http://localhost:8000/api/scanner/ai-scan?sport=football")
+    console.print("  curl http://localhost:8000/api/scanner/ai-scan?sport=tennis")
 
 
 @app.command()
@@ -88,7 +74,7 @@ def dbinfo():
     db = SessionLocal()
 
     total = db.query(FootballMatch).count()
-    console.print(f"\n[bold]Database Statistics[/bold]")
+    console.print("\n[bold]Database Statistics[/bold]")
     console.print(f"Total football matches: [green]{total}[/green]")
 
     if total > 0:
@@ -117,7 +103,7 @@ def dbinfo():
             .filter(FootballMatch.odds_home_close.isnot(None))
             .count()
         )
-        console.print(f"\n[bold]Odds coverage:[/bold]")
+        console.print("\n[bold]Odds coverage:[/bold]")
         console.print(f"  With opening odds: {with_odds}/{total} ({with_odds/total*100:.1f}%)")
         console.print(f"  With closing odds: {with_close}/{total} ({with_close/total*100:.1f}%)")
 

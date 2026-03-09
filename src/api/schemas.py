@@ -1,8 +1,71 @@
 """Pydantic schemas for API request/response models."""
 
-from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
+
+
+# --- Auth schemas ---
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    display_name: str = Field(min_length=1, max_length=100)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    display_name: str
+    tier: str
+    is_active: bool
+    trial_ends_at: str | None = None
+    created_at: str
+
+
+class UpdateProfileRequest(BaseModel):
+    display_name: str | None = Field(default=None, min_length=1, max_length=100)
+    email: EmailStr | None = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
+class UserStatsResponse(BaseModel):
+    total_bets: int
+    roi_pct: float
+    member_since: str
+    is_active: bool
 
 
 # --- Match schemas ---
@@ -195,212 +258,6 @@ class BankrollPointResponse(BaseModel):
     bankroll: float
 
 
-# --- Scanner schemas ---
-
-
-class ScanRequest(BaseModel):
-    min_prob: float | None = None
-    max_odds: float | None = None
-    min_odds: float | None = None
-    min_edge: float | None = None
-    outcomes: list[str] | None = None
-    leagues: list[str] | None = None
-
-
-class ValueBetResponse(BaseModel):
-    home_team: str
-    away_team: str
-    league: str
-    date: str
-    outcome: str
-    model_prob: float
-    implied_prob: float
-    edge: float
-    best_odds: float
-    bookmaker: str
-
-
-class OutcomeDetail(BaseModel):
-    outcome: str
-    best_odds: float
-    best_bookmaker: str
-    all_odds: dict[str, float]  # bookmaker → odds (toutes les cotes dispo)
-    model_prob: float
-    implied_prob: float
-    edge: float
-    is_value: bool
-
-
-class MatchCardResponse(BaseModel):
-    home_team: str
-    away_team: str
-    league: str
-    date: str
-    outcomes: dict[str, OutcomeDetail]
-    best_value_outcome: str | None
-    best_edge: float
-
-
-class ScanResponse(BaseModel):
-    matches: list[MatchCardResponse]
-    value_bets: list[ValueBetResponse]
-    total_matches_scanned: int
-    api_quota_remaining: int | None
-    cached: bool = False
-    cached_at: str | None = None
-
-
-# --- Multi-Market schemas (Betclic) ---
-
-
-class MarketSelection(BaseModel):
-    name: str
-    odds: float
-    bookmaker: str = "betclic"
-    all_odds: dict[str, float] = {}
-    model_prob: float | None = None
-    implied_prob: float = 0.0
-    edge: float | None = None
-
-
-class MarketData(BaseModel):
-    market_type: str
-    market_name: str
-    selections: list[MarketSelection]
-
-
-class MatchWithMarkets(BaseModel):
-    home_team: str
-    away_team: str
-    league: str
-    league_name: str = ""
-    date: str
-    is_live: bool = False
-    score: dict | None = None
-    timer: str = ""
-    url: str = ""
-    markets: list[MarketData]
-    outcomes: dict[str, OutcomeDetail] = {}
-    best_value_outcome: str | None = None
-    best_edge: float = 0.0
-
-
-class MultiMarketScanResponse(BaseModel):
-    matches: list[MatchWithMarkets]
-    total_matches_scanned: int
-    source: str = "betclic"
-    cached: bool = False
-    cached_at: str | None = None
-    api_quota_remaining: int | None = None
-
-
-# --- Match Detail schemas ---
-
-
-class TeamFormEntry(BaseModel):
-    date: str
-    opponent: str
-    venue: str  # "home" or "away"
-    goals_for: int
-    goals_against: int
-    result: str  # "W", "D", "L"
-    league: str
-
-
-class TeamFormStats(BaseModel):
-    team_name: str
-    elo_rating: float
-    league_position: int
-    recent_matches: list[TeamFormEntry]
-    ppg_5: float
-    ppg_10: float
-    goals_scored_avg_5: float
-    goals_conceded_avg_5: float
-    goal_diff_avg_5: float
-    home_or_away_form_5: float
-    current_streak: str
-    win_streak: int
-    unbeaten_run: int
-    clean_sheets_5: int
-    failed_to_score_5: int
-    shots_avg_5: float | None = None
-    shots_on_target_avg_5: float | None = None
-    shot_accuracy_5: float | None = None
-    rest_days: float | None = None
-
-
-class H2HMatch(BaseModel):
-    date: str
-    home_team: str
-    away_team: str
-    fthg: int
-    ftag: int
-    ftr: str
-    league: str
-    season: str
-
-
-class H2HStats(BaseModel):
-    total_meetings: int
-    home_team_wins: int
-    draws: int
-    away_team_wins: int
-    avg_goals: float
-    home_win_rate: float
-    draw_rate: float
-    recent_matches: list[H2HMatch]
-
-
-class KeyFeature(BaseModel):
-    name: str
-    value: float
-    description: str
-    direction: str  # "positive" (favors home), "negative" (favors away), "neutral"
-
-
-class ModelAnalysis(BaseModel):
-    prob_home: float
-    prob_draw: float
-    prob_away: float
-    predicted_outcome: str
-    confidence: float
-    key_features: list[KeyFeature]
-    edge_home: float | None = None
-    edge_draw: float | None = None
-    edge_away: float | None = None
-
-
-class HistoricalAverages(BaseModel):
-    home_shots_avg: float | None = None
-    home_shots_target_avg: float | None = None
-    home_corners_avg: float | None = None
-    home_fouls_avg: float | None = None
-    home_yellow_avg: float | None = None
-    away_shots_avg: float | None = None
-    away_shots_target_avg: float | None = None
-    away_corners_avg: float | None = None
-    away_fouls_avg: float | None = None
-    away_yellow_avg: float | None = None
-
-
-class MatchDetailResponse(BaseModel):
-    home_team: str
-    away_team: str
-    league: str
-    league_name: str
-    date: str
-    home_form: TeamFormStats
-    away_form: TeamFormStats
-    h2h: H2HStats
-    model: ModelAnalysis
-    historical: HistoricalAverages
-
-
-class MatchDetailRequest(BaseModel):
-    home_team: str
-    away_team: str
-    league: str
-    date: str
 
 
 # --- Campaign schemas ---
@@ -498,6 +355,10 @@ class CampaignRecommendationsResponse(BaseModel):
     total_scanned: int
 
 
+class BetUpdateRequest(BaseModel):
+    result: str  # "won", "lost", "void", "pending"
+
+
 class CampaignAcceptRequest(BaseModel):
     home_team: str
     away_team: str
@@ -508,38 +369,7 @@ class CampaignAcceptRequest(BaseModel):
     stake: float = Field(gt=0)
 
 
-# --- Player data schemas (scraped from Transfermarkt) ---
-
-
-class PlayerInjury(BaseModel):
-    player: str
-    position: str
-    injury: str
-    since: str
-    expected_return: str
-
-
-class PlayerSeasonStat(BaseModel):
-    player: str
-    position: str
-    appearances: int
-    goals: int
-    assists: int
-    minutes: int
-    yellow_cards: int
-    red_cards: int
-
-
-class TeamPlayersResponse(BaseModel):
-    team_name: str
-    injuries: list[PlayerInjury]
-    players: list[PlayerSeasonStat]
-    scraped_at: str | None = None
-    available: bool = True
-    error: str | None = None
-
-
-# --- AI Research schemas (Claude Code powered) ---
+# --- AI Scanner schemas ---
 
 
 class AIScanMatch(BaseModel):

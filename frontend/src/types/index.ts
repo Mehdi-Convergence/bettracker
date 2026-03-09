@@ -1,3 +1,10 @@
+export interface UserStats {
+  total_bets: number;
+  roi_pct: number;
+  member_since: string;
+  is_active: boolean;
+}
+
 export interface ValueBet {
   home_team: string;
   away_team: string;
@@ -9,36 +16,6 @@ export interface ValueBet {
   edge: number;
   best_odds: number;
   bookmaker: string;
-}
-
-export interface OutcomeDetail {
-  outcome: string;
-  best_odds: number;
-  best_bookmaker: string;
-  all_odds: Record<string, number>;
-  model_prob: number;
-  implied_prob: number;
-  edge: number;
-  is_value: boolean;
-}
-
-export interface MatchCard {
-  home_team: string;
-  away_team: string;
-  league: string;
-  date: string;
-  outcomes: Record<string, OutcomeDetail>;
-  best_value_outcome: string | null;
-  best_edge: number;
-}
-
-export interface ScanResponse {
-  matches: MatchCard[];
-  value_bets: ValueBet[];
-  total_matches_scanned: number;
-  api_quota_remaining: number | null;
-  cached: boolean;
-  cached_at: string | null;
 }
 
 export interface ComboLeg {
@@ -138,202 +115,46 @@ export interface LeagueInfo {
 }
 
 export const LEAGUE_INFO: Record<string, LeagueInfo> = {
-  E0:  { name: "Premier League",   country: "Angleterre", flag: "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F", division: 1 },
-  F1:  { name: "Ligue 1",          country: "France",     flag: "\uD83C\uDDEB\uD83C\uDDF7", division: 1 },
-  I1:  { name: "Serie A",          country: "Italie",     flag: "\uD83C\uDDEE\uD83C\uDDF9", division: 1 },
-  D1:  { name: "Bundesliga",       country: "Allemagne",  flag: "\uD83C\uDDE9\uD83C\uDDEA", division: 1 },
-  SP1: { name: "La Liga",          country: "Espagne",    flag: "\uD83C\uDDEA\uD83C\uDDF8", division: 1 },
-  N1:  { name: "Eredivisie",       country: "Pays-Bas",   flag: "\uD83C\uDDF3\uD83C\uDDF1", division: 1 },
-  E1:  { name: "Championship",     country: "Angleterre", flag: "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F", division: 2 },
-  D2:  { name: "2. Bundesliga",    country: "Allemagne",  flag: "\uD83C\uDDE9\uD83C\uDDEA", division: 2 },
-  I2:  { name: "Serie B",          country: "Italie",     flag: "\uD83C\uDDEE\uD83C\uDDF9", division: 2 },
-  SP2: { name: "Segunda Div",      country: "Espagne",    flag: "\uD83C\uDDEA\uD83C\uDDF8", division: 2 },
-  F2:  { name: "Ligue 2",          country: "France",     flag: "\uD83C\uDDEB\uD83C\uDDF7", division: 2 },
-  P1:  { name: "Liga Portugal",    country: "Portugal",   flag: "\uD83C\uDDF5\uD83C\uDDF9", division: 1 },
-  B1:  { name: "Jupiler League",   country: "Belgique",   flag: "\uD83C\uDDE7\uD83C\uDDEA", division: 1 },
-  T1:  { name: "Super Lig",        country: "Turquie",    flag: "\uD83C\uDDF9\uD83C\uDDF7", division: 1 },
-  G1:  { name: "Super League",     country: "Grece",      flag: "\uD83C\uDDEC\uD83C\uDDF7", division: 1 },
-  SC0: { name: "Scottish Prem",    country: "Ecosse",     flag: "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F", division: 1 },
+  // --- Ligues ---
+  E0:  { name: "Premier League",        country: "Angleterre", flag: "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F", division: 1 },
+  F1:  { name: "Ligue 1",               country: "France",     flag: "\uD83C\uDDEB\uD83C\uDDF7", division: 1 },
+  I1:  { name: "Serie A",               country: "Italie",     flag: "\uD83C\uDDEE\uD83C\uDDF9", division: 1 },
+  D1:  { name: "Bundesliga",            country: "Allemagne",  flag: "\uD83C\uDDE9\uD83C\uDDEA", division: 1 },
+  SP1: { name: "La Liga",               country: "Espagne",    flag: "\uD83C\uDDEA\uD83C\uDDF8", division: 1 },
+  N1:  { name: "Eredivisie",            country: "Pays-Bas",   flag: "\uD83C\uDDF3\uD83C\uDDF1", division: 1 },
+  E1:  { name: "Championship",          country: "Angleterre", flag: "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F", division: 2 },
+  D2:  { name: "2. Bundesliga",         country: "Allemagne",  flag: "\uD83C\uDDE9\uD83C\uDDEA", division: 2 },
+  I2:  { name: "Serie B",               country: "Italie",     flag: "\uD83C\uDDEE\uD83C\uDDF9", division: 2 },
+  SP2: { name: "Segunda Divisi\u00f3n", country: "Espagne",    flag: "\uD83C\uDDEA\uD83C\uDDF8", division: 2 },
+  F2:  { name: "Ligue 2",               country: "France",     flag: "\uD83C\uDDEB\uD83C\uDDF7", division: 2 },
+  P1:  { name: "Primeira Liga",         country: "Portugal",   flag: "\uD83C\uDDF5\uD83C\uDDF9", division: 1 },
+  B1:  { name: "Jupiler Pro League",    country: "Belgique",   flag: "\uD83C\uDDE7\uD83C\uDDEA", division: 1 },
+  T1:  { name: "S\u00fcper Lig",        country: "Turquie",    flag: "\uD83C\uDDF9\uD83C\uDDF7", division: 1 },
+  G1:  { name: "Super League 1",        country: "Grece",      flag: "\uD83C\uDDEC\uD83C\uDDF7", division: 1 },
+  SC0: { name: "Premiership",           country: "Ecosse",     flag: "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F", division: 1 },
+  // --- Coupes domestiques (division 0) ---
+  EFA:   { name: "FA Cup",              country: "Angleterre", flag: "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F", division: 0 },
+  EFLC:  { name: "EFL Cup",             country: "Angleterre", flag: "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F", division: 0 },
+  FCF:   { name: "Coupe de France",     country: "France",     flag: "\uD83C\uDDEB\uD83C\uDDF7", division: 0 },
+  DDFB:  { name: "DFB Pokal",           country: "Allemagne",  flag: "\uD83C\uDDE9\uD83C\uDDEA", division: 0 },
+  SPDR:  { name: "Copa del Rey",        country: "Espagne",    flag: "\uD83C\uDDEA\uD83C\uDDF8", division: 0 },
+  ICI:   { name: "Coppa Italia",        country: "Italie",     flag: "\uD83C\uDDEE\uD83C\uDDF9", division: 0 },
+  NKNVB: { name: "KNVB Cup",            country: "Pays-Bas",   flag: "\uD83C\uDDF3\uD83C\uDDF1", division: 0 },
+  PTP:   { name: "Taca de Portugal",    country: "Portugal",   flag: "\uD83C\uDDF5\uD83C\uDDF9", division: 0 },
+  BCB:   { name: "Belgian Cup",         country: "Belgique",   flag: "\uD83C\uDDE7\uD83C\uDDEA", division: 0 },
+  TTC:   { name: "Turkish Cup",         country: "Turquie",    flag: "\uD83C\uDDF9\uD83C\uDDF7", division: 0 },
+  GGC:   { name: "Greek Cup",           country: "Grece",      flag: "\uD83C\uDDEC\uD83C\uDDF7", division: 0 },
+  SCFA:  { name: "Scottish Cup",        country: "Ecosse",     flag: "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F", division: 0 },
+  // --- Coupes europeennes (division -1) ---
+  UCL:   { name: "UEFA Champions League",          country: "Europe", flag: "\uD83C\uDDEA\uD83C\uDDFA", division: -1 },
+  UEL:   { name: "UEFA Europa League",             country: "Europe", flag: "\uD83C\uDDEA\uD83C\uDDFA", division: -1 },
+  UECL:  { name: "UEFA Europa Conference League",  country: "Europe", flag: "\uD83C\uDDEA\uD83C\uDDFA", division: -1 },
 };
 
 // Backwards-compatible simple map
 export const LEAGUES: Record<string, string> = Object.fromEntries(
   Object.entries(LEAGUE_INFO).map(([k, v]) => [k, v.name])
 );
-
-// --- Match Detail types ---
-
-export interface TeamFormEntry {
-  date: string;
-  opponent: string;
-  venue: "home" | "away";
-  goals_for: number;
-  goals_against: number;
-  result: "W" | "D" | "L";
-  league: string;
-}
-
-export interface TeamFormStats {
-  team_name: string;
-  elo_rating: number;
-  league_position: number;
-  recent_matches: TeamFormEntry[];
-  ppg_5: number;
-  ppg_10: number;
-  goals_scored_avg_5: number;
-  goals_conceded_avg_5: number;
-  goal_diff_avg_5: number;
-  home_or_away_form_5: number;
-  current_streak: string;
-  win_streak: number;
-  unbeaten_run: number;
-  clean_sheets_5: number;
-  failed_to_score_5: number;
-  shots_avg_5: number | null;
-  shots_on_target_avg_5: number | null;
-  shot_accuracy_5: number | null;
-  rest_days: number | null;
-}
-
-export interface H2HMatch {
-  date: string;
-  home_team: string;
-  away_team: string;
-  fthg: number;
-  ftag: number;
-  ftr: string;
-  league: string;
-  season: string;
-}
-
-export interface H2HStats {
-  total_meetings: number;
-  home_team_wins: number;
-  draws: number;
-  away_team_wins: number;
-  avg_goals: number;
-  home_win_rate: number;
-  draw_rate: number;
-  recent_matches: H2HMatch[];
-}
-
-export interface KeyFeature {
-  name: string;
-  value: number;
-  description: string;
-  direction: "positive" | "negative" | "neutral";
-}
-
-export interface ModelAnalysis {
-  prob_home: number;
-  prob_draw: number;
-  prob_away: number;
-  predicted_outcome: string;
-  confidence: number;
-  key_features: KeyFeature[];
-  edge_home: number | null;
-  edge_draw: number | null;
-  edge_away: number | null;
-}
-
-export interface HistoricalAverages {
-  home_shots_avg: number | null;
-  home_shots_target_avg: number | null;
-  home_corners_avg: number | null;
-  home_fouls_avg: number | null;
-  home_yellow_avg: number | null;
-  away_shots_avg: number | null;
-  away_shots_target_avg: number | null;
-  away_corners_avg: number | null;
-  away_fouls_avg: number | null;
-  away_yellow_avg: number | null;
-}
-
-export interface MatchDetail {
-  home_team: string;
-  away_team: string;
-  league: string;
-  league_name: string;
-  date: string;
-  home_form: TeamFormStats;
-  away_form: TeamFormStats;
-  h2h: H2HStats;
-  model: ModelAnalysis;
-  historical: HistoricalAverages;
-}
-
-// --- Player data types (scraped from Transfermarkt) ---
-
-export interface PlayerInjury {
-  player: string;
-  position: string;
-  injury: string;
-  since: string;
-  expected_return: string;
-}
-
-export interface PlayerSeasonStat {
-  player: string;
-  position: string;
-  appearances: number;
-  goals: number;
-  assists: number;
-  minutes: number;
-  yellow_cards: number;
-  red_cards: number;
-}
-
-export interface TeamPlayersResponse {
-  team_name: string;
-  injuries: PlayerInjury[];
-  players: PlayerSeasonStat[];
-  scraped_at: string | null;
-  available: boolean;
-  error: string | null;
-}
-
-// --- Multi-Market types (Betclic) ---
-
-export interface MarketSelection {
-  name: string;
-  odds: number;
-  bookmaker: string;
-  all_odds: Record<string, number>;
-  model_prob: number | null;
-  implied_prob: number;
-  edge: number | null;
-}
-
-export interface MarketData {
-  market_type: string;
-  market_name: string;
-  selections: MarketSelection[];
-}
-
-export interface MatchWithMarkets {
-  home_team: string;
-  away_team: string;
-  league: string;
-  league_name: string;
-  date: string;
-  is_live: boolean;
-  score: { home: number; away: number } | null;
-  timer: string;
-  url: string;
-  markets: MarketData[];
-  outcomes: Record<string, OutcomeDetail>;
-  best_value_outcome: string | null;
-  best_edge: number;
-}
-
-export interface MultiMarketScanResponse {
-  matches: MatchWithMarkets[];
-  total_matches_scanned: number;
-  source: string;
-  cached: boolean;
-  cached_at: string | null;
-  api_quota_remaining: number | null;
-}
 
 // --- Ticket Builder types ---
 

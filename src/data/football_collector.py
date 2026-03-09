@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pandas as pd
 from rich.console import Console
-from rich.progress import track
 from sqlalchemy.orm import Session
 
 from src.data.cleaner import DataCleaner

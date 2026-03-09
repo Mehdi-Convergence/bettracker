@@ -1,733 +1,44 @@
 """Scanner API endpoints for value bet detection."""
 
-import random
-import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Query
 
 from src.api.schemas import (
     AIResearchResponse,
     AIScanMatch,
     AIScanResponse,
-    MarketData,
-    MarketSelection,
-    MatchCardResponse,
-    MatchDetailRequest,
-    MatchDetailResponse,
-    MatchWithMarkets,
-    MultiMarketScanResponse,
-    OutcomeDetail,
-    ScanResponse,
-    TeamPlayersResponse,
-    ValueBetResponse,
 )
-from src.database import get_db
 
 router = APIRouter(tags=["scanner"])
 
-# --- Scan cache (in-memory, TTL 15 min) ---
-CACHE_TTL_SECONDS = 900
-_scan_cache: dict = {
-    "results": None,
-    "value_bets": None,
-    "timestamp": None,
-    "total": 0,
-    "quota": None,
-}
-
-DEMO_BOOKMAKERS = ["bet365", "Pinnacle", "Unibet", "Betfair", "Winamax", "Betclic"]
-
-DEMO_MATCHES = [
-    ("E0", "Arsenal", "Chelsea"),
-    ("E0", "Liverpool", "Man City"),
-    ("E0", "Tottenham", "Aston Villa"),
-    ("E0", "Newcastle", "Brighton"),
-    ("E0", "Man United", "West Ham"),
-    ("F1", "PSG", "Marseille"),
-    ("F1", "Lyon", "Monaco"),
-    ("F1", "Lille", "Lens"),
-    ("F1", "Nice", "Rennes"),
-    ("I1", "Inter", "AC Milan"),
-    ("I1", "Juventus", "Napoli"),
-    ("I1", "Roma", "Lazio"),
-    ("I1", "Atalanta", "Fiorentina"),
-    ("D1", "Bayern Munich", "Dortmund"),
-    ("D1", "Leverkusen", "RB Leipzig"),
-    ("D1", "Stuttgart", "Frankfurt"),
-    ("SP1", "Real Madrid", "Barcelona"),
-    ("SP1", "Atletico Madrid", "Sevilla"),
-    ("SP1", "Real Sociedad", "Villarreal"),
-    ("N1", "PSV", "Ajax"),
-    ("N1", "Feyenoord", "AZ Alkmaar"),
-    ("P1", "Benfica", "Porto"),
-    ("P1", "Sporting CP", "Braga"),
-    ("B1", "Club Brugge", "Anderlecht"),
-    ("T1", "Galatasaray", "Fenerbahce"),
-    ("SC0", "Celtic", "Rangers"),
-    ("E1", "Leeds", "Sheffield Utd"),
-    ("E1", "Burnley", "Sunderland"),
-    ("D2", "Hamburg", "Koln"),
-    ("F2", "Saint-Etienne", "Metz"),
-    ("I2", "Palermo", "Sampdoria"),
-    ("SP2", "Zaragoza", "Racing Santander"),
-    ("G1", "Olympiacos", "Panathinaikos"),
-]
+# --- V6 model lazy loader ---
+_V6_MODEL = None
+_V6_MODEL_LOADED = False
 
 
-def _generate_demo_matches() -> list[MatchCardResponse]:
-    """Generate demo match cards with all 3 outcomes and multiple bookmaker odds."""
-    rng = random.Random(42)
-    result: list[MatchCardResponse] = []
-    today = datetime.now()
-
-    for league, home, away in DEMO_MATCHES:
-        hour = rng.choice([13, 14, 15, 16, 17, 18, 19, 20, 21])
-        minute = rng.choice([0, 0, 15, 30, 45])
-        match_dt = (today + timedelta(days=rng.randint(0, 10))).replace(
-            hour=hour, minute=minute, second=0
-        )
-        match_date = match_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-        # Generate 3 model probs that sum to ~1
-        raw = [rng.uniform(0.20, 0.60) for _ in range(3)]
-        total = sum(raw)
-        probs = [p / total for p in raw]
-
-        outcomes: dict[str, OutcomeDetail] = {}
-        best_value_outcome = None
-        best_edge = 0.0
-
-        for i, outcome_key in enumerate(["H", "D", "A"]):
-            model_prob = round(probs[i], 4)
-
-            # Generate odds for 3-5 bookmakers
-            n_bk = rng.randint(3, 5)
-            selected_bk = rng.sample(DEMO_BOOKMAKERS, n_bk)
-            base_implied = rng.uniform(max(0.10, model_prob - 0.12), model_prob + 0.05)
-            base_implied = max(0.05, min(0.90, base_implied))
-            all_odds: dict[str, float] = {}
-            for bk in selected_bk:
-                noise = rng.uniform(-0.03, 0.03)
-                ip = max(0.05, base_implied + noise)
-                all_odds[bk] = round(1.0 / ip, 2)
-
-            # Best odds across bookmakers
-            best_bk = max(all_odds, key=lambda k: all_odds[k])
-            bo = all_odds[best_bk]
-            implied_prob = round(1.0 / bo, 4)
-            edge = round(model_prob - implied_prob, 4)
-            is_value = edge > 0.02
-
-            outcomes[outcome_key] = OutcomeDetail(
-                outcome=outcome_key,
-                best_odds=bo,
-                best_bookmaker=best_bk,
-                all_odds=all_odds,
-                model_prob=model_prob,
-                implied_prob=implied_prob,
-                edge=edge,
-                is_value=is_value,
-            )
-
-            if is_value and edge > best_edge:
-                best_edge = edge
-                best_value_outcome = outcome_key
-
-        result.append(
-            MatchCardResponse(
-                home_team=home,
-                away_team=away,
-                league=league,
-                date=match_date,
-                outcomes=outcomes,
-                best_value_outcome=best_value_outcome,
-                best_edge=round(best_edge, 4),
-            )
-        )
-
-    return result
-
-
-def _matches_to_value_bets(matches: list[MatchCardResponse]) -> list[ValueBetResponse]:
-    """Convert match cards to flat value bets (backward compat)."""
-    bets = []
-    for m in matches:
-        for o in m.outcomes.values():
-            if o.is_value:
-                bets.append(
-                    ValueBetResponse(
-                        home_team=m.home_team,
-                        away_team=m.away_team,
-                        league=m.league,
-                        date=m.date,
-                        outcome=o.outcome,
-                        model_prob=o.model_prob,
-                        implied_prob=o.implied_prob,
-                        edge=o.edge,
-                        best_odds=o.best_odds,
-                        bookmaker=o.best_bookmaker,
-                    )
-                )
-    return bets
-
-
-def _apply_filters(
-    all_matches: list[MatchCardResponse],
-    min_edge: float | None,
-    min_prob: float | None,
-    min_odds: float | None,
-    max_odds: float | None,
-    outcomes: list[str] | None,
-    excluded_leagues: list[str] | None,
-) -> list[MatchCardResponse]:
-    """Post-filter matches by edge, prob, odds, outcomes, leagues."""
-    filtered_matches = []
-    edge_threshold = min_edge or 0.0
-    for m in all_matches:
-        if excluded_leagues and m.league in excluded_leagues:
-            continue
-        has_any_value = any(o.edge >= edge_threshold for o in m.outcomes.values())
-        if min_prob is not None and not any(
-            o.model_prob >= min_prob for o in m.outcomes.values()
-        ):
-            continue
-        if not has_any_value and edge_threshold > 0:
-            continue
-        if min_odds is not None or max_odds is not None or outcomes is not None:
-            has_valid = False
-            for o in m.outcomes.values():
-                if outcomes and o.outcome not in outcomes:
-                    continue
-                if min_odds is not None and o.best_odds < min_odds:
-                    continue
-                if max_odds is not None and o.best_odds > max_odds:
-                    continue
-                if o.edge >= edge_threshold:
-                    has_valid = True
-                    break
-            if not has_valid:
-                continue
-        filtered_matches.append(m)
-    filtered_matches.sort(key=lambda m: m.best_edge, reverse=True)
-    return filtered_matches
-
-
-def get_scanned_matches(
-    demo: bool = False,
-    min_edge: float | None = None,
-    min_prob: float | None = None,
-    min_odds: float | None = None,
-    max_odds: float | None = None,
-    outcomes: list[str] | None = None,
-    excluded_leagues: list[str] | None = None,
-    force_refresh: bool = False,
-) -> tuple[list[MatchCardResponse], int, int | None, bool, str | None]:
-    """Core scan logic returning (filtered_matches, total_scanned, quota_remaining, is_cached, cached_at).
-
-    Used by both /scanner/value-bets and /campaigns/{id}/recommendations.
-    """
-    quota_remaining = None
-    is_cached = False
-    cached_at = None
-
-    if demo:
-        all_matches = _generate_demo_matches()
-    elif not force_refresh and _scan_cache["results"] is not None and _scan_cache["timestamp"] is not None:
-        elapsed = time.time() - _scan_cache["timestamp"]
-        if elapsed < CACHE_TTL_SECONDS:
-            all_matches = _scan_cache["results"]
-            quota_remaining = _scan_cache["quota"]
-            is_cached = True
-            cached_at = datetime.fromtimestamp(_scan_cache["timestamp"]).isoformat()
-            # Skip to filtering
-            total_scanned = _scan_cache["total"]
-            # Post-filter
-            filtered_matches = _apply_filters(
-                all_matches, min_edge, min_prob, min_odds, max_odds, outcomes, excluded_leagues
-            )
-            return filtered_matches, total_scanned, quota_remaining, is_cached, cached_at
-    if not demo:
+def _ai_scan_v6_model():
+    """Load V6 FootballModel once, return None if unavailable."""
+    global _V6_MODEL, _V6_MODEL_LOADED
+    if _V6_MODEL_LOADED:
+        return _V6_MODEL
+    try:
         model_path = Path("models/football")
-        if not (model_path / "model.joblib").exists():
-            raise HTTPException(
-                status_code=503, detail="No trained model. Run 'train' first."
-            )
-
-        from src.api.schemas import OutcomeDetail as OD
-        from src.services.scanner import Scanner
-
-        scanner = Scanner(model_path=model_path)
-        if min_edge is not None:
-            scanner.value_detector.min_edge = min_edge
-
-        match_outcomes = scanner.scan_matches()
-
-        try:
-            quota_remaining = scanner.odds_collector.get_quota().get("remaining")
-        except Exception:
-            pass
-
-        all_matches = []
-        for mo in match_outcomes:
-            oc = {}
-            for key, data in mo.outcomes.items():
-                oc[key] = OD(
-                    outcome=key,
-                    best_odds=data["best_odds"],
-                    best_bookmaker=data["best_bookmaker"],
-                    all_odds=data["all_odds"],
-                    model_prob=data["model_prob"],
-                    implied_prob=data["implied_prob"],
-                    edge=data["edge"],
-                    is_value=data["is_value"],
-                )
-            all_matches.append(
-                MatchCardResponse(
-                    home_team=mo.home_team,
-                    away_team=mo.away_team,
-                    league=mo.league,
-                    date=mo.date,
-                    outcomes=oc,
-                    best_value_outcome=mo.best_value_outcome,
-                    best_edge=mo.best_edge,
-                )
-            )
-
-    total_scanned = len(all_matches)
-
-    # Update cache for live (non-demo) scans
-    if not demo and not is_cached:
-        _scan_cache["results"] = all_matches
-        _scan_cache["timestamp"] = time.time()
-        _scan_cache["total"] = total_scanned
-        _scan_cache["quota"] = quota_remaining
-
-    filtered_matches = _apply_filters(
-        all_matches, min_edge, min_prob, min_odds, max_odds, outcomes, excluded_leagues
-    )
-
-    return filtered_matches, total_scanned, quota_remaining, is_cached, cached_at
-
-
-@router.get("/scanner/value-bets", response_model=ScanResponse)
-def scan_value_bets(
-    min_prob: Optional[float] = Query(default=None, description="Min model probability"),
-    max_odds: Optional[float] = Query(default=None, description="Max odds"),
-    min_odds: Optional[float] = Query(default=None, description="Min odds"),
-    min_edge: Optional[float] = Query(default=None, description="Min edge threshold"),
-    outcomes: Optional[str] = Query(default=None, description="Comma-separated: H,D,A"),
-    demo: bool = Query(default=False, description="Use demo data instead of live API"),
-    force: bool = Query(default=False, description="Force refresh, bypass cache"),
-):
-    """Scan upcoming matches for value bets using the trained model."""
-    outcome_list = outcomes.split(",") if outcomes else None
-
-    filtered_matches, total_scanned, quota_remaining, is_cached, cached_at = get_scanned_matches(
-        demo=demo,
-        min_edge=min_edge,
-        min_prob=min_prob,
-        min_odds=min_odds,
-        max_odds=max_odds,
-        outcomes=outcome_list,
-        force_refresh=force,
-    )
-
-    return ScanResponse(
-        matches=filtered_matches,
-        value_bets=_matches_to_value_bets(filtered_matches),
-        total_matches_scanned=total_scanned,
-        api_quota_remaining=quota_remaining,
-        cached=is_cached,
-        cached_at=cached_at,
-    )
-
-
-@router.post("/scanner/match-details", response_model=MatchDetailResponse)
-def get_match_details(
-    req: MatchDetailRequest,
-    db: Session = Depends(get_db),
-):
-    """Get detailed stats for a specific match."""
-    from src.services.match_detail import MatchDetailService
-
-    service = MatchDetailService()
-    return service.get_match_detail(
-        home_team=req.home_team,
-        away_team=req.away_team,
-        league=req.league,
-        date=req.date,
-        db=db,
-    )
-
-
-@router.get("/scanner/team-players", response_model=TeamPlayersResponse)
-def get_team_players(
-    team: str = Query(..., description="Team name (e.g. Arsenal)"),
-    league: str = Query(default="", description="League code (e.g. E0)"),
-    force: bool = Query(default=False, description="Force re-scrape, bypass cache"),
-):
-    """Get player injuries and stats for a team (scraped from Transfermarkt)."""
-    from src.data.football_scraper import get_team_data
-
-    result = get_team_data(team, force=force)
-    return TeamPlayersResponse(**result)
+        if (model_path / "model.joblib").exists():
+            from src.ml.football_model import FootballModel
+            m = FootballModel()
+            m.load(model_path)
+            _V6_MODEL = m
+    except Exception as _e:
+        import logging
+        logging.getLogger(__name__).warning("V6 model unavailable: %s", _e)
+    _V6_MODEL_LOADED = True
+    return _V6_MODEL
 
 
 # ---------------------------------------------------------------------------
-# Multi-Market endpoints (Betclic scraping)
-# ---------------------------------------------------------------------------
-
-
-@router.get("/scanner/matches", response_model=MultiMarketScanResponse)
-async def scan_matches_multi_market(
-    live: bool = Query(default=False, description="Get live matches"),
-    force: bool = Query(default=False, description="Force refresh"),
-):
-    """Scan matches with all markets via Betclic scraping + Poisson model."""
-    from src.data.odds_aggregator import OddsAggregator
-    from src.ml.goals_model import PoissonGoalsModel
-
-    aggregator = OddsAggregator()
-    poisson = PoissonGoalsModel()
-
-    # 1. Get matches from Betclic (or fallback)
-    matches_raw, source = await aggregator.get_matches(live=live, force=force)
-
-    if not matches_raw:
-        return MultiMarketScanResponse(
-            matches=[],
-            total_matches_scanned=0,
-            source=source,
-            cached=not force,
-            cached_at=aggregator.get_cached_at(),
-        )
-
-    # 2. For each match, scrape detail page for all markets
-    result_matches: list[MatchWithMarkets] = []
-    for m in matches_raw:
-        match_url = m.get("url", "")
-
-        # Scrape all markets from the match detail page
-        detail = {}
-        if match_url:
-            try:
-                detail = await aggregator.get_match_detail(match_url, force=force)
-            except Exception:
-                pass
-
-        raw_markets = detail.get("markets", [])
-
-        # 3. Compute Poisson probabilities for model_prob on each selection
-        # Use simple estimation from 1X2 odds if available
-        odds_data = m.get("odds", {})
-        poisson_probs = _compute_poisson_probs(odds_data, poisson, raw_markets)
-
-        # Build MarketData list with model_prob
-        markets: list[MarketData] = []
-        for mkt in raw_markets:
-            market_type = mkt.get("market_type", "unknown")
-            raw_sels = mkt.get("selections", [])
-
-            selections = []
-            for idx, sel in enumerate(raw_sels):
-                name = sel["name"]
-                odds_val = sel["odds"]
-                implied = round(1.0 / odds_val, 4) if odds_val > 0 else 0.0
-                m_prob = _find_model_prob(
-                    name, poisson_probs, market_type, idx, len(raw_sels)
-                )
-                edge = round(m_prob - implied, 4) if m_prob is not None else None
-
-                selections.append(MarketSelection(
-                    name=name,
-                    odds=odds_val,
-                    bookmaker="betclic",
-                    all_odds={"betclic": odds_val},
-                    model_prob=round(m_prob, 4) if m_prob is not None else None,
-                    implied_prob=implied,
-                    edge=edge,
-                ))
-
-            markets.append(MarketData(
-                market_type=market_type,
-                market_name=mkt.get("market_name", ""),
-                selections=selections,
-            ))
-
-        # 4. Build 1X2 outcomes for backward compat
-        outcomes = _build_1x2_outcomes(markets, odds_data)
-
-        # Best value across ALL markets (not just 1X2)
-        best_val_out = None
-        best_edge = 0.0
-        # First check 1X2 outcomes
-        for key, od in outcomes.items():
-            if od.is_value and od.edge > best_edge:
-                best_edge = od.edge
-                best_val_out = key
-        # Then check all markets for best edge overall (keep best_val_out as 1X2 key only)
-        for mkt in markets:
-            for sel in mkt.selections:
-                if sel.edge is not None and sel.edge > best_edge:
-                    best_edge = sel.edge
-
-        result_matches.append(MatchWithMarkets(
-            home_team=m.get("home_team", detail.get("home_team", "")),
-            away_team=m.get("away_team", detail.get("away_team", "")),
-            league=m.get("league", ""),
-            league_name=m.get("league_name", ""),
-            date=m.get("date", ""),
-            is_live=m.get("is_live", False),
-            score=m.get("score"),
-            timer=m.get("timer", ""),
-            url=match_url,
-            markets=markets,
-            outcomes=outcomes,
-            best_value_outcome=best_val_out,
-            best_edge=round(best_edge, 4),
-        ))
-
-    # Sort by best edge descending
-    result_matches.sort(key=lambda x: x.best_edge, reverse=True)
-
-    return MultiMarketScanResponse(
-        matches=result_matches,
-        total_matches_scanned=len(matches_raw),
-        source=source,
-        cached=not force,
-        cached_at=aggregator.get_cached_at(),
-        api_quota_remaining=aggregator.get_quota().get("remaining"),
-    )
-
-
-@router.get("/scanner/live", response_model=MultiMarketScanResponse)
-async def get_live_matches():
-    """Get live football matches with odds (Betclic)."""
-    return await scan_matches_multi_market(live=True, force=False)
-
-
-def _compute_poisson_probs(
-    odds_data: dict,
-    poisson: "PoissonGoalsModel",
-    raw_markets: list[dict] | None = None,
-) -> dict[str, dict[str, float]]:
-    """Estimate Poisson probabilities from 1X2 implied odds.
-
-    Tries two sources: odds_data (from overview) or the 1X2 market in raw_markets.
-    """
-    h_odds = 0.0
-    a_odds = 0.0
-
-    # Source 1: odds_data dict (from overview page)
-    h_odds_dict = odds_data.get("H", {})
-    a_odds_dict = odds_data.get("A", {})
-    if h_odds_dict:
-        h_odds = max(h_odds_dict.values()) if isinstance(h_odds_dict, dict) else float(h_odds_dict)
-    if a_odds_dict:
-        a_odds = max(a_odds_dict.values()) if isinstance(a_odds_dict, dict) else float(a_odds_dict)
-
-    # Source 2: from scraped 1X2 market (more reliable)
-    if (h_odds <= 1 or a_odds <= 1) and raw_markets:
-        for mkt in raw_markets:
-            if mkt.get("market_type") == "1x2":
-                sels = mkt.get("selections", [])
-                if len(sels) >= 3:
-                    h_odds = sels[0].get("odds", 0)
-                    a_odds = sels[-1].get("odds", 0)
-                break
-
-    if h_odds <= 1 or a_odds <= 1:
-        return {}
-
-    # Rough lambda estimation from implied probabilities
-    implied_h = 1.0 / h_odds
-    implied_a = 1.0 / a_odds
-
-    # Use a simple mapping: higher implied prob -> higher lambda
-    # Average football match: ~1.4 home goals, ~1.1 away goals
-    lambda_h = 0.5 + implied_h * 2.5  # Range roughly 0.7 - 3.0
-    lambda_a = 0.5 + implied_a * 2.5
-
-    lambda_h = max(0.3, min(4.0, lambda_h))
-    lambda_a = max(0.3, min(4.0, lambda_a))
-
-    return poisson.get_all_market_probs(lambda_h, lambda_a)
-
-
-def _find_model_prob(
-    selection_name: str,
-    all_poisson_probs: dict[str, dict[str, float]],
-    market_type: str = "",
-    sel_index: int = 0,
-    total_sels: int = 0,
-) -> float | None:
-    """Find the model probability for a selection name.
-
-    Uses market_type and position to properly map Betclic French names
-    to Poisson model keys. all_poisson_probs is the full Poisson output
-    (market_key -> {selection_key: prob}).
-    """
-    if not all_poisson_probs:
-        return None
-
-    name_lower = selection_name.lower().strip()
-
-    # --- 1X2: position-based (Home=0, Draw="nul", Away=last) ---
-    if market_type == "1x2":
-        probs = all_poisson_probs.get("1x2", {})
-        if "nul" in name_lower:
-            return probs.get("D")
-        if sel_index == 0:
-            return probs.get("H")
-        if sel_index == total_sels - 1:
-            return probs.get("A")
-        return None
-
-    # --- Double Chance: match pattern ---
-    if market_type == "double_chance":
-        probs = all_poisson_probs.get("double_chance", {})
-        if " ou nul" in name_lower and sel_index == 0:
-            return probs.get("1X")
-        if " ou " in name_lower and "nul" not in name_lower:
-            return probs.get("12")
-        if "nul ou " in name_lower:
-            return probs.get("X2")
-        return None
-
-    # --- Over/Under: extract line number, look up correct sub-market ---
-    if market_type == "over_under":
-        num = _extract_number(selection_name)
-        if num:
-            probs = all_poisson_probs.get(f"over_under_{num}", {})
-            if any(w in name_lower for w in ["plus", "+"]):
-                return probs.get(f"O{num}")
-            if any(w in name_lower for w in ["moins", "-"]):
-                return probs.get(f"U{num}")
-        return None
-
-    # --- BTTS ---
-    if market_type == "btts":
-        probs = all_poisson_probs.get("btts", {})
-        if "oui" in name_lower:
-            return probs.get("Oui")
-        if "non" in name_lower:
-            return probs.get("Non")
-        return None
-
-    # --- Half-Time Result ---
-    if market_type in ("half_time_result", "half_time_2_result"):
-        probs = all_poisson_probs.get("half_time_result", {})
-        if "nul" in name_lower:
-            return probs.get("D")
-        if sel_index == 0:
-            return probs.get("H")
-        if sel_index == total_sels - 1:
-            return probs.get("A")
-        return None
-
-    # --- Correct Score: match "X - Y" pattern ---
-    if market_type == "correct_score":
-        import re
-        probs = all_poisson_probs.get("correct_score", {})
-        score_match = re.search(r"(\d+)\s*[-:]\s*(\d+)", selection_name)
-        if score_match:
-            key = f"{score_match.group(1)} - {score_match.group(2)}"
-            return probs.get(key)
-        return None
-
-    # --- Team Totals: extract line and team direction ---
-    if market_type == "team_total":
-        num = _extract_number(selection_name)
-        if num:
-            # Try both home and away team totals
-            for team_label in ("home", "away"):
-                probs = all_poisson_probs.get(f"team_total_{team_label}_{num}", {})
-                if probs:
-                    if any(w in name_lower for w in ["plus", "+"]):
-                        val = probs.get(f"O{num}")
-                        if val is not None:
-                            return val
-                    if any(w in name_lower for w in ["moins", "-"]):
-                        val = probs.get(f"U{num}")
-                        if val is not None:
-                            return val
-        return None
-
-    # --- Goal Margin ---
-    if market_type == "goal_margin":
-        probs = all_poisson_probs.get("goal_margin", {})
-        for key, prob in probs.items():
-            if key.lower() == name_lower:
-                return prob
-        return None
-
-    return None
-
-
-def _extract_number(s: str) -> str | None:
-    """Extract a number from a string (e.g., '+ de 2,5' -> '2.5')."""
-    import re
-    m = re.search(r"(\d+[.,]\d+|\d+)", s)
-    if m:
-        return m.group(1).replace(",", ".")
-    return None
-
-
-def _build_1x2_outcomes(
-    markets: list[MarketData], odds_data: dict
-) -> dict[str, OutcomeDetail]:
-    """Extract 1X2 outcomes from markets for backward compatibility."""
-    outcomes: dict[str, OutcomeDetail] = {}
-
-    # Find the 1X2 market
-    market_1x2 = None
-    for mkt in markets:
-        if mkt.market_type == "1x2":
-            market_1x2 = mkt
-            break
-
-    if not market_1x2:
-        return outcomes
-
-    outcome_map = {"H": None, "D": None, "A": None}
-
-    for sel in market_1x2.selections:
-        name = sel.name.lower()
-        if "nul" in name:
-            outcome_map["D"] = sel
-        elif sel == market_1x2.selections[0]:
-            outcome_map["H"] = sel
-        elif sel == market_1x2.selections[-1]:
-            outcome_map["A"] = sel
-
-    for key in ["H", "D", "A"]:
-        sel = outcome_map.get(key)
-        if sel:
-            m_prob = sel.model_prob or 0.0
-            implied = sel.implied_prob
-            edge = sel.edge or 0.0
-            is_value = edge > 0.02
-
-            outcomes[key] = OutcomeDetail(
-                outcome=key,
-                best_odds=sel.odds,
-                best_bookmaker="betclic",
-                all_odds=sel.all_odds,
-                model_prob=m_prob,
-                implied_prob=implied,
-                edge=edge,
-                is_value=is_value,
-            )
-
-    return outcomes
-
-
-# ---------------------------------------------------------------------------
-# AI Research endpoints (Claude Code powered)
+# AI Scanner endpoints
 # ---------------------------------------------------------------------------
 
 
@@ -753,41 +64,54 @@ async def ai_scan(
     # --- Football via API-Football ---
     from src.data.api_football_client import ApiFootballClient, CACHE_DIR as AF_CACHE_DIR
     from src.services.probability_calculator import calculate_football
+    from src.services.live_features import build_live_features
 
-    # Scan-level cache (processed results, 30min TTL)
+    # Load V6 model once per process (lazy global cache)
+    import numpy as _np
+
+    _v6 = _ai_scan_v6_model()  # returns model or None
+
+    # Scan-level cache (30min TTL) — Redis if available, file fallback
+    from src.cache import cache_get, cache_set
     scan_key = hashlib.md5(f"football_{','.join(sorted(league_list))}_{timeframe}".encode()).hexdigest()[:12]
-    scan_cache_file = AF_CACHE_DIR / f"scan_result_{scan_key}.json"
+    cache_redis_key = f"scan:football:{scan_key}"
     SCAN_CACHE_TTL = 1800  # 30 min
 
+    # Also keep file cache path for get_scanned_matches helper
+    scan_cache_file = AF_CACHE_DIR / f"scan_result_{scan_key}.json"
+
     if not force:
-        if scan_cache_file.exists():
+        # Try Redis first, then file fallback
+        cached = cache_get(cache_redis_key)
+        if cached is None and scan_cache_file.exists():
             try:
                 cached = _json.loads(scan_cache_file.read_text(encoding="utf-8"))
                 age = _time.time() - cached.get("_cached_at", 0)
-                if age < SCAN_CACHE_TTL or cache_only:
-                    raw = cached.get("matches", [])
-                    return AIScanResponse(
-                        matches=[AIScanMatch(**m) for m in raw],
-                        sport="football",
-                        source="api_football",
-                        cached=True,
-                        cached_at=datetime.fromtimestamp(cached["_cached_at"]).isoformat(),
-                        research_duration_seconds=cached.get("duration", 0.0),
-                    )
+                if age >= SCAN_CACHE_TTL and not cache_only:
+                    cached = None
             except Exception:
-                pass
+                cached = None
+        if cached:
+            raw = cached.get("matches", [])
+            return AIScanResponse(
+                matches=[AIScanMatch(**m) for m in raw],
+                sport="football",
+                source="api_football",
+                cached=True,
+                cached_at=datetime.fromtimestamp(cached["_cached_at"]).isoformat(),
+                research_duration_seconds=cached.get("duration", 0.0),
+            )
         if cache_only:
             return AIScanResponse(matches=[], sport="football", source="api_football",
                                   cached=False, cached_at=None, research_duration_seconds=0.0)
 
     t0 = _time.time()
+    from src.data.api_football_client import LEAGUE_ID_MAP
     client = ApiFootballClient()
 
-    # 1. Fixtures
-    fixtures = await client.get_fixtures(league_list or list(client.__class__.__dict__.get("LEAGUE_ID_MAP", {}).keys()), timeframe)
-    if not fixtures:
-        from src.data.api_football_client import LEAGUE_ID_MAP
-        fixtures = await client.get_fixtures(list(LEAGUE_ID_MAP.keys()), timeframe)
+    # 1. Fixtures — scan all known competitions unless caller specifies
+    effective_leagues = league_list or list(LEAGUE_ID_MAP.keys())
+    fixtures = await client.get_fixtures(effective_leagues, timeframe)
 
     now = datetime.now()
     matches_out: list[AIScanMatch] = []
@@ -911,6 +235,43 @@ async def ai_scan(
                 btts_pct_away=stats_a.get("away_btts_pct"),
             )
 
+            # --- V6 ML model blending (45% ML + 55% Poisson) ---
+            ML_WEIGHT = 0.45
+            if _v6 is not None:
+                try:
+                    from src.ml.football_model import MODEL_FEATURES
+                    live_feats = build_live_features(
+                        stats_h=stats_h, stats_a=stats_a,
+                        home_rank=home_rank, away_rank=away_rank,
+                        h2h_raw=h2h_raw, home_id=home_id,
+                        odds_1x2=odds.get("1x2", {}),
+                        league_name=league_name, fixture_dt=fixture_dt,
+                    )
+                    X = _np.array([[live_feats.get(feat, 0.0) for feat in MODEL_FEATURES]])
+                    X = _np.nan_to_num(X, nan=0.0)
+                    ml_p = _v6.predict_proba(X)[0]  # [prob_H, prob_D, prob_A]
+                    # Blend: final = ML_WEIGHT * ml + (1-ML_WEIGHT) * poisson
+                    ph = ML_WEIGHT * float(ml_p[0]) + (1 - ML_WEIGHT) * calc.home_prob
+                    pd_ = ML_WEIGHT * float(ml_p[1]) + (1 - ML_WEIGHT) * calc.draw_prob
+                    pa = ML_WEIGHT * float(ml_p[2]) + (1 - ML_WEIGHT) * calc.away_prob
+                    # Renormalize
+                    tot = ph + pd_ + pa
+                    calc.home_prob = round(ph / tot, 4)
+                    calc.draw_prob = round(pd_ / tot, 4)
+                    calc.away_prob = round(pa / tot, 4)
+                    # Recompute edges with blended probs
+                    if calc.edges:
+                        odds_1x2_local = odds.get("1x2", {})
+                        for key, prob in [("H", calc.home_prob), ("D", calc.draw_prob), ("A", calc.away_prob)]:
+                            bk_odds = odds_1x2_local.get(key, {})
+                            best_o = max((float(v) for v in bk_odds.values() if v and float(v) > 1), default=0.0)
+                            if best_o > 1:
+                                implied = 1 / best_o
+                                calc.edges[key] = round(prob - implied, 4)
+                except Exception as _ve:
+                    import logging
+                    logging.getLogger(__name__).debug("V6 blend error: %s", _ve)
+
             # H2H summary and avg goals
             h2h_goals = None
             if h2h_raw:
@@ -997,23 +358,31 @@ async def ai_scan(
             return await _process_fixture(fix)
 
     results = await asyncio.gather(*[_guarded(f) for f in fixtures])
-    matches_out = [m for m in results if m is not None]
+    # Filter out matches with insufficient data (data_score < 0.4 = less than 8/20 points)
+    # These matches have too few reliable inputs for the Poisson model to be trustworthy
+    DATA_SCORE_MIN = 0.40
+    matches_out = [m for m in results if m is not None and (m.data_score or 0) >= DATA_SCORE_MIN]
 
     duration = _time.time() - t0
 
-    # Save scan result cache
+    # Save scan result cache (Redis + file fallback)
+    cache_payload = {
+        "_cached_at": _time.time(),
+        "duration": duration,
+        "matches": [m.model_dump() for m in matches_out],
+    }
+    try:
+        cache_set(cache_redis_key, cache_payload, ttl=SCAN_CACHE_TTL)
+    except Exception:
+        pass
     try:
         scan_cache_file.write_text(
-            _json.dumps({
-                "_cached_at": _time.time(),
-                "duration": duration,
-                "matches": [m.model_dump() for m in matches_out],
-            }, ensure_ascii=False, default=str),
+            _json.dumps(cache_payload, ensure_ascii=False, default=str),
             encoding="utf-8",
         )
     except Exception as exc:
         import logging
-        logging.getLogger(__name__).warning("Failed to save scan result cache: %s", exc)
+        logging.getLogger(__name__).warning("Failed to save scan file cache: %s", exc)
 
     return AIScanResponse(
         matches=matches_out,
@@ -1026,37 +395,23 @@ async def ai_scan(
 
 
 async def _ai_scan_tennis(league_list, timeframe, force, cache_only):
-    """Tennis scan via Claude (API-Football doesn't cover tennis)."""
-    import json as _json
-    import time as _time
-    from src.data.claude_researcher import ClaudeResearcher, CACHE_DIR
+    """Tennis scan via The Odds API."""
+    import asyncio as _asyncio
+    from src.data.tennis_client import TennisClient
     from src.services.probability_calculator import calculate_tennis
 
-    researcher = ClaudeResearcher()
+    client = TennisClient()
 
     if cache_only:
-        best_file = None
-        best_ts = 0.0
-        if CACHE_DIR.exists():
-            for f in CACHE_DIR.rglob("scan_*.json"):
-                try:
-                    data = _json.loads(f.read_text(encoding="utf-8"))
-                    ts = data.get("_cached_at", 0)
-                    if ts > best_ts:
-                        best_ts = ts
-                        best_file = (f, data)
-                except Exception:
-                    pass
-        if best_file:
-            _, data = best_file
-            result = data
-            result["_from_cache"] = True
-        else:
-            return AIScanResponse(matches=[], sport="tennis", source="claude_code",
+        result = client.get_cached_result()
+        if result is None:
+            return AIScanResponse(matches=[], sport="tennis", source="odds_api",
                                   cached=False, cached_at=None, research_duration_seconds=0.0)
     else:
-        result = await researcher.scan_matches(
-            sport="tennis", leagues=league_list or None, timeframe=timeframe, force=force
+        # Run sync client in executor to avoid blocking async event loop
+        loop = _asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None, lambda: client.get_matches(timeframe=timeframe, force=force)
         )
 
     raw_matches = result.get("matches", [])
@@ -1083,6 +438,20 @@ async def _ai_scan_tennis(league_list, timeframe, force, cache_only):
                 ranking_p1=m.get("p1_ranking"), ranking_p2=m.get("p2_ranking"),
                 h2h_summary=m.get("h2h"),
                 absences_p1=abs_p1, absences_p2=abs_p2,
+                surface_record_p1=m.get("p1_surface_record"),
+                surface_record_p2=m.get("p2_surface_record"),
+                serve_pct_p1=m.get("p1_serve_pct"),
+                serve_pct_p2=m.get("p2_serve_pct"),
+                return_pct_p1=m.get("p1_return_pct"),
+                return_pct_p2=m.get("p2_return_pct"),
+                season_record_p1=m.get("p1_season_record"),
+                season_record_p2=m.get("p2_season_record"),
+                aces_avg_p1=m.get("p1_aces_avg"),
+                aces_avg_p2=m.get("p2_aces_avg"),
+                rest_days_p1=m.get("p1_rest_days"),
+                rest_days_p2=m.get("p2_rest_days"),
+                h2h_surface=m.get("h2h_surface"),
+                h2h_last3=m.get("h2h_last3", []) or [],
             )
             matches.append(AIScanMatch(
                 sport="tennis",
@@ -1113,11 +482,78 @@ async def _ai_scan_tennis(league_list, timeframe, force, cache_only):
             continue
 
     return AIScanResponse(
-        matches=matches, sport="tennis", source="claude_code",
+        matches=matches, sport="tennis", source="odds_api",
         cached=from_cache,
         cached_at=datetime.fromtimestamp(cached_at_ts).isoformat() if cached_at_ts else None,
         research_duration_seconds=duration,
     )
+
+
+def get_scanned_matches(
+    demo: bool = False,
+    min_edge: float | None = None,
+    min_prob: float | None = None,
+    min_odds: float | None = None,
+    max_odds: float | None = None,
+    outcomes: list[str] | None = None,
+    excluded_leagues: list[str] | None = None,
+):
+    """Synchronous helper: load cached scan results and filter by campaign criteria.
+
+    Returns (filtered_matches, total_scanned, 0, 0, 0) for backward compat.
+    """
+    import json as _json
+    from src.data.api_football_client import CACHE_DIR as AF_CACHE_DIR
+
+    # Find most recent scan cache file
+    cache_files = sorted(AF_CACHE_DIR.glob("scan_result_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    all_matches: list[AIScanMatch] = []
+    for cf in cache_files[:1]:
+        try:
+            data = _json.loads(cf.read_text(encoding="utf-8"))
+            all_matches = [AIScanMatch(**m) for m in data.get("matches", [])]
+        except Exception:
+            pass
+        break
+
+    total_scanned = len(all_matches)
+
+    # Filter
+    filtered: list[AIScanMatch] = []
+    for m in all_matches:
+        if excluded_leagues:
+            if any(el.lower() in m.league.lower() for el in excluded_leagues):
+                continue
+
+        # Check if any outcome passes filters
+        edges = m.edges or {}
+        odds_1x2 = {}
+        if isinstance(m.odds, dict):
+            odds_1x2 = m.odds.get("1x2", {})
+
+        has_value = False
+        for key in (outcomes or ["H", "D", "A"]):
+            edge = edges.get(key, 0)
+            if min_edge and edge < min_edge:
+                continue
+            prob_map = {"H": m.model_prob_home, "D": m.model_prob_draw, "A": m.model_prob_away}
+            prob = prob_map.get(key, 0) or 0
+            if min_prob and prob < min_prob:
+                continue
+            bk_odds = odds_1x2.get(key, {})
+            best = max((float(v) for v in bk_odds.values() if v and float(v) > 1), default=0.0) if isinstance(bk_odds, dict) else 0.0
+            if min_odds and best < min_odds:
+                continue
+            if max_odds and best > max_odds:
+                continue
+            if edge > 0:
+                has_value = True
+                break
+
+        if has_value:
+            filtered.append(m)
+
+    return filtered, total_scanned, 0, 0, 0
 
 
 @router.get("/scanner/ai-research", response_model=AIResearchResponse)

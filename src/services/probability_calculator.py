@@ -154,15 +154,46 @@ def _h2h_adjustment(h2h_summary: str | None, h2h_details: list[dict] | None, hom
     return 0.0
 
 
+def _form_multiplier(form: str | None) -> float:
+    """Multiplier for λ based on recent form. Range 0.80 (5 losses) to 1.20 (5 wins)."""
+    if not form:
+        return 1.0
+    mapping = {"V": 1.0, "W": 1.0, "N": 0.5, "D": 0.0, "L": 0.0, "P": 0.5}
+    chars = list(form.upper().strip())[-5:]
+    if not chars:
+        return 1.0
+    strength = sum(mapping.get(c, 0.5) for c in chars) / len(chars)
+    # 0.0 (all losses) → 0.80, 0.5 (all draws) → 1.0, 1.0 (all wins) → 1.20
+    return 0.80 + strength * 0.40
+
+
+def _dc_tau(lam_h: float, lam_a: float, x: int, y: int, rho: float = -0.04) -> float:
+    """Dixon-Coles tau correction for low-scoring matches (0-0, 1-0, 0-1, 1-1).
+
+    rho < 0 means 0-0 and 1-1 are more likely than pure Poisson predicts,
+    while 1-0 and 0-1 are slightly less likely.
+    """
+    if x == 0 and y == 0:
+        return 1.0 - lam_h * lam_a * rho
+    elif x == 0 and y == 1:
+        return 1.0 + lam_h * rho
+    elif x == 1 and y == 0:
+        return 1.0 + lam_a * rho
+    elif x == 1 and y == 1:
+        return 1.0 - rho
+    return 1.0
+
+
 def _poisson_probs(lambda_h: float, lambda_a: float, max_goals: int = 10) -> tuple[float, float, float]:
-    """Compute P(home wins), P(draw), P(away wins) via Poisson distribution."""
+    """Compute P(home wins), P(draw), P(away wins) via Dixon-Coles corrected Poisson."""
     p_home = 0.0
     p_draw = 0.0
     p_away = 0.0
     for i in range(max_goals + 1):
         for j in range(max_goals + 1):
             p = (math.exp(-lambda_h) * lambda_h ** i / math.factorial(i)
-                 * math.exp(-lambda_a) * lambda_a ** j / math.factorial(j))
+                 * math.exp(-lambda_a) * lambda_a ** j / math.factorial(j)
+                 * _dc_tau(lambda_h, lambda_a, i, j))
             if i > j:
                 p_home += p
             elif i == j:
@@ -249,6 +280,9 @@ def calculate_football(
         avg = league_avg_goals if league_avg_goals > 0 else LEAGUE_AVG_GOALS
         lambda_h_val = (home_goals_scored_avg * away_goals_conceded_avg / avg) * HOME_ADV  # type: ignore[operator]
         lambda_a_val = away_goals_scored_avg * home_goals_conceded_avg / avg               # type: ignore[operator]
+        # Apply form multiplier: recent form adjusts λ by ±20%
+        lambda_h_val *= _form_multiplier(form_home)
+        lambda_a_val *= _form_multiplier(form_away)
         lambda_h_val = max(0.1, lambda_h_val)
         lambda_a_val = max(0.1, lambda_a_val)
         p_h, p_d, p_a = _poisson_probs(lambda_h_val, lambda_a_val)
@@ -362,6 +396,72 @@ def calculate_football(
 # Tennis calculator (unchanged except form mapping fix)
 # ---------------------------------------------------------------------------
 
+# Tennis-specific data quality
+# Points available:
+#   odds P1/P2                  -> 2 pts
+#   form_p1                     -> 1 pt
+#   form_p2                     -> 1 pt
+#   ranking_p1/p2               -> 2 pts
+#   h2h_summary                 -> 1 pt
+#   h2h_surface                 -> 1 pt
+#   h2h_last3                   -> 1 pt
+#   surface_record_p1           -> 1 pt
+#   surface_record_p2           -> 1 pt
+#   serve_pct_p1                -> 1 pt
+#   serve_pct_p2                -> 1 pt
+#   return_pct_p1               -> 1 pt
+#   return_pct_p2               -> 1 pt
+#   season_record_p1            -> 1 pt
+#   season_record_p2            -> 1 pt
+#   rest_days                   -> 1 pt
+#   aces_avg                    -> 1 pt
+TENNIS_MAX_POINTS = 18
+
+
+def _parse_record(record: str | None) -> tuple[int, int] | None:
+    """Parse a W-L record string like '15-3' into (wins, losses)."""
+    if not record:
+        return None
+    m = re.match(r'(\d+)\s*[-/]\s*(\d+)', record)
+    if m:
+        return int(m.group(1)), int(m.group(2))
+    return None
+
+
+def _surface_adjustment(rec_p1: str | None, rec_p2: str | None) -> float:
+    """Adjustment based on surface win rates. Range: -0.06 to +0.06."""
+    r1 = _parse_record(rec_p1)
+    r2 = _parse_record(rec_p2)
+    if r1 is None or r2 is None:
+        return 0.0
+    total1 = r1[0] + r1[1]
+    total2 = r2[0] + r2[1]
+    if total1 < 3 or total2 < 3:
+        return 0.0
+    wr1 = r1[0] / total1
+    wr2 = r2[0] / total2
+    return max(-0.06, min(0.06, (wr1 - wr2) * 0.12))
+
+
+def _serve_return_adjustment(
+    serve_p1: float | None, serve_p2: float | None,
+    return_p1: float | None, return_p2: float | None,
+) -> float:
+    """Adjustment based on serve/return efficiency. Range: -0.05 to +0.05."""
+    if serve_p1 is None or serve_p2 is None:
+        return 0.0
+    # Serve advantage: high serve% + opponent low return%
+    s1 = serve_p1 / 100 if serve_p1 > 1 else serve_p1
+    s2 = serve_p2 / 100 if serve_p2 > 1 else serve_p2
+    r1 = (return_p1 / 100 if return_p1 and return_p1 > 1 else return_p1) if return_p1 else None
+    r2 = (return_p2 / 100 if return_p2 and return_p2 > 1 else return_p2) if return_p2 else None
+    # Composite: serve strength - opponent return strength
+    comp1 = s1 + (1 - r2 if r2 else 0) if r2 else s1
+    comp2 = s2 + (1 - r1 if r1 else 0) if r1 else s2
+    diff = comp1 - comp2
+    return max(-0.05, min(0.05, diff * 0.10))
+
+
 def calculate_tennis(
     odds_p1: float,
     odds_p2: float,
@@ -372,6 +472,21 @@ def calculate_tennis(
     h2h_summary: str | None = None,
     absences_p1: list[str] | None = None,
     absences_p2: list[str] | None = None,
+    # Tennis enriched stats
+    surface_record_p1: str | None = None,
+    surface_record_p2: str | None = None,
+    serve_pct_p1: float | None = None,
+    serve_pct_p2: float | None = None,
+    return_pct_p1: float | None = None,
+    return_pct_p2: float | None = None,
+    season_record_p1: str | None = None,
+    season_record_p2: str | None = None,
+    aces_avg_p1: float | None = None,
+    aces_avg_p2: float | None = None,
+    rest_days_p1: int | None = None,
+    rest_days_p2: int | None = None,
+    h2h_surface: str | None = None,
+    h2h_last3: list[str] | None = None,
 ) -> MatchProbabilityResult:
     """Estimate fair probabilities and edge for a tennis match."""
     absences_p1 = absences_p1 or []
@@ -390,6 +505,7 @@ def calculate_tennis(
     fair_p1, _, fair_p2 = _remove_overround(raw_p1, 0.0, raw_p2)
     data_points += 2
 
+    # --- Form adjustment ---
     form_adj = 0.0
     fs1 = _form_strength(form_p1)
     fs2 = _form_strength(form_p2)
@@ -400,14 +516,20 @@ def calculate_tennis(
     if fs1 is not None and fs2 is not None:
         form_adj = (fs1 - fs2) * 0.10
 
+    # --- Ranking adjustment ---
     rank_adj = 0.0
     if ranking_p1 is not None and ranking_p2 is not None:
         data_points += 2
         gap = ranking_p2 - ranking_p1
         rank_adj = max(-0.12, min(0.12, gap / 500))
 
+    # --- H2H adjustment ---
     h2h_adj = _h2h_adjustment(h2h_summary, None)
     if h2h_summary:
+        data_points += 1
+    if h2h_surface:
+        data_points += 1
+    if h2h_last3 and len(h2h_last3) > 0:
         data_points += 1
 
     abs_pen_p1 = _absence_penalty(absences_p1)
@@ -415,7 +537,45 @@ def calculate_tennis(
     if absences_p1 or absences_p2:
         data_points += 1
 
-    total_adj = form_adj + rank_adj + h2h_adj
+    # --- Surface record adjustment ---
+    surface_adj = _surface_adjustment(surface_record_p1, surface_record_p2)
+    if surface_record_p1:
+        data_points += 1
+    if surface_record_p2:
+        data_points += 1
+
+    # --- Serve/return adjustment ---
+    sr_adj = _serve_return_adjustment(serve_pct_p1, serve_pct_p2, return_pct_p1, return_pct_p2)
+    if serve_pct_p1 is not None:
+        data_points += 1
+    if serve_pct_p2 is not None:
+        data_points += 1
+    if return_pct_p1 is not None:
+        data_points += 1
+    if return_pct_p2 is not None:
+        data_points += 1
+
+    # --- Season record (data quality only, no adjustment) ---
+    if season_record_p1:
+        data_points += 1
+    if season_record_p2:
+        data_points += 1
+
+    # --- Rest days ---
+    rest_adj = 0.0
+    if rest_days_p1 is not None and rest_days_p2 is not None:
+        data_points += 1
+        # Fatigue: player with fewer rest days gets a small penalty
+        diff = rest_days_p1 - rest_days_p2
+        if abs(diff) >= 2:
+            rest_adj = max(-0.03, min(0.03, diff * 0.01))
+
+    # --- Aces (data quality only) ---
+    if aces_avg_p1 is not None or aces_avg_p2 is not None:
+        data_points += 1
+
+    # --- Combine adjustments ---
+    total_adj = form_adj + rank_adj + h2h_adj + surface_adj + sr_adj + rest_adj
     est_p1 = max(0.03, fair_p1 + total_adj - abs_pen_p1)
     est_p2 = max(0.03, fair_p2 - total_adj - abs_pen_p2)
     total_est = est_p1 + est_p2
@@ -425,7 +585,7 @@ def calculate_tennis(
     edge_p1 = round(est_p1 - raw_p1, 4)
     edge_p2 = round(est_p2 - raw_p2, 4)
 
-    data_score = data_points / MAX_POINTS
+    data_score = min(data_points / TENNIS_MAX_POINTS, 1.0)
     if data_score >= GREEN_THRESHOLD:
         quality: Literal["green", "yellow", "red"] = "green"
     elif data_score >= YELLOW_THRESHOLD:
@@ -441,7 +601,7 @@ def calculate_tennis(
         data_quality=quality,
         data_score=round(data_score, 3),
         data_points_used=data_points,
-        data_points_max=MAX_POINTS,
+        data_points_max=TENNIS_MAX_POINTS,
         used_odds=True,
         used_form=fs1 is not None or fs2 is not None,
         used_position=ranking_p1 is not None,

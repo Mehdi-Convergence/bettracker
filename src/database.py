@@ -3,14 +3,22 @@ from sqlalchemy.orm import sessionmaker, Session
 
 from src.config import settings
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    echo=False,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
-)
+_is_sqlite = "sqlite" in settings.DATABASE_URL
+
+_engine_kwargs = {
+    "echo": False,
+}
+if _is_sqlite:
+    _engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    # PostgreSQL pool settings
+    _engine_kwargs["pool_size"] = 5
+    _engine_kwargs["max_overflow"] = 10
+
+engine = create_engine(settings.DATABASE_URL, **_engine_kwargs)
 
 # Enable WAL mode for SQLite (better concurrent read performance)
-if "sqlite" in settings.DATABASE_URL:
+if _is_sqlite:
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()

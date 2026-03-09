@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import { Layers, Plus, X, Target, Building2, AlertTriangle, Send, Loader2, Check } from "lucide-react";
-import { LEAGUE_INFO } from "../types";
-import type { Ticket, ValueBet } from "../types";
-import { createBet } from "../services/api";
+import { LEAGUE_INFO } from "@/types";
+import type { Ticket, ValueBet } from "@/types";
+import { createBet } from "@/services/api";
 
 interface TicketBuilderProps {
   tickets: Ticket[];
@@ -153,19 +153,19 @@ export default function TicketBuilder({
       className={`w-[26%] min-w-[320px] shrink-0 rounded-xl border-2 flex flex-col max-h-[calc(100vh-12rem)] sticky top-0 transition-all ${
         dragOver
           ? "border-blue-400 bg-blue-50 shadow-lg shadow-blue-200/30"
-          : "border-gray-200 bg-white shadow-lg"
+          : "border-slate-200 bg-white shadow-lg"
       }`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center">
             <Layers size={14} className="text-blue-600" />
           </div>
-          <span className="text-gray-900 text-sm font-semibold">Mes Tickets</span>
+          <span className="text-slate-900 text-sm font-semibold">Mes Tickets</span>
         </div>
         {tickets.length > 0 && (
-          <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+          <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
             {tickets.reduce((s, t) => s + t.legs.length, 0)} paris
           </span>
         )}
@@ -173,7 +173,7 @@ export default function TicketBuilder({
 
       {/* Ticket tabs */}
       {tickets.length > 0 && (
-        <div className="flex items-center border-b border-gray-200 px-2 overflow-x-auto">
+        <div className="flex items-center border-b border-slate-200 px-2 overflow-x-auto">
           {tickets.map((ticket, idx) => (
             <button
               key={ticket.id}
@@ -181,12 +181,12 @@ export default function TicketBuilder({
               className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                 idx === activeTicketIdx
                   ? "text-blue-600 border-blue-500"
-                  : "text-gray-400 border-transparent hover:text-gray-600"
+                  : "text-slate-400 border-transparent hover:text-slate-600"
               }`}
             >
               {ticket.name}
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                idx === activeTicketIdx ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"
+                idx === activeTicketIdx ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-400"
               }`}>
                 {ticket.legs.length}
               </span>
@@ -196,7 +196,7 @@ export default function TicketBuilder({
                     e.stopPropagation();
                     onRemoveTicket(idx);
                   }}
-                  className="ml-0.5 text-gray-300 hover:text-red-400 transition-colors"
+                  className="ml-0.5 text-slate-300 hover:text-red-400 transition-colors"
                 >
                   <X size={10} />
                 </span>
@@ -205,7 +205,7 @@ export default function TicketBuilder({
           ))}
           <button
             onClick={onAddTicket}
-            className="px-2 py-2 text-gray-400 hover:text-blue-500 transition-colors"
+            className="px-2 py-2 text-slate-400 hover:text-blue-500 transition-colors"
             title="Nouveau ticket"
           >
             <Plus size={14} />
@@ -217,17 +217,17 @@ export default function TicketBuilder({
       <div className="flex-1 overflow-y-auto">
         {!hasLegs ? (
           <div className={`flex flex-col items-center justify-center py-10 px-4 text-center transition-colors ${
-            dragOver ? "text-blue-500" : "text-gray-400"
+            dragOver ? "text-blue-500" : "text-slate-400"
           }`}>
             <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
-              dragOver ? "bg-blue-100" : "bg-gray-100"
+              dragOver ? "bg-blue-100" : "bg-slate-100"
             }`}>
-              <Target size={20} className={dragOver ? "text-blue-500" : "text-gray-400"} />
+              <Target size={20} className={dragOver ? "text-blue-500" : "text-slate-400"} />
             </div>
             <p className="text-xs font-medium">
               {dragOver ? "Deposer ici !" : "Glissez un match ici"}
             </p>
-            <p className="text-[10px] text-gray-400 mt-1">
+            <p className="text-[10px] text-slate-400 mt-1">
               ou cliquez sur un outcome
             </p>
           </div>
@@ -244,12 +244,12 @@ export default function TicketBuilder({
               return (
                 <div
                   key={leg.id}
-                  className="bg-gray-50 rounded-lg p-2.5 text-xs border border-gray-200 hover:border-gray-300 transition-colors group"
+                  className="bg-slate-50 rounded-lg p-2.5 text-xs border border-slate-200 hover:border-slate-300 transition-colors group"
                 >
                   {/* Row 1: Team [Outcome] Team + remove */}
                   <div className="flex items-center justify-between gap-1">
                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                      <span className="text-gray-900 font-medium text-[11px] truncate">{leg.home_team}</span>
+                      <span className="text-slate-900 font-medium text-[11px] truncate">{leg.home_team}</span>
                       <select
                         value={leg.outcome}
                         onChange={(e) => onUpdateLegOutcome(activeTicketIdx, leg.id, e.target.value)}
@@ -259,18 +259,18 @@ export default function TicketBuilder({
                         <option value="D">Nul</option>
                         <option value="A">Ext</option>
                       </select>
-                      <span className="text-gray-900 font-medium text-[11px] truncate">{leg.away_team}</span>
+                      <span className="text-slate-900 font-medium text-[11px] truncate">{leg.away_team}</span>
                     </div>
                     <button
                       onClick={() => onRemoveLeg(activeTicketIdx, leg.id)}
-                      className="text-gray-300 hover:text-red-400 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="text-slate-300 hover:text-red-400 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <X size={12} />
                     </button>
                   </div>
 
                   {/* Row 2: league + date */}
-                  <div className="text-gray-400 text-[10px] mt-0.5">
+                  <div className="text-slate-400 text-[10px] mt-0.5">
                     {info ? `${info.flag} ${info.name}` : leg.league} · {fmtDate}
                   </div>
 
@@ -281,9 +281,9 @@ export default function TicketBuilder({
                     ) : (
                       <span className="text-red-400 font-bold text-[10px]">N/A</span>
                     )}
-                    <span className="text-gray-400 text-[9px]">{leg.bookmaker}</span>
+                    <span className="text-slate-400 text-[9px]">{leg.bookmaker}</span>
                     <span
-                      className="text-gray-500 text-[10px] cursor-help"
+                      className="text-slate-500 text-[10px] cursor-help"
                       title="Probabilite estimee par le modele pour cet outcome"
                     >
                       {(leg.model_prob * 100).toFixed(0)}%
@@ -309,22 +309,22 @@ export default function TicketBuilder({
 
       {/* Stats card */}
       {hasLegs && (
-        <div className="border-t border-gray-200 p-3 space-y-2">
+        <div className="border-t border-slate-200 p-3 space-y-2">
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-gray-50 rounded-lg p-2 text-center border border-gray-200">
-              <div className="text-[9px] text-gray-400 uppercase tracking-wider">Cote</div>
+            <div className="bg-slate-50 rounded-lg p-2 text-center border border-slate-200">
+              <div className="text-[9px] text-slate-400 uppercase tracking-wider">Cote</div>
               <div className="text-amber-600 font-bold text-sm mt-0.5">
                 {combinedOdds.toFixed(2)}
               </div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-2 text-center border border-gray-200">
-              <div className="text-[9px] text-gray-400 uppercase tracking-wider">Proba</div>
+            <div className="bg-slate-50 rounded-lg p-2 text-center border border-slate-200">
+              <div className="text-[9px] text-slate-400 uppercase tracking-wider">Proba</div>
               <div className="text-emerald-600 font-bold text-sm mt-0.5">
                 {(combinedProb * 100).toFixed(1)}%
               </div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-2 text-center border border-gray-200">
-              <div className="text-[9px] text-gray-400 uppercase tracking-wider">EV</div>
+            <div className="bg-slate-50 rounded-lg p-2 text-center border border-slate-200">
+              <div className="text-[9px] text-slate-400 uppercase tracking-wider">EV</div>
               <div className={`font-bold text-sm mt-0.5 ${
                 ev > 0 ? "text-emerald-600" : "text-red-500"
               }`}>
@@ -337,8 +337,8 @@ export default function TicketBuilder({
           {availableBookmakers.length > 0 && (
             <div className="space-y-1">
               <div className="flex items-center gap-1.5">
-                <Building2 size={10} className="text-gray-400" />
-                <label className="text-[10px] text-gray-400 shrink-0">Bookmaker</label>
+                <Building2 size={10} className="text-slate-400" />
+                <label className="text-[10px] text-slate-400 shrink-0">Bookmaker</label>
               </div>
               <div className="flex flex-wrap gap-1">
                 <button
@@ -346,7 +346,7 @@ export default function TicketBuilder({
                   className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
                     activeTicket!.bookmaker === null
                       ? "bg-blue-500 text-white"
-                      : "bg-gray-100 text-gray-500 border border-gray-200 hover:text-gray-700"
+                      : "bg-slate-100 text-slate-500 border border-slate-200 hover:text-slate-700"
                   }`}
                 >
                   Meilleure cote
@@ -358,7 +358,7 @@ export default function TicketBuilder({
                     className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
                       activeTicket!.bookmaker === bk
                         ? "bg-blue-500 text-white"
-                        : "bg-gray-100 text-gray-500 border border-gray-200 hover:text-gray-700"
+                        : "bg-slate-100 text-slate-500 border border-slate-200 hover:text-slate-700"
                     }`}
                   >
                     {bk}
@@ -375,7 +375,7 @@ export default function TicketBuilder({
           )}
 
           <div className="flex items-center gap-2">
-            <label className="text-[10px] text-gray-400 shrink-0">Mise</label>
+            <label className="text-[10px] text-slate-400 shrink-0">Mise</label>
             <div className="relative flex-1">
               <input
                 type="number"
@@ -383,9 +383,9 @@ export default function TicketBuilder({
                 onChange={(e) =>
                   onUpdateStake(activeTicketIdx, Number(e.target.value))
                 }
-                className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-900 w-full pr-6 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 w-full pr-6 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">EUR</span>
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">EUR</span>
             </div>
           </div>
 
@@ -421,18 +421,18 @@ export default function TicketBuilder({
 
       {/* Total across all tickets */}
       {tickets.length > 1 && (
-        <div className="border-t border-gray-200 px-3 py-2.5 bg-gray-50 rounded-b-xl">
-          <div className="text-[10px] text-gray-400 font-medium mb-1.5">
+        <div className="border-t border-slate-200 px-3 py-2.5 bg-slate-50 rounded-b-xl">
+          <div className="text-[10px] text-slate-400 font-medium mb-1.5">
             Total · {tickets.length} tickets
           </div>
           <div className="flex justify-between text-xs">
-            <span className="text-gray-500">Mise totale</span>
-            <span className="text-gray-900 font-semibold">
+            <span className="text-slate-500">Mise totale</span>
+            <span className="text-slate-900 font-semibold">
               {totalStake.toFixed(2)} EUR
             </span>
           </div>
           <div className="flex justify-between text-xs mt-1">
-            <span className="text-gray-500">Gain total</span>
+            <span className="text-slate-500">Gain total</span>
             <span className="text-emerald-600 font-bold">
               +{totalPotentialGain.toFixed(2)} EUR
             </span>

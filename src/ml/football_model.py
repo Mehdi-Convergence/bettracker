@@ -1,4 +1,4 @@
-"""XGBoost multiclass football prediction model with isotonic calibration."""
+"""Ensemble (XGBoost + LightGBM) multiclass football prediction model."""
 
 import json
 from pathlib import Path
@@ -6,6 +6,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
+from lightgbm import LGBMClassifier
 from rich.console import Console
 from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import accuracy_score, brier_score_loss, log_loss
@@ -22,62 +23,91 @@ REVERSE_MAP = {0: "H", 1: "D", 2: "A"}
 # Drop xG features (not available). Keep implied odds (carry injury/news info).
 MODEL_FEATURES = [f for f in FEATURE_COLUMNS if "xg" not in f]
 
+# Ensemble weight: XGBoost vs LightGBM (sum must = 1.0)
+XGB_WEIGHT = 0.80
+LGB_WEIGHT = 0.20
+
 
 class FootballModel:
-    """XGBoost 3-class (H/D/A) with optional isotonic calibration."""
+    """Ensemble XGBoost + LightGBM 3-class (H/D/A) with soft voting."""
 
     def __init__(self):
         self.base_model = XGBClassifier(
             objective="multi:softprob",
             num_class=3,
-            n_estimators=250,
-            max_depth=3,
-            learning_rate=0.018348,
-            subsample=0.6448,
-            colsample_bytree=0.8828,
-            min_child_weight=30,
-            reg_alpha=0.749750,
-            reg_lambda=0.165750,
-            gamma=1.818039,
+            # Optuna-tuned params (v6, 150 trials, log-loss 0.9809, 95 features)
+            n_estimators=205,
+            max_depth=2,
+            learning_rate=0.03655,
+            subsample=0.4579,
+            colsample_bytree=0.7459,
+            min_child_weight=33,
+            reg_alpha=2.683,
+            reg_lambda=0.716,
+            gamma=3.796,
             eval_metric="mlogloss",
             verbosity=0,
+        )
+        self.lgb_model = LGBMClassifier(
+            objective="multiclass",
+            num_class=3,
+            # Optuna-tuned params (v6, 120 trials, log-loss 0.9825, 95 features)
+            n_estimators=504,
+            max_depth=3,
+            learning_rate=0.00740,
+            subsample=0.6054,
+            colsample_bytree=0.5297,
+            min_child_samples=7,
+            reg_alpha=1.661,
+            reg_lambda=1.486,
+            num_leaves=34,
+            verbose=-1,
         )
         self.calibrators = None  # One IsotonicRegression per class
 
     def train(self, X_train, y_train):
-        """Train base model without calibration (raw softprob)."""
+        """Train both models without calibration."""
         self.calibrators = None
         self.base_model.fit(X_train, y_train)
+        self.lgb_model.fit(X_train, y_train)
 
     def train_with_calibration(self, X_train, y_train, X_cal, y_cal):
-        """Train base model then calibrate with isotonic regression on held-out set."""
+        """Train both models then calibrate ensemble on held-out set."""
         self.base_model.fit(X_train, y_train)
+        self.lgb_model.fit(X_train, y_train)
 
-        # Manual calibration: fit isotonic regression per class on calibration set
-        raw_proba = self.base_model.predict_proba(X_cal)
+        # Calibrate on ensemble probabilities
+        raw_proba = self._ensemble_proba(X_cal)
         self.calibrators = []
         for cls_idx in range(3):
             ir = IsotonicRegression(out_of_bounds="clip")
             ir.fit(raw_proba[:, cls_idx], (y_cal == cls_idx).astype(float))
             self.calibrators.append(ir)
 
+    def _ensemble_proba(self, X) -> np.ndarray:
+        """Soft-voting ensemble: weighted average of XGB and LGB probas."""
+        xgb_p = self.base_model.predict_proba(X)
+        lgb_p = self.lgb_model.predict_proba(X)
+        blended = XGB_WEIGHT * xgb_p + LGB_WEIGHT * lgb_p
+        # Normalize (should sum to 1 already, but guard against float errors)
+        row_sums = blended.sum(axis=1, keepdims=True)
+        return blended / np.maximum(row_sums, 1e-10)
+
     def predict_proba(self, X) -> np.ndarray:
-        """Return calibrated probabilities [P(H), P(D), P(A)]."""
-        raw = self.base_model.predict_proba(X)
+        """Return ensemble probabilities [P(H), P(D), P(A)]."""
+        raw = self._ensemble_proba(X)
         if self.calibrators is None:
             return raw
 
         calibrated = np.column_stack([
             self.calibrators[i].predict(raw[:, i]) for i in range(3)
         ])
-        # Normalize so probabilities sum to 1
         row_sums = calibrated.sum(axis=1, keepdims=True)
-        row_sums = np.maximum(row_sums, 1e-10)
-        return calibrated / row_sums
+        return calibrated / np.maximum(row_sums, 1e-10)
 
     def predict_proba_uncalibrated(self, X) -> np.ndarray:
-        """Return raw (uncalibrated) probabilities."""
-        return self.base_model.predict_proba(X)
+        """Return raw (uncalibrated) ensemble probabilities."""
+        return self._ensemble_proba(X)
 
     def walk_forward_train(self, df: pd.DataFrame) -> dict:
         """Full walk-forward training with per-fold metrics."""
@@ -153,6 +183,7 @@ class FootballModel:
         path.mkdir(parents=True, exist_ok=True)
         joblib.dump({
             "base_model": self.base_model,
+            "lgb_model": self.lgb_model,
             "calibrators": self.calibrators,
         }, path / "model.joblib")
         with open(path / "metadata.json", "w") as f:
@@ -162,4 +193,5 @@ class FootballModel:
         """Load saved model."""
         data = joblib.load(path / "model.joblib")
         self.base_model = data["base_model"]
+        self.lgb_model = data.get("lgb_model", self.lgb_model)
         self.calibrators = data["calibrators"]

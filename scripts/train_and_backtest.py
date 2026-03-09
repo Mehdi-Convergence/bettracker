@@ -3,13 +3,15 @@ import os
 import sys
 from pathlib import Path
 
+sys.path.insert(0, "C:/Users/MehdiBouziane/bettracker")
+
 import pandas as pd
 from rich.console import Console
 
 from src.backtest.engine import BacktestEngine
 from src.backtest.metrics import BacktestMetrics
 from src.backtest.report import print_report
-from src.ml.football_model import FootballModel, MODEL_FEATURES
+from src.ml.football_model import FootballModel, MODEL_FEATURES, LABEL_MAP
 
 console = Console()
 
@@ -114,11 +116,26 @@ def main():
             color = "green" if roi > 0 else "red"
             console.print(f"  {league}: {total} bets, {wins}/{total} W, ROI [{color}]{roi:+.1f}%[/{color}]")
 
+    # --- Final production model: retrain on ALL data ---
+    console.print("\n" + "=" * 60)
+    console.print("[bold]PHASE 3: Production Model (train on ALL seasons)[/bold]")
+    console.print("=" * 60)
+    X_all = df[MODEL_FEATURES].fillna(0).values
+    y_all = df["ftr"].map(LABEL_MAP).values
+    console.print(f"  Training on {len(X_all)} matches ({sorted(df['season'].unique())})")
+    model.train(X_all, y_all)
+    console.print("  [green]Done.[/green]")
+
     # --- Save model ---
     model_path = Path("models/football")
     model_path.mkdir(parents=True, exist_ok=True)
-    model.save(model_path, {"features": MODEL_FEATURES, "results": results["average"]})
-    console.print(f"\n[bold green]Model saved to {model_path}[/bold green]")
+    model.save(model_path, {
+        "features": MODEL_FEATURES,
+        "results": results["average"],
+        "trained_on": "all_seasons",
+        "n_samples": len(X_all),
+    })
+    console.print(f"\n[bold green]Production model saved to {model_path}[/bold green]")
 
 
 if __name__ == "__main__":

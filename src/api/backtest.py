@@ -2,8 +2,9 @@
 
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from src.api.deps import require_tier
 from src.api.schemas import (
     BacktestRequest,
     BacktestResponse,
@@ -13,7 +14,7 @@ from src.api.schemas import (
 from src.backtest.engine import BacktestEngine
 from src.backtest.metrics import BacktestMetrics
 
-router = APIRouter(tags=["backtest"])
+router = APIRouter(tags=["backtest"], dependencies=[Depends(require_tier("premium"))])
 
 
 @router.post("/backtest/run", response_model=BacktestResponse)

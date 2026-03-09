@@ -30,7 +30,33 @@ class Settings(BaseSettings):
     REQUEST_DELAY_SECONDS: float = 1.0
     MAX_RETRIES: int = 3
 
+    # Redis (optional, for shared cache)
+    REDIS_URL: str = ""
+
+    # CORS
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+    ]
+
+    # Auth / JWT (no default — MUST be set via env or .env)
+    JWT_SECRET_KEY: str = ""
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    TRIAL_DAYS: int = 7
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
 settings = Settings()
+
+if not settings.JWT_SECRET_KEY or settings.JWT_SECRET_KEY in ("", "change-me-in-production", "CHANGE-ME-IN-PRODUCTION"):
+    import os
+    if os.getenv("TESTING") != "1":
+        raise RuntimeError(
+            "JWT_SECRET_KEY must be set to a strong random value. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+        )
