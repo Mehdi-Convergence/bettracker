@@ -85,10 +85,24 @@ export interface PortfolioStats {
   roi_pct: number;
   longest_winning_streak: number;
   longest_losing_streak: number;
+  prev_roi_pct: number | null;
+}
+
+export interface PortfolioHistoryPoint {
+  date: string;
+  cumulative_pnl: number;
+  roi_pct: number;
+}
+
+export interface DashboardSummary {
+  active_campaigns: number;
+  pending_bets: number;
+  recent_results: { won: number; lost: number };
 }
 
 export interface Bet {
   id: number;
+  sport: string;
   home_team: string;
   away_team: string;
   league: string;

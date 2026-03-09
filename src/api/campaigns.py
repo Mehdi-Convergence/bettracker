@@ -100,6 +100,7 @@ def _compute_bet_stats(bets: list[Bet], initial_bankroll: float) -> CampaignStat
 def _bet_to_response(b: Bet) -> BetResponse:
     return BetResponse(
         id=b.id,
+        sport=b.sport or "football",
         home_team=b.home_team,
         away_team=b.away_team,
         league=b.league or "",

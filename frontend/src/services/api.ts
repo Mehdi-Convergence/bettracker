@@ -105,8 +105,24 @@ export function createBet(body: unknown) {
   });
 }
 
-export function getPortfolioStats() {
-  return request<import("../types").PortfolioStats>("/portfolio/stats");
+export function getPortfolioStats(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams();
+  if (fromDate) params.set("from_date", fromDate);
+  if (toDate) params.set("to_date", toDate);
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  return request<import("../types").PortfolioStats>(`/portfolio/stats${qs}`);
+}
+
+export function getPortfolioHistory(fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams();
+  if (fromDate) params.set("from_date", fromDate);
+  if (toDate) params.set("to_date", toDate);
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  return request<import("../types").PortfolioHistoryPoint[]>(`/portfolio/history${qs}`);
+}
+
+export function getDashboardSummary() {
+  return request<import("../types").DashboardSummary>("/dashboard/summary");
 }
 
 // Team autocomplete

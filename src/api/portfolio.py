@@ -1,6 +1,7 @@
 """Portfolio management: track bets, bankroll, stats."""
 
-from datetime import datetime
+from collections import defaultdict
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 from src.api.schemas import (
     BetCreateRequest,
     BetResponse,
+    PortfolioHistoryPoint,
     PortfolioStatsResponse,
 )
 from src.api.deps import require_tier
@@ -90,9 +92,18 @@ def update_bet_result(
 
 
 @router.get("/portfolio/stats", response_model=PortfolioStatsResponse)
-def get_portfolio_stats(db: Session = Depends(get_db)):
-    """Get portfolio statistics."""
-    bets = db.query(Bet).filter(Bet.is_backtest == False).order_by(Bet.match_date).all()
+def get_portfolio_stats(
+    from_date: date | None = Query(default=None, description="Filter bets from this date (inclusive)"),
+    to_date: date | None = Query(default=None, description="Filter bets up to this date (inclusive)"),
+    db: Session = Depends(get_db),
+):
+    """Get portfolio statistics, optionally filtered by date range."""
+    query = db.query(Bet).filter(Bet.is_backtest == False)
+    if from_date:
+        query = query.filter(Bet.match_date >= datetime.combine(from_date, datetime.min.time()))
+    if to_date:
+        query = query.filter(Bet.match_date <= datetime.combine(to_date, datetime.max.time()))
+    bets = query.order_by(Bet.match_date).all()
 
     if not bets:
         return PortfolioStatsResponse(
@@ -120,6 +131,26 @@ def get_portfolio_stats(db: Session = Depends(get_db)):
             w_streak = 0
             max_l = max(max_l, l_streak)
 
+    roi_pct = round((total_pnl / total_staked * 100), 2) if total_staked > 0 else 0
+
+    # Compute prev_roi_pct for delta display when date range is provided
+    prev_roi_pct = None
+    if from_date and to_date:
+        period_days = (to_date - from_date).days
+        if period_days > 0:
+            prev_from = from_date - timedelta(days=period_days)
+            prev_to = from_date - timedelta(days=1)
+            prev_query = db.query(Bet).filter(
+                Bet.is_backtest == False,
+                Bet.match_date >= datetime.combine(prev_from, datetime.min.time()),
+                Bet.match_date <= datetime.combine(prev_to, datetime.max.time()),
+                Bet.result.in_(["won", "lost"]),
+            )
+            prev_bets = prev_query.all()
+            prev_staked = sum(b.stake for b in prev_bets)
+            prev_pnl = sum(b.profit_loss or 0 for b in prev_bets)
+            prev_roi_pct = round((prev_pnl / prev_staked * 100), 2) if prev_staked > 0 else 0.0
+
     return PortfolioStatsResponse(
         total_bets=len(bets),
         pending_bets=pending,
@@ -128,16 +159,63 @@ def get_portfolio_stats(db: Session = Depends(get_db)):
         win_rate=round(won / len(settled), 4) if settled else 0,
         total_staked=round(total_staked, 2),
         total_pnl=round(total_pnl, 2),
-        roi_pct=round((total_pnl / total_staked * 100), 2) if total_staked > 0 else 0,
+        roi_pct=roi_pct,
         longest_winning_streak=max_w,
         longest_losing_streak=max_l,
+        prev_roi_pct=prev_roi_pct,
     )
+
+
+@router.get("/portfolio/history", response_model=list[PortfolioHistoryPoint])
+def get_portfolio_history(
+    from_date: date | None = Query(default=None, description="Filter from this date"),
+    to_date: date | None = Query(default=None, description="Filter up to this date"),
+    db: Session = Depends(get_db),
+):
+    """Get P&L history as cumulative points grouped by date."""
+    query = db.query(Bet).filter(
+        Bet.is_backtest == False,
+        Bet.result.in_(["won", "lost"]),
+    )
+    if from_date:
+        query = query.filter(Bet.match_date >= datetime.combine(from_date, datetime.min.time()))
+    if to_date:
+        query = query.filter(Bet.match_date <= datetime.combine(to_date, datetime.max.time()))
+
+    bets = query.order_by(Bet.match_date).all()
+
+    if not bets:
+        return []
+
+    # Group by date
+    daily: dict[str, dict] = defaultdict(lambda: {"pnl": 0.0, "staked": 0.0})
+    for b in bets:
+        d = b.match_date.strftime("%Y-%m-%d")
+        daily[d]["pnl"] += b.profit_loss or 0
+        daily[d]["staked"] += b.stake
+
+    # Build cumulative series
+    points: list[PortfolioHistoryPoint] = []
+    cum_pnl = 0.0
+    cum_staked = 0.0
+    for d in sorted(daily.keys()):
+        cum_pnl += daily[d]["pnl"]
+        cum_staked += daily[d]["staked"]
+        roi = round((cum_pnl / cum_staked * 100), 2) if cum_staked > 0 else 0.0
+        points.append(PortfolioHistoryPoint(
+            date=d,
+            cumulative_pnl=round(cum_pnl, 2),
+            roi_pct=roi,
+        ))
+
+    return points
 
 
 
 def _bet_to_response(b: Bet) -> BetResponse:
     return BetResponse(
         id=b.id,
+        sport=b.sport or "football",
         home_team=b.home_team,
         away_team=b.away_team,
         league=b.league or "",

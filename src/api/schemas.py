@@ -227,6 +227,7 @@ class BetCreateRequest(BaseModel):
 
 class BetResponse(BaseModel):
     id: int
+    sport: str
     home_team: str
     away_team: str
     league: str
@@ -251,6 +252,19 @@ class PortfolioStatsResponse(BaseModel):
     roi_pct: float
     longest_winning_streak: int
     longest_losing_streak: int
+    prev_roi_pct: float | None = None
+
+
+class PortfolioHistoryPoint(BaseModel):
+    date: str
+    cumulative_pnl: float
+    roi_pct: float
+
+
+class DashboardSummaryResponse(BaseModel):
+    active_campaigns: int
+    pending_bets: int
+    recent_results: dict  # {"won": int, "lost": int}
 
 
 class BankrollPointResponse(BaseModel):

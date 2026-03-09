@@ -13,6 +13,7 @@ from src.api.combos import router as combos_router
 from src.api.portfolio import router as portfolio_router
 from src.api.campaigns import router as campaigns_router
 from src.api.auth import router as auth_router
+from src.api.dashboard import router as dashboard_router
 
 from src.config import settings
 from src.rate_limit import limiter
@@ -48,3 +49,4 @@ app.include_router(scanner_router, prefix="/api")
 app.include_router(combos_router, prefix="/api")
 app.include_router(portfolio_router, prefix="/api")
 app.include_router(campaigns_router, prefix="/api")
+app.include_router(dashboard_router, prefix="/api")
