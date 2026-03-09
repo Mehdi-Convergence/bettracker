@@ -74,6 +74,15 @@ export interface BacktestResponse {
   config: Record<string, unknown>;
 }
 
+export interface SportBreakdown {
+  sport: string;
+  won: number;
+  lost: number;
+  pnl: number;
+  staked: number;
+  roi_pct: number;
+}
+
 export interface PortfolioStats {
   total_bets: number;
   pending_bets: number;
@@ -86,6 +95,10 @@ export interface PortfolioStats {
   longest_winning_streak: number;
   longest_losing_streak: number;
   prev_roi_pct: number | null;
+  prev_total_staked: number | null;
+  prev_win_rate: number | null;
+  prev_total_bets: number | null;
+  sport_breakdown: SportBreakdown[] | null;
 }
 
 export interface PortfolioHistoryPoint {
@@ -94,10 +107,21 @@ export interface PortfolioHistoryPoint {
   roi_pct: number;
 }
 
+export interface CampaignSummaryItem {
+  id: number;
+  name: string;
+  total_bets: number;
+  won: number;
+  lost: number;
+  pending: number;
+  roi_pct: number;
+}
+
 export interface DashboardSummary {
   active_campaigns: number;
   pending_bets: number;
   recent_results: { won: number; lost: number };
+  campaign_summaries: CampaignSummaryItem[];
 }
 
 export interface Bet {
@@ -113,6 +137,7 @@ export interface Bet {
   result: string;
   profit_loss: number | null;
   campaign_id: number | null;
+  combo_group: string | null;
   created_at: string;
 }
 

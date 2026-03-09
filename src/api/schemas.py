@@ -238,6 +238,7 @@ class BetResponse(BaseModel):
     result: str
     profit_loss: float | None = None
     campaign_id: int | None = None
+    combo_group: str | None = None
     created_at: str
 
 
@@ -253,6 +254,10 @@ class PortfolioStatsResponse(BaseModel):
     longest_winning_streak: int
     longest_losing_streak: int
     prev_roi_pct: float | None = None
+    prev_total_staked: float | None = None
+    prev_win_rate: float | None = None
+    prev_total_bets: int | None = None
+    sport_breakdown: list[dict] | None = None  # [{sport, won, lost, pnl, staked, roi_pct}]
 
 
 class PortfolioHistoryPoint(BaseModel):
@@ -261,10 +266,21 @@ class PortfolioHistoryPoint(BaseModel):
     roi_pct: float
 
 
+class CampaignSummaryItem(BaseModel):
+    id: int
+    name: str
+    total_bets: int
+    won: int
+    lost: int
+    pending: int
+    roi_pct: float
+
+
 class DashboardSummaryResponse(BaseModel):
     active_campaigns: int
     pending_bets: int
     recent_results: dict  # {"won": int, "lost": int}
+    campaign_summaries: list[CampaignSummaryItem] = []
 
 
 class BankrollPointResponse(BaseModel):

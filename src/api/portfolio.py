@@ -133,8 +133,11 @@ def get_portfolio_stats(
 
     roi_pct = round((total_pnl / total_staked * 100), 2) if total_staked > 0 else 0
 
-    # Compute prev_roi_pct for delta display when date range is provided
+    # Compute prev period deltas when date range is provided
     prev_roi_pct = None
+    prev_total_staked = None
+    prev_win_rate = None
+    prev_total_bets = None
     if from_date and to_date:
         period_days = (to_date - from_date).days
         if period_days > 0:
@@ -144,12 +147,39 @@ def get_portfolio_stats(
                 Bet.is_backtest == False,
                 Bet.match_date >= datetime.combine(prev_from, datetime.min.time()),
                 Bet.match_date <= datetime.combine(prev_to, datetime.max.time()),
-                Bet.result.in_(["won", "lost"]),
             )
-            prev_bets = prev_query.all()
-            prev_staked = sum(b.stake for b in prev_bets)
-            prev_pnl = sum(b.profit_loss or 0 for b in prev_bets)
+            prev_all = prev_query.all()
+            prev_settled = [b for b in prev_all if b.result in ("won", "lost")]
+            prev_won_count = sum(1 for b in prev_settled if b.result == "won")
+            prev_staked = sum(b.stake for b in prev_settled)
+            prev_pnl = sum(b.profit_loss or 0 for b in prev_settled)
             prev_roi_pct = round((prev_pnl / prev_staked * 100), 2) if prev_staked > 0 else 0.0
+            prev_total_staked = round(prev_staked, 2)
+            prev_win_rate = round(prev_won_count / len(prev_settled), 4) if prev_settled else 0.0
+            prev_total_bets = len(prev_all)
+
+    # Sport breakdown
+    sport_map: dict[str, dict] = defaultdict(lambda: {"won": 0, "lost": 0, "pnl": 0.0, "staked": 0.0})
+    for b in settled:
+        sport_name = b.sport or "football"
+        sport_map[sport_name]["staked"] += b.stake
+        sport_map[sport_name]["pnl"] += b.profit_loss or 0
+        if b.result == "won":
+            sport_map[sport_name]["won"] += 1
+        else:
+            sport_map[sport_name]["lost"] += 1
+
+    sport_breakdown = []
+    for sname, sdata in sport_map.items():
+        s_roi = round((sdata["pnl"] / sdata["staked"] * 100), 2) if sdata["staked"] > 0 else 0.0
+        sport_breakdown.append({
+            "sport": sname,
+            "won": sdata["won"],
+            "lost": sdata["lost"],
+            "pnl": round(sdata["pnl"], 2),
+            "staked": round(sdata["staked"], 2),
+            "roi_pct": s_roi,
+        })
 
     return PortfolioStatsResponse(
         total_bets=len(bets),
@@ -163,6 +193,10 @@ def get_portfolio_stats(
         longest_winning_streak=max_w,
         longest_losing_streak=max_l,
         prev_roi_pct=prev_roi_pct,
+        prev_total_staked=prev_total_staked,
+        prev_win_rate=prev_win_rate,
+        prev_total_bets=prev_total_bets,
+        sport_breakdown=sport_breakdown,
     )
 
 
@@ -226,5 +260,6 @@ def _bet_to_response(b: Bet) -> BetResponse:
         result=b.result or "pending",
         profit_loss=b.profit_loss,
         campaign_id=b.campaign_id,
+        combo_group=b.combo_group,
         created_at=b.created_at.isoformat() if b.created_at else "",
     )
