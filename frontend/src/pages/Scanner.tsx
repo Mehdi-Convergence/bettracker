@@ -1,22 +1,102 @@
 import { useState, useMemo, useEffect } from "react";
-import { Search, AlertTriangle, Filter, Calendar, Clock, HelpCircle, GripVertical, X, Eye, Star, ChevronDown, Trophy, RefreshCw } from "lucide-react";
+import {
+  Search, AlertTriangle, Filter, Calendar, Clock, HelpCircle,
+  GripVertical, X, Eye, Star, ChevronDown, Trophy, RefreshCw,
+  ScanSearch, TrendingUp, Shield, CheckCircle2,
+} from "lucide-react";
 import { aiScan } from "@/services/api";
 import TicketBuilder from "@/components/TicketBuilder";
 import AIScanMatchDetailPanel from "@/components/AIScanMatchDetailPanel";
 import type { ValueBet, Ticket, AIScanMatch } from "@/types";
 import { LEAGUE_INFO } from "@/types";
 
+/* ═══════════════════════════════════════════════════════════════════
+   Constants
+   ═══════════════════════════════════════════════════════════════════ */
+
 const ALL_LEAGUE_CODES = Object.keys(LEAGUE_INFO);
 const DIV1_CODES = ALL_LEAGUE_CODES.filter((c) => LEAGUE_INFO[c].division === 1);
 const DIV2_CODES = ALL_LEAGUE_CODES.filter((c) => LEAGUE_INFO[c].division === 2);
 const CUP_CODES = ALL_LEAGUE_CODES.filter((c) => LEAGUE_INFO[c].division === 0);
 const EUR_CODES = ALL_LEAGUE_CODES.filter((c) => LEAGUE_INFO[c].division === -1);
-// Reverse lookup: API league name → LeagueInfo (for card display)
+
+/* ── Tennis circuits (static, like LEAGUE_INFO for football) ── */
+interface TennisCircuit {
+  code: string;
+  name: string;
+  emoji: string;
+  patterns: string[];
+  knownTournaments: string[];
+}
+
+const TENNIS_CIRCUITS: TennisCircuit[] = [
+  {
+    code: "GS", name: "Grand Chelem", emoji: "🏆",
+    patterns: ["australian open", "roland garros", "french open", "wimbledon", "us open"],
+    knownTournaments: ["Australian Open", "Roland Garros", "Wimbledon", "US Open"],
+  },
+  {
+    code: "ATP", name: "ATP", emoji: "🎾",
+    patterns: ["atp"],
+    knownTournaments: [
+      "ATP Indian Wells", "ATP Miami Open", "ATP Monte Carlo", "ATP Madrid Open",
+      "ATP Italian Open", "ATP Canadian Open", "ATP Cincinnati", "ATP Shanghai",
+      "ATP Paris Masters", "ATP Barcelona", "ATP Halle", "ATP Queen's Club",
+      "ATP Hamburg", "ATP Washington", "ATP Beijing", "ATP Vienna",
+      "ATP Basel", "ATP Brisbane", "ATP Adelaide", "ATP Auckland",
+      "ATP Doha", "ATP Dubai", "ATP Marseille", "ATP Rotterdam",
+      "ATP Rio de Janeiro", "ATP Buenos Aires", "ATP Acapulco",
+      "ATP Lyon", "ATP Geneva", "ATP Stuttgart", "ATP Eastbourne",
+      "ATP Atlanta", "ATP Los Cabos", "ATP Umag", "ATP Gstaad",
+      "ATP Kitzbuhel", "ATP Winston-Salem", "ATP Chengdu", "ATP Zhuhai",
+      "ATP Tokyo", "ATP Stockholm", "ATP Antwerp", "ATP Moscow",
+      "ATP St. Petersburg", "ATP Metz", "ATP Sofia", "ATP Astana",
+      "ATP Florence", "ATP Naples", "ATP Tel Aviv", "ATP Nitto ATP Finals",
+    ],
+  },
+  {
+    code: "WTA", name: "WTA", emoji: "🎾",
+    patterns: ["wta"],
+    knownTournaments: [
+      "WTA Indian Wells", "WTA Miami Open", "WTA Madrid Open", "WTA Italian Open",
+      "WTA Canadian Open", "WTA Cincinnati", "WTA Beijing", "WTA Wuhan",
+      "WTA Dubai", "WTA Doha", "WTA Stuttgart", "WTA Rome",
+      "WTA San Diego", "WTA Guadalajara", "WTA Zhengzhou", "WTA Tokyo",
+      "WTA Brisbane", "WTA Adelaide", "WTA Hobart", "WTA Auckland",
+      "WTA Lyon", "WTA Monterrey", "WTA Bogota", "WTA Charleston",
+      "WTA Istanbul", "WTA Strasbourg", "WTA Nottingham", "WTA Birmingham",
+      "WTA Eastbourne", "WTA Bad Homburg", "WTA Budapest", "WTA Palermo",
+      "WTA Prague", "WTA Lausanne", "WTA San Jose", "WTA Washington",
+      "WTA Cleveland", "WTA Granby", "WTA Chicago", "WTA Portoroz",
+      "WTA Ostrava", "WTA Moscow", "WTA Cluj-Napoca", "WTA Tenerife",
+      "WTA Courmayeur", "WTA Linz", "WTA Transylvania", "WTA WTA Finals",
+    ],
+  },
+  {
+    code: "CHALLENGER", name: "Challengers", emoji: "🔸",
+    patterns: ["challenger"],
+    knownTournaments: [],
+  },
+  {
+    code: "ITF", name: "ITF", emoji: "🔹",
+    patterns: ["itf"],
+    knownTournaments: [],
+  },
+];
+const ALL_CIRCUIT_CODES = TENNIS_CIRCUITS.map((c) => c.code);
+
+function matchCircuit(league: string): string | null {
+  const lower = (league || "").toLowerCase();
+  for (const c of TENNIS_CIRCUITS) {
+    if (c.patterns.some((p) => lower.includes(p))) return c.code;
+  }
+  return null;
+}
+
 const LEAGUE_INFO_BY_NAME: Record<string, import("@/types").LeagueInfo> = Object.fromEntries(
   Object.values(LEAGUE_INFO).map((v) => [v.name, v])
 );
 
-// Group leagues by country for the selector
 const LEAGUES_BY_COUNTRY: { country: string; flag: string; leagues: { code: string; name: string; division: number }[] }[] = (() => {
   const map = new Map<string, { flag: string; leagues: { code: string; name: string; division: number }[] }>();
   for (const [code, info] of Object.entries(LEAGUE_INFO)) {
@@ -28,6 +108,10 @@ const LEAGUES_BY_COUNTRY: { country: string; flag: string; leagues: { code: stri
 })();
 
 type SortKey = "edge" | "date" | "league" | "prob";
+
+/* ═══════════════════════════════════════════════════════════════════
+   Helpers
+   ═══════════════════════════════════════════════════════════════════ */
 
 function parseBetDate(raw: string): { dateStr: string; timeStr: string | null; hour: number | null } {
   if (raw.includes("T")) {
@@ -42,12 +126,44 @@ function parseBetDate(raw: string): { dateStr: string; timeStr: string | null; h
 function Tip({ text }: { text: string }) {
   return (
     <span className="inline-block ml-1 cursor-help" title={text}>
-      <HelpCircle size={11} className="text-slate-400 hover:text-slate-600 inline" />
+      <HelpCircle size={11} className="text-[#8a919e] hover:text-[#111318] inline" />
     </span>
   );
 }
 
+function extractBkOdds(val: unknown): Record<string, number> {
+  if (val && typeof val === "object" && !Array.isArray(val)) {
+    const res: Record<string, number> = {};
+    for (const [bk, o] of Object.entries(val as Record<string, unknown>)) {
+      const n = Number(o); if (n > 0) res[bk] = n;
+    }
+    return res;
+  }
+  const n = Number(val);
+  return n > 0 ? { "IA": n } : {};
+}
+
+/** Day label for grouping matches */
+function dayLabel(dateStr: string): string {
+  const d = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const matchDay = new Date(d);
+  matchDay.setHours(0, 0, 0, 0);
+
+  if (matchDay.getTime() === today.getTime()) return "Aujourd'hui";
+  if (matchDay.getTime() === tomorrow.getTime()) return "Demain";
+  return d.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit" });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Component
+   ═══════════════════════════════════════════════════════════════════ */
+
 export default function Scanner() {
+  /* ── State ── */
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hasScanned, setHasScanned] = useState(false);
@@ -57,13 +173,13 @@ export default function Scanner() {
   const [aiMatches, setAiMatches] = useState<AIScanMatch[]>([]);
   const [aiDuration, setAiDuration] = useState(0);
 
-  // On mount: auto-load last cached scan silently
+  // Auto-load cached scan on mount
   useEffect(() => {
     handleAIScan(false, true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Ticket builder
+  // Tickets
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [activeTicketIdx, setActiveTicketIdx] = useState(0);
   const [hiddenMatches, setHiddenMatches] = useState<Set<string>>(new Set());
@@ -78,6 +194,8 @@ export default function Scanner() {
   // Filters
   const [searchTeam, setSearchTeam] = useState("");
   const [activeLeagues, setActiveLeagues] = useState<Set<string>>(new Set(ALL_LEAGUE_CODES));
+  const [excludedTournaments, setExcludedTournaments] = useState<Set<string>>(new Set());
+  const [showCircuits, setShowCircuits] = useState(false);
   const [dateFrom, setDateFrom] = useState(() => new Date().toISOString().slice(0, 10));
   const [dateTo, setDateTo] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 2); return d.toISOString().slice(0, 10); });
   const [timeFrom, setTimeFrom] = useState("");
@@ -87,11 +205,15 @@ export default function Scanner() {
   const [minEdge, setMinEdge] = useState<string>("");
   const [minOdds, setMinOdds] = useState<string>("");
   const [maxOdds, setMaxOdds] = useState<string>("");
+  // New filters
+  const [hideInTicket, setHideInTicket] = useState(false);
+  const [minDataScore, setMinDataScore] = useState<string>("");
+  const [valueOnlyFilter, setValueOnlyFilter] = useState(false);
 
+  /* ── Scan ── */
   async function handleAIScan(forceRefresh = false, silent = false) {
     if (!silent) { setLoading(true); setError(""); }
     try {
-      // Always scan all leagues → stable cache key, league selector = display filter only
       const timeframeMap: Record<string, string> = { today: "24h", "48h": "48h", "72h": "72h", week: "1w", month: "1m" };
       const data = await aiScan({
         sport,
@@ -114,18 +236,26 @@ export default function Scanner() {
     if (!silent) setLoading(false);
   }
 
-  // Filtered + sorted AI matches
+  /* ── Filtered + sorted AI matches ── */
   const filteredAiMatches = useMemo(() => {
     let result = aiMatches.filter((am) => !hiddenMatches.has(
       am.sport === "football" ? `${am.home_team}_${am.away_team}` : `${am.player1}_${am.player2}`
     ));
 
-    // League display filter (football only) — compare league names since API returns names not codes
+    // League display filter (football only)
     if (sport === "football" && activeLeagues.size < ALL_LEAGUE_CODES.length) {
       const activeNames = new Set(
         ALL_LEAGUE_CODES.filter((c) => activeLeagues.has(c)).map((c) => LEAGUE_INFO[c]?.name).filter(Boolean)
       );
       result = result.filter((am) => am.sport !== "football" || !am.league || activeNames.has(am.league));
+    }
+
+    // Circuit/tournament filter (tennis only)
+    if (sport === "tennis" && excludedTournaments.size > 0) {
+      result = result.filter((am) => {
+        if (am.sport !== "tennis") return true;
+        return !excludedTournaments.has(am.league || "");
+      });
     }
 
     if (searchTeam.trim()) {
@@ -196,6 +326,34 @@ export default function Scanner() {
       });
     }
 
+    // Value bets only filter
+    if (valueOnlyFilter) {
+      result = result.filter((am) => {
+        const maxEdge = Math.max(...Object.values(am.edges ?? {}), 0);
+        return maxEdge > 0;
+      });
+    }
+
+    // Min data score filter
+    if (minDataScore) {
+      const minD = Number(minDataScore);
+      result = result.filter((am) => {
+        const maxPts = am.sport === "tennis" ? 18 : 20;
+        return (am.data_score ?? 0) * maxPts >= minD;
+      });
+    }
+
+    // Hide in-ticket filter
+    if (hideInTicket) {
+      result = result.filter((am) => {
+        const isFootball = am.sport === "football";
+        const home = isFootball ? (am.home_team || "") : (am.player1 || "");
+        const away = isFootball ? (am.away_team || "") : (am.player2 || "");
+        const prefix = `${home}_${away}_`;
+        return !tickets.some((t) => t.legs.some((l) => l.id.startsWith(prefix)));
+      });
+    }
+
     // Sort
     result = [...result].sort((a, b) => {
       switch (sortBy) {
@@ -216,8 +374,9 @@ export default function Scanner() {
     });
 
     return result;
-  }, [aiMatches, searchTeam, activeLeagues, sport, dateFrom, dateTo, timeFrom, timeTo, sortBy, hiddenMatches, minEdge, minOdds, maxOdds]);
+  }, [aiMatches, searchTeam, activeLeagues, excludedTournaments, sport, dateFrom, dateTo, timeFrom, timeTo, sortBy, hiddenMatches, minEdge, minOdds, maxOdds, valueOnlyFilter, minDataScore, hideInTicket, tickets]);
 
+  /* ── League management ── */
   function toggleLeague(code: string) {
     const next = new Set(activeLeagues);
     if (next.has(code)) next.delete(code); else next.add(code);
@@ -235,6 +394,67 @@ export default function Scanner() {
     else setActiveLeagues(new Set(ALL_LEAGUE_CODES));
   }
 
+  /* ── Tennis circuit grouping (static base + dynamic from matches) ── */
+  const tennisByCircuit = useMemo(() => {
+    // Collect tournament names actually present in scan results
+    const scannedTournaments = new Set<string>();
+    for (const am of aiMatches) {
+      if (am.sport === "tennis" && am.league) scannedTournaments.add(am.league);
+    }
+
+    const groups: { code: string; name: string; emoji: string; tournaments: string[]; hasMatches: Set<string> }[] = [];
+    const coveredTournaments = new Set<string>();
+
+    for (const c of TENNIS_CIRCUITS) {
+      // Start with known tournaments
+      const tournamentSet = new Set(c.knownTournaments);
+      // Add any scanned tournaments matching this circuit's patterns
+      for (const t of scannedTournaments) {
+        if (c.patterns.some((p) => t.toLowerCase().includes(p))) {
+          tournamentSet.add(t);
+          coveredTournaments.add(t);
+        }
+      }
+      // For circuits with known tournaments, always show
+      // For empty circuits (Challengers/ITF) only show if matches exist
+      if (tournamentSet.size > 0) {
+        const hasMatches = new Set([...tournamentSet].filter((t) => scannedTournaments.has(t)));
+        groups.push({ code: c.code, name: c.name, emoji: c.emoji, tournaments: [...tournamentSet].sort(), hasMatches });
+      }
+    }
+
+    // Any unknown tournaments
+    const unknowns = [...scannedTournaments].filter((t) => !coveredTournaments.has(t));
+    if (unknowns.length > 0) {
+      groups.push({ code: "OTHER", name: "Autres", emoji: "🎾", tournaments: unknowns.sort(), hasMatches: new Set(unknowns) });
+    }
+
+    return groups;
+  }, [aiMatches]);
+
+  const allTennisNames = useMemo(() => {
+    return tennisByCircuit.flatMap((g) => g.tournaments);
+  }, [tennisByCircuit]);
+
+  const activeTennisCount = allTennisNames.length - excludedTournaments.size;
+
+  function toggleTournament(name: string) {
+    const next = new Set(excludedTournaments);
+    if (next.has(name)) next.delete(name); else next.add(name);
+    setExcludedTournaments(next);
+  }
+  function toggleCircuitGroup(tournaments: string[]) {
+    const allExcluded = tournaments.every((t) => excludedTournaments.has(t));
+    const next = new Set(excludedTournaments);
+    if (allExcluded) tournaments.forEach((t) => next.delete(t));
+    else tournaments.forEach((t) => next.add(t));
+    setExcludedTournaments(next);
+  }
+  function toggleAllTournaments() {
+    if (excludedTournaments.size === 0) setExcludedTournaments(new Set(allTennisNames));
+    else setExcludedTournaments(new Set());
+  }
+
   function applyDatePreset(preset: string) {
     setDatePreset(preset);
     const today = new Date();
@@ -248,7 +468,7 @@ export default function Scanner() {
     if (preset === "month") { setDateFrom(from); setDateTo(add(30)); return; }
   }
 
-  // AI match -> TicketLeg conversion
+  /* ── AI match -> TicketLeg conversion ── */
   function aiMatchToLeg(am: AIScanMatch, outcome: string): import("@/types").TicketLeg | null {
     const isFootball = am.sport === "football";
     const home = isFootball ? (am.home_team || "") : (am.player1 || "");
@@ -256,18 +476,6 @@ export default function Scanner() {
     const rawOddsBase = isFootball
       ? (am.odds?.["1x2"] as Record<string, unknown> | undefined)
       : (am.odds?.["winner"] as Record<string, unknown> | undefined);
-
-    function extractBkOdds(val: unknown): Record<string, number> {
-      if (val && typeof val === "object" && !Array.isArray(val)) {
-        const res: Record<string, number> = {};
-        for (const [bk, o] of Object.entries(val as Record<string, unknown>)) {
-          const n = Number(o); if (n > 0) res[bk] = n;
-        }
-        return res;
-      }
-      const n = Number(val);
-      return n > 0 ? { "IA": n } : {};
-    }
 
     const allBks = extractBkOdds(rawOddsBase?.[outcome]);
     const best = Object.entries(allBks).sort((a, b) => b[1] - a[1])[0];
@@ -324,156 +532,375 @@ export default function Scanner() {
     e.dataTransfer.effectAllowed = "copy";
   }
 
+  /* ── Computed stats ── */
+  const valueBetCount = useMemo(() => {
+    return filteredAiMatches.filter((am) => Math.max(...Object.values(am.edges ?? {}), 0) > 0).length;
+  }, [filteredAiMatches]);
+
+  const avgEdge = useMemo(() => {
+    const edges = filteredAiMatches
+      .map((am) => Math.max(...Object.values(am.edges ?? {}), 0))
+      .filter((e) => e > 0);
+    if (edges.length === 0) return 0;
+    return edges.reduce((a, b) => a + b, 0) / edges.length;
+  }, [filteredAiMatches]);
+
+  /** Check if any outcome of a match is in any ticket */
+  function isMatchInAnyTicket(am: AIScanMatch): boolean {
+    const isFootball = am.sport === "football";
+    const home = isFootball ? (am.home_team || "") : (am.player1 || "");
+    const away = isFootball ? (am.away_team || "") : (am.player2 || "");
+    const prefix = `${home}_${away}_`;
+    return tickets.some((t) => t.legs.some((l) => l.id.startsWith(prefix)));
+  }
+
+  /* ── Ticket builder callbacks ── */
+  const ticketCallbacks = {
+    tickets,
+    activeTicketIdx,
+    onSetActiveTicket: setActiveTicketIdx,
+    onAddTicket: () => {
+      const n = tickets.length + 1;
+      setTickets([...tickets, { id: `ticket-${n}`, name: `Ticket ${n}`, legs: [], stake: 10, bookmaker: null }]);
+      setActiveTicketIdx(tickets.length);
+    },
+    onRemoveTicket: (idx: number) => {
+      const updated = tickets.filter((_, i) => i !== idx);
+      setTickets(updated);
+      if (activeTicketIdx >= updated.length) setActiveTicketIdx(Math.max(0, updated.length - 1));
+    },
+    onRemoveLeg: (ticketIdx: number, legId: string) => {
+      const updated = [...tickets];
+      updated[ticketIdx] = { ...updated[ticketIdx], legs: updated[ticketIdx].legs.filter((l) => l.id !== legId) };
+      setTickets(updated);
+    },
+    onUpdateStake: (ticketIdx: number, stake: number) => {
+      const updated = [...tickets];
+      updated[ticketIdx] = { ...updated[ticketIdx], stake };
+      setTickets(updated);
+    },
+    onDropBet: (b: ValueBet) => {
+      const am = aiMatches.find((m) =>
+        (m.home_team === b.home_team || m.player1 === b.home_team) &&
+        (m.away_team === b.away_team || m.player2 === b.away_team)
+      );
+      let allOdds: Record<string, number> = { [b.bookmaker]: b.best_odds };
+      if (am) {
+        const isFootball = am.sport === "football";
+        const rawOddsBase = isFootball
+          ? (am.odds?.["1x2"] as Record<string, unknown> | undefined)
+          : (am.odds?.["winner"] as Record<string, unknown> | undefined);
+        const val = rawOddsBase?.[b.outcome];
+        if (val && typeof val === "object" && !Array.isArray(val)) {
+          const res: Record<string, number> = {};
+          for (const [bk, o] of Object.entries(val as Record<string, unknown>)) {
+            const n = Number(o); if (n > 0) res[bk] = n;
+          }
+          if (Object.keys(res).length > 0) allOdds = res;
+        }
+      }
+      setTickets((prev) => {
+        let updated = [...prev];
+        if (updated.length === 0) updated.push({ id: "ticket-1", name: "Ticket 1", legs: [], stake: 10, bookmaker: null });
+        const idx = activeTicketIdx >= updated.length ? 0 : activeTicketIdx;
+        const ticket = { ...updated[idx] };
+        const id = `${b.home_team}_${b.away_team}_${b.outcome}`;
+        if (!ticket.legs.some((l) => l.id === id)) {
+          const prefix = `${b.home_team}_${b.away_team}_`;
+          ticket.legs = ticket.legs.filter((l) => !l.id.startsWith(prefix));
+          const leg: import("@/types").TicketLeg = {
+            id, home_team: b.home_team, away_team: b.away_team,
+            league: b.league, date: b.date, outcome: b.outcome,
+            odds: b.best_odds, model_prob: b.model_prob, bookmaker: b.bookmaker, all_odds: allOdds,
+          };
+          ticket.legs = [...ticket.legs, leg];
+        }
+        updated[idx] = ticket;
+        return updated;
+      });
+    },
+    onUpdateLegOutcome: (ticketIdx: number, legId: string, newOutcome: string) => {
+      setTickets((prev) => {
+        const updated = [...prev];
+        const ticket = { ...updated[ticketIdx] };
+        const leg = ticket.legs.find((l) => l.id === legId);
+        if (!leg) return prev;
+        const am = aiMatches.find((m) =>
+          (m.home_team === leg.home_team || m.player1 === leg.home_team) &&
+          (m.away_team === leg.away_team || m.player2 === leg.away_team)
+        );
+        if (!am) return prev;
+        const newLeg = aiMatchToLeg(am, newOutcome);
+        if (!newLeg) return prev;
+        ticket.legs = ticket.legs.map((l) => l.id === legId ? newLeg : l);
+        updated[ticketIdx] = ticket;
+        return updated;
+      });
+    },
+    onUpdateBookmaker: (ticketIdx: number, bk: string | null) => {
+      setTickets((prev) => {
+        const updated = [...prev];
+        const ticket = { ...updated[ticketIdx], bookmaker: bk };
+        ticket.legs = ticket.legs.map((leg) => {
+          if (bk === null) {
+            const best = Object.entries(leg.all_odds).reduce(
+              (acc, [k, v]) => (v > acc.odds ? { odds: v, bookmaker: k } : acc),
+              { odds: 0, bookmaker: "" }
+            );
+            return { ...leg, odds: best.odds, bookmaker: best.bookmaker };
+          }
+          const bkOdds = leg.all_odds[bk];
+          if (bkOdds) return { ...leg, odds: bkOdds, bookmaker: bk };
+          return { ...leg, odds: 0, bookmaker: bk };
+        });
+        updated[ticketIdx] = ticket;
+        return updated;
+      });
+    },
+  };
+
+  /* ── Group matches by day ── */
+  const matchesByDay = useMemo(() => {
+    const groups: { day: string; matches: AIScanMatch[] }[] = [];
+    let currentDay = "";
+    for (const am of filteredAiMatches) {
+      const d = am.date ? parseBetDate(am.date).dateStr : "";
+      const label = d ? dayLabel(d) : "Sans date";
+      if (label !== currentDay) {
+        currentDay = label;
+        groups.push({ day: label, matches: [] });
+      }
+      groups[groups.length - 1].matches.push(am);
+    }
+    return groups;
+  }, [filteredAiMatches]);
+
+  /* ═══════════════════════════════════════════════════════════════════
+     RENDER
+     ═══════════════════════════════════════════════════════════════════ */
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Scanner</h2>
-          <p className="text-slate-500 text-sm">Detecter les value bets sur les matchs a venir</p>
+    <div className="-mx-6 -my-5 h-[calc(100vh-3.5rem)] flex flex-col overflow-hidden">
+
+      {/* ═══ TOP: Header + Filters + Action bar (full width) ═══ */}
+
+      {/* Scanner Header */}
+      <div className="shrink-0 px-5 pt-2.5 pb-2 bg-white border-b border-[#e3e6eb]">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#3b5bdb]/10 flex items-center justify-center">
+              <ScanSearch size={16} className="text-[#3b5bdb]" />
+            </div>
+            <div>
+              <h2 className="text-[17px] font-bold text-[#111318]">Scanner</h2>
+              <p className="text-[#8a919e] text-[12px]">Detecter les value bets sur les matchs a venir</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {valueBetCount > 0 && (
+              <span className="flex items-center gap-1.5 bg-[#12b76a]/10 text-[#12b76a] text-[11px] font-bold px-2.5 py-1 rounded-full border border-[#12b76a]/20">
+                <TrendingUp size={11} />
+                {valueBetCount} value bet{valueBetCount > 1 ? "s" : ""}
+              </span>
+            )}
+            {avgEdge > 0 && (
+              <span className="text-[11px] font-mono font-bold text-[#3b5bdb] bg-[#3b5bdb]/8 px-2 py-1 rounded-full">
+                Edge moy. +{(avgEdge * 100).toFixed(1)}%
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-200">
-          <div className="flex items-center gap-2 text-slate-700 text-sm font-semibold">
-            <Filter size={14} />
-            Filtres
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-500">Trier par</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}
-              className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700 font-medium focus:ring-2 focus:ring-blue-500 outline-none">
-              <option value="prob">Meilleure probabilite</option>
-              <option value="edge">Meilleur edge</option>
-              <option value="date">Date (plus proche)</option>
-              <option value="league">Ligue (A-Z)</option>
-            </select>
-          </div>
-        </div>
-
+      <div className="shrink-0 bg-white border-b border-[#e3e6eb]">
         {/* Row 1: Sport + Search + Period + Time + Edge + Odds */}
-        <div className="px-4 py-3 border-b border-slate-100">
-          <div className="flex gap-3 items-end flex-wrap">
+        <div className="px-5 py-2.5 border-b border-[#f0f1f3]">
+          <div className="flex gap-2.5 items-end flex-wrap">
+            {/* Sport pills */}
             <div>
-              <label className="block text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">Sport</label>
-              <div className="flex gap-0.5 bg-slate-100 rounded-lg p-0.5">
-                <button onClick={() => setSport("football")}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    sport === "football" ? "bg-white text-green-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                  }`}>Football</button>
-                <button onClick={() => setSport("tennis")}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    sport === "tennis" ? "bg-white text-yellow-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                  }`}>Tennis</button>
-              </div>
-            </div>
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">{sport === "tennis" ? "Joueur" : "Equipe"}</label>
-              <div className="relative">
-                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="text" placeholder={sport === "tennis" ? "Djokovic, Alcaraz, Sinner..." : "Arsenal, PSG, Real Madrid..."}
-                  value={searchTeam} onChange={(e) => setSearchTeam(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-sm text-slate-900 w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">
-                <Calendar size={9} className="inline mr-0.5" />Periode
-              </label>
-              <div className="flex gap-0.5 bg-slate-100 rounded-lg p-0.5">
-                {(["today", "48h", "72h", "week", "month"] as const).map((p) => (
-                  <button key={p} onClick={() => applyDatePreset(p)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                      datePreset === p ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                    }`}>{p === "today" ? "Auj." : p === "week" ? "7j" : p === "month" ? "1m" : p}</button>
+              <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Sport</label>
+              <div className="flex gap-1">
+                {(["football", "tennis"] as const).map((s) => (
+                  <button key={s} onClick={() => setSport(s)}
+                    className={`px-3 py-[5px] rounded-full text-[11.5px] font-semibold transition-all ${
+                      sport === s
+                        ? "bg-[#3b5bdb] text-white shadow-sm"
+                        : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
+                    }`}>
+                    {s === "football" ? "Football" : "Tennis"}
+                  </button>
                 ))}
               </div>
             </div>
-            <div className="flex gap-2">
-              <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">Du</label>
-                <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setDatePreset(""); }}
-                  className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700" />
-              </div>
-              <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">Au</label>
-                <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setDatePreset(""); }}
-                  className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700" />
+
+            {/* Search */}
+            <div className="flex-1 min-w-[180px]">
+              <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">
+                {sport === "tennis" ? "Joueur" : "Equipe"}
+              </label>
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#b0b7c3]" />
+                <input type="text"
+                  placeholder={sport === "tennis" ? "Djokovic, Alcaraz..." : "Arsenal, PSG..."}
+                  value={searchTeam} onChange={(e) => setSearchTeam(e.target.value)}
+                  className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg pl-8 pr-3 py-[5px] text-[12px] text-[#111318] w-full focus:ring-2 focus:ring-[#3b5bdb]/30 focus:border-[#3b5bdb] outline-none" />
               </div>
             </div>
-            <div className="flex gap-2">
+
+            {/* Period pills */}
+            <div>
+              <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">
+                <Calendar size={9} className="inline mr-0.5" />Periode
+              </label>
+              <div className="flex gap-1">
+                {(["today", "48h", "72h", "week", "month"] as const).map((p) => (
+                  <button key={p} onClick={() => applyDatePreset(p)}
+                    className={`px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${
+                      datePreset === p
+                        ? "bg-[#3b5bdb] text-white shadow-sm"
+                        : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
+                    }`}>
+                    {p === "today" ? "Auj." : p === "week" ? "7j" : p === "month" ? "1m" : p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom dates */}
+            <div className="flex gap-1.5">
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">
+                <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Du</label>
+                <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setDatePreset(""); }}
+                  className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg px-2 py-[5px] text-[11px] text-[#111318]" />
+              </div>
+              <div>
+                <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Au</label>
+                <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setDatePreset(""); }}
+                  className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg px-2 py-[5px] text-[11px] text-[#111318]" />
+              </div>
+            </div>
+
+            {/* Time range */}
+            <div className="flex gap-1.5">
+              <div>
+                <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">
                   <Clock size={9} className="inline mr-0.5" />De
                 </label>
                 <input type="time" value={timeFrom} onChange={(e) => setTimeFrom(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700" />
+                  className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg px-2 py-[5px] text-[11px] text-[#111318]" />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">
+                <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">
                   <Clock size={9} className="inline mr-0.5" />A
                 </label>
                 <input type="time" value={timeTo} onChange={(e) => setTimeTo(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700" />
+                  className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg px-2 py-[5px] text-[11px] text-[#111318]" />
               </div>
             </div>
-            <div className="h-6 w-px bg-slate-200" />
+
+            <div className="h-6 w-px bg-[#e3e6eb]" />
+
+            {/* Edge + Odds */}
             <div>
-              <label className="block text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">Edge min %<Tip text="Ecart entre la probabilite estimee et la cote implicite. Ex : modele 48%, cote implique 40% = edge +8%." /></label>
+              <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">
+                Edge min %<Tip text="Ecart entre la probabilite estimee et la cote implicite. Ex : modele 48%, cote implique 40% = edge +8%." />
+              </label>
               <input type="number" step="1" min="0" placeholder="%" value={minEdge} onChange={(e) => setMinEdge(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 w-16" />
+                className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg px-2 py-[5px] text-[11px] text-[#111318] w-14" />
             </div>
             <div>
-              <label className="block text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">Cote min</label>
-              <input type="number" step="0.1" min="1" placeholder="ex: 1.3" value={minOdds} onChange={(e) => setMinOdds(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 w-20" />
+              <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Cote min</label>
+              <input type="number" step="0.1" min="1" placeholder="1.3" value={minOdds} onChange={(e) => setMinOdds(e.target.value)}
+                className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg px-2 py-[5px] text-[11px] text-[#111318] w-16" />
             </div>
             <div>
-              <label className="block text-[10px] text-slate-400 uppercase tracking-wider font-medium mb-1">Cote max</label>
-              <input type="number" step="0.1" min="1" placeholder="ex: 3.0" value={maxOdds} onChange={(e) => setMaxOdds(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 w-20" />
+              <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Cote max</label>
+              <input type="number" step="0.1" min="1" placeholder="3.0" value={maxOdds} onChange={(e) => setMaxOdds(e.target.value)}
+                className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg px-2 py-[5px] text-[11px] text-[#111318] w-16" />
             </div>
           </div>
         </div>
 
-        {/* Row 2: Leagues/Circuits selector */}
-        <div className="px-4 py-3">
-          {sport === "tennis" ? (
-            <div className="flex items-center gap-3">
-              <Trophy size={14} className="text-yellow-500" />
-              <span className="text-sm font-medium text-slate-700">Circuits</span>
-              <span className="text-xs text-slate-400">L'IA recherche automatiquement les matchs ATP, WTA et Challengers du moment.</span>
-            </div>
-          ) : (
-          <>
-            <div className="flex items-center gap-3">
+        {/* Row 2: Leagues + toggle filters */}
+        <div className="px-5 py-2.5">
+          <div className="flex items-center gap-3 flex-wrap">
+            {sport === "tennis" ? (
+            <>
+              <button
+                onClick={() => setShowCircuits(!showCircuits)}
+                className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
+              >
+                <Trophy size={12} className="text-[#f79009]" />
+                <span className="font-semibold">Circuits</span>
+                <span className="text-[10px] text-[#f79009] bg-[#f79009]/10 px-1.5 py-0.5 rounded-full font-bold">
+                  {activeTennisCount}/{allTennisNames.length}
+                </span>
+                <ChevronDown size={12} className={`text-[#8a919e] transition-transform ${showCircuits ? "rotate-180" : ""}`} />
+              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={toggleAllTournaments}
+                  className="text-[10px] text-[#f79009] hover:text-[#d97706] font-semibold px-2 py-1 rounded-md hover:bg-[#f79009]/8 transition-colors"
+                >
+                  {excludedTournaments.size === 0 ? "Aucun" : "Tous"}
+                </button>
+                {tennisByCircuit.map((g) => {
+                  const allActive = g.tournaments.every((t) => !excludedTournaments.has(t));
+                  return (
+                    <button
+                      key={g.code}
+                      onClick={() => toggleCircuitGroup(g.tournaments)}
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${
+                        allActive
+                          ? "text-[#f79009] hover:bg-[#f79009]/8"
+                          : "text-[#b0b7c3] hover:text-[#f79009] hover:bg-[#f79009]/8"
+                      }`}
+                    >
+                      {allActive ? `- ${g.name}` : `+ ${g.name}`}
+                    </button>
+                  );
+                })}
+              </div>
+              {!showCircuits && excludedTournaments.size > 0 && excludedTournaments.size < allTennisNames.length && (
+                <div className="flex flex-wrap gap-1 flex-1 min-w-0">
+                  {allTennisNames.filter((t) => !excludedTournaments.has(t)).slice(0, 6).map((name) => (
+                    <span key={name} className="text-[10px] text-[#111318] bg-[#f4f5f7] px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-[#e3e6eb]">
+                      {name}
+                      <X size={8} className="text-[#8a919e] hover:text-[#f04438] cursor-pointer" onClick={() => toggleTournament(name)} />
+                    </span>
+                  ))}
+                  {activeTennisCount > 6 && <span className="text-[10px] text-[#8a919e]">+{activeTennisCount - 6}</span>}
+                </div>
+              )}
+            </>
+            ) : (
+            <>
               <button
                 onClick={() => setShowLeagues(!showLeagues)}
-                className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 transition-colors"
+                className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
               >
-                <Trophy size={14} className="text-blue-500" />
-                <span className="font-medium">Competitions</span>
-                <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full font-semibold">
+                <Trophy size={12} className="text-[#3b5bdb]" />
+                <span className="font-semibold">Competitions</span>
+                <span className="text-[10px] text-[#3b5bdb] bg-[#3b5bdb]/10 px-1.5 py-0.5 rounded-full font-bold">
                   {activeLeagues.size}/{ALL_LEAGUE_CODES.length}
                 </span>
-                <ChevronDown size={14} className={`text-slate-400 transition-transform ${showLeagues ? "rotate-180" : ""}`} />
+                <ChevronDown size={12} className={`text-[#8a919e] transition-transform ${showLeagues ? "rotate-180" : ""}`} />
               </button>
-              <div className="flex items-center gap-1.5">
-                <button onClick={toggleAllLeagues} className="text-[10px] text-blue-600 hover:text-blue-700 font-semibold px-2 py-1 rounded-md hover:bg-blue-50 transition-colors">
+              <div className="flex items-center gap-1">
+                <button onClick={toggleAllLeagues} className="text-[10px] text-[#3b5bdb] hover:text-[#2b4bc7] font-semibold px-2 py-1 rounded-md hover:bg-[#3b5bdb]/8 transition-colors">
                   {activeLeagues.size === ALL_LEAGUE_CODES.length ? "Aucun" : "Tous"}
                 </button>
-                <button onClick={() => setLeagueGroup(DIV1_CODES)} className="text-[10px] text-blue-600 hover:text-blue-700 font-semibold px-2 py-1 rounded-md hover:bg-blue-50 transition-colors">
+                <button onClick={() => setLeagueGroup(DIV1_CODES)} className="text-[10px] text-[#3b5bdb] font-semibold px-2 py-1 rounded-md hover:bg-[#3b5bdb]/8 transition-colors">
                   {DIV1_CODES.every((c) => activeLeagues.has(c)) ? "- Div 1" : "+ Div 1"}
                 </button>
-                <button onClick={() => setLeagueGroup(DIV2_CODES)} className="text-[10px] text-blue-600 hover:text-blue-700 font-semibold px-2 py-1 rounded-md hover:bg-blue-50 transition-colors">
+                <button onClick={() => setLeagueGroup(DIV2_CODES)} className="text-[10px] text-[#3b5bdb] font-semibold px-2 py-1 rounded-md hover:bg-[#3b5bdb]/8 transition-colors">
                   {DIV2_CODES.every((c) => activeLeagues.has(c)) ? "- Div 2" : "+ Div 2"}
                 </button>
-                <button onClick={() => setLeagueGroup(CUP_CODES)} className="text-[10px] text-amber-600 hover:text-amber-700 font-semibold px-2 py-1 rounded-md hover:bg-amber-50 transition-colors">
+                <button onClick={() => setLeagueGroup(CUP_CODES)} className="text-[10px] text-[#f79009] font-semibold px-2 py-1 rounded-md hover:bg-[#f79009]/8 transition-colors">
                   {CUP_CODES.every((c) => activeLeagues.has(c)) ? "- Coupes" : "+ Coupes"}
                 </button>
-                <button onClick={() => setLeagueGroup(EUR_CODES)} className="text-[10px] text-purple-600 hover:text-purple-700 font-semibold px-2 py-1 rounded-md hover:bg-purple-50 transition-colors">
+                <button onClick={() => setLeagueGroup(EUR_CODES)} className="text-[10px] text-purple-600 font-semibold px-2 py-1 rounded-md hover:bg-purple-50 transition-colors">
                   {EUR_CODES.every((c) => activeLeagues.has(c)) ? "- Europe" : "+ Europe"}
                 </button>
               </div>
@@ -482,606 +909,691 @@ export default function Scanner() {
                   {[...activeLeagues].slice(0, 6).map((code) => {
                     const info = LEAGUE_INFO[code];
                     return (
-                      <span key={code} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                      <span key={code} className="text-[10px] text-[#111318] bg-[#f4f5f7] px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-[#e3e6eb]">
                         {info.flag} {info.name}
-                        <X size={8} className="text-slate-400 hover:text-red-400 cursor-pointer" onClick={() => toggleLeague(code)} />
+                        <X size={8} className="text-[#8a919e] hover:text-[#f04438] cursor-pointer" onClick={() => toggleLeague(code)} />
                       </span>
                     );
                   })}
-                  {activeLeagues.size > 6 && <span className="text-[10px] text-slate-400">+{activeLeagues.size - 6}</span>}
+                  {activeLeagues.size > 6 && <span className="text-[10px] text-[#8a919e]">+{activeLeagues.size - 6}</span>}
+                </div>
+              )}
+            </>
+            )}
+
+            <div className="h-5 w-px bg-[#e3e6eb]" />
+
+            {/* Toggle filters */}
+            <button
+              onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
+              className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${
+                valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
+              }`}
+            >
+              <TrendingUp size={10} />
+              Value bets
+            </button>
+            <button
+              onClick={() => setHideInTicket(!hideInTicket)}
+              className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${
+                hideInTicket ? "bg-[#3b5bdb] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
+              }`}
+            >
+              <Shield size={10} />
+              Masquer en ticket
+            </button>
+            <div>
+              <input type="number" min="0" max="20" step="1" placeholder="Data min" value={minDataScore}
+                onChange={(e) => setMinDataScore(e.target.value)}
+                className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-2.5 py-[5px] text-[11px] text-[#111318] w-20 outline-none focus:ring-2 focus:ring-[#3b5bdb]/30"
+                title="Score de qualite de donnees minimum (sur 20)" />
+            </div>
+          </div>
+
+          {/* Leagues dropdown panel */}
+          {/* Leagues dropdown panel (football) */}
+          {showLeagues && sport === "football" && (
+            <div className="mt-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-xl p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {LEAGUES_BY_COUNTRY.map(({ country, flag, leagues }) => {
+                const countryCodes = leagues.map((l) => l.code);
+                const allActive = countryCodes.every((c) => activeLeagues.has(c));
+                const someActive = countryCodes.some((c) => activeLeagues.has(c));
+                return (
+                  <div key={country}>
+                    <button
+                      onClick={() => {
+                        const next = new Set(activeLeagues);
+                        if (allActive) countryCodes.forEach((c) => next.delete(c));
+                        else countryCodes.forEach((c) => next.add(c));
+                        setActiveLeagues(next);
+                      }}
+                      className="flex items-center gap-2 mb-1.5 w-full group"
+                    >
+                      <span className="text-base">{flag}</span>
+                      <span className="text-[11px] font-semibold text-[#111318] group-hover:text-[#3b5bdb] transition-colors">{country}</span>
+                      <div className={`w-3 h-3 rounded border ml-auto flex items-center justify-center transition-colors ${
+                        allActive ? "bg-[#3b5bdb] border-[#3b5bdb]" : someActive ? "bg-[#3b5bdb]/30 border-[#3b5bdb]" : "border-[#cdd1d9]"
+                      }`}>
+                        {allActive && <span className="text-white text-[8px] font-bold">v</span>}
+                        {someActive && !allActive && <span className="text-[#3b5bdb] text-[7px] font-bold">-</span>}
+                      </div>
+                    </button>
+                    <div className="space-y-0.5 pl-6">
+                      {leagues.map((l) => (
+                        <button key={l.code} onClick={() => toggleLeague(l.code)}
+                          className="flex items-center gap-2 w-full py-0.5 group/league">
+                          <div className={`w-3 h-3 rounded border flex items-center justify-center transition-colors ${
+                            activeLeagues.has(l.code) ? "bg-[#3b5bdb] border-[#3b5bdb]" : "border-[#cdd1d9] group-hover/league:border-[#3b5bdb]"
+                          }`}>
+                            {activeLeagues.has(l.code) && <span className="text-white text-[8px] font-bold">v</span>}
+                          </div>
+                          <span className={`text-[11px] transition-colors ${
+                            activeLeagues.has(l.code) ? "text-[#111318] font-medium" : "text-[#8a919e] group-hover/league:text-[#111318]"
+                          }`}>{l.name}</span>
+                          {l.division === 2 && <span className="text-[8px] text-[#b0b7c3] ml-auto">D2</span>}
+                          {l.division === 0 && <span className="text-[8px] text-[#f79009] ml-auto">Coupe</span>}
+                          {l.division === -1 && <span className="text-[8px] text-purple-400 ml-auto">EUR</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Circuits dropdown panel (tennis) — circuit → tournaments */}
+          {showCircuits && sport === "tennis" && (
+            <div className="mt-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-xl p-4">
+              {tennisByCircuit.length === 0 ? (
+                <span className="text-[11px] text-[#8a919e]">Aucun tournoi — lancez un scan tennis pour voir les tournois actifs</span>
+              ) : (
+                <div className="flex gap-6">
+                  {tennisByCircuit.map((g) => {
+                    const activeCount = g.tournaments.filter((t) => !excludedTournaments.has(t)).length;
+                    const allActive = activeCount === g.tournaments.length;
+                    const someActive = activeCount > 0;
+                    // Grand Chelem = 1 col, ATP/WTA = 3 cols, others = 1 col
+                    const useTripleCols = g.tournaments.length > 8;
+                    const colSpan = useTripleCols ? "flex-[3]" : "flex-[1]";
+                    // Split tournaments into 3 columns for large circuits
+                    const third = Math.ceil(g.tournaments.length / 3);
+                    const col1 = useTripleCols ? g.tournaments.slice(0, third) : g.tournaments;
+                    const col2 = useTripleCols ? g.tournaments.slice(third, third * 2) : [];
+                    const col3 = useTripleCols ? g.tournaments.slice(third * 2) : [];
+
+                    const renderTournament = (t: string) => {
+                      const isActive = !excludedTournaments.has(t);
+                      const hasMatch = g.hasMatches.has(t);
+                      return (
+                        <button key={t} onClick={() => toggleTournament(t)}
+                          className="flex items-center gap-1.5 w-full py-[2px] group/tournament">
+                          <div className={`w-3 h-3 shrink-0 rounded border flex items-center justify-center transition-colors ${
+                            isActive ? "bg-[#f79009] border-[#f79009]" : "border-[#cdd1d9] group-hover/tournament:border-[#f79009]"
+                          }`}>
+                            {isActive && <span className="text-white text-[8px] font-bold">✓</span>}
+                          </div>
+                          <span className={`text-[10.5px] truncate transition-colors ${
+                            isActive ? "text-[#111318] font-medium" : "text-[#8a919e] group-hover/tournament:text-[#111318]"
+                          }`}>{t}</span>
+                          {hasMatch && <span className="w-1.5 h-1.5 rounded-full bg-[#12b76a] ml-auto shrink-0" title="Matchs disponibles" />}
+                        </button>
+                      );
+                    };
+
+                    return (
+                      <div key={g.code} className={`${colSpan} min-w-0`}>
+                        {/* Circuit header */}
+                        <button
+                          onClick={() => toggleCircuitGroup(g.tournaments)}
+                          className="flex items-center gap-2 mb-1.5 pb-1.5 border-b border-[#e3e6eb] w-full group"
+                        >
+                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
+                            allActive ? "bg-[#f79009] border-[#f79009]" : someActive ? "bg-[#f79009]/30 border-[#f79009]" : "border-[#cdd1d9]"
+                          }`}>
+                            {allActive && <span className="text-white text-[8px] font-bold">✓</span>}
+                            {someActive && !allActive && <span className="text-[#f79009] text-[7px] font-bold">-</span>}
+                          </div>
+                          <span className="text-sm">{g.emoji}</span>
+                          <span className="text-[11px] font-bold text-[#111318] group-hover:text-[#f79009] transition-colors">{g.name}</span>
+                          <span className="text-[9px] text-[#8a919e] ml-auto whitespace-nowrap">({activeCount}/{g.tournaments.length})</span>
+                        </button>
+                        {/* Tournament list */}
+                        {useTripleCols ? (
+                          <div className="flex gap-3">
+                            <div className="flex-1 min-w-0">{col1.map(renderTournament)}</div>
+                            <div className="flex-1 min-w-0">{col2.map(renderTournament)}</div>
+                            <div className="flex-1 min-w-0">{col3.map(renderTournament)}</div>
+                          </div>
+                        ) : (
+                          <div>{col1.map(renderTournament)}</div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
-
-            {showLeagues && (
-              <div className="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {LEAGUES_BY_COUNTRY.map(({ country, flag, leagues }) => {
-                  const countryCodes = leagues.map((l) => l.code);
-                  const allActive = countryCodes.every((c) => activeLeagues.has(c));
-                  const someActive = countryCodes.some((c) => activeLeagues.has(c));
-                  return (
-                    <div key={country}>
-                      <button
-                        onClick={() => {
-                          const next = new Set(activeLeagues);
-                          if (allActive) countryCodes.forEach((c) => next.delete(c));
-                          else countryCodes.forEach((c) => next.add(c));
-                          setActiveLeagues(next);
-                        }}
-                        className="flex items-center gap-2 mb-1.5 w-full group"
-                      >
-                        <span className="text-base">{flag}</span>
-                        <span className="text-xs font-semibold text-slate-700 group-hover:text-blue-600 transition-colors">{country}</span>
-                        <div className={`w-3 h-3 rounded border ml-auto flex items-center justify-center transition-colors ${
-                          allActive ? "bg-blue-600 border-blue-600" : someActive ? "bg-blue-200 border-blue-400" : "border-slate-300"
-                        }`}>
-                          {allActive && <span className="text-white text-[8px] font-bold">v</span>}
-                          {someActive && !allActive && <span className="text-blue-600 text-[7px] font-bold">-</span>}
-                        </div>
-                      </button>
-                      <div className="space-y-0.5 pl-6">
-                        {leagues.map((l) => (
-                          <button key={l.code} onClick={() => toggleLeague(l.code)}
-                            className="flex items-center gap-2 w-full py-0.5 group/league">
-                            <div className={`w-3 h-3 rounded border flex items-center justify-center transition-colors ${
-                              activeLeagues.has(l.code) ? "bg-blue-600 border-blue-600" : "border-slate-300 group-hover/league:border-blue-400"
-                            }`}>
-                              {activeLeagues.has(l.code) && <span className="text-white text-[8px] font-bold">v</span>}
-                            </div>
-                            <span className={`text-[11px] transition-colors ${
-                              activeLeagues.has(l.code) ? "text-slate-700 font-medium" : "text-slate-400 group-hover/league:text-slate-600"
-                            }`}>{l.name}</span>
-                            {l.division === 2 && <span className="text-[8px] text-slate-300 ml-auto">D2</span>}
-                            {l.division === 0 && <span className="text-[8px] text-amber-400 ml-auto">Coupe</span>}
-                            {l.division === -1 && <span className="text-[8px] text-purple-400 ml-auto">EUR</span>}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
           )}
         </div>
       </div>
 
-      {/* Scan button */}
-      <div className="flex flex-wrap gap-4 items-center">
+      {/* Action Bar */}
+      <div className="shrink-0 px-5 py-2 bg-[#f4f5f7] border-b border-[#e3e6eb] flex items-center gap-3">
         <button onClick={() => handleAIScan()} disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white px-6 py-2 rounded-lg text-sm flex items-center gap-2 font-medium shadow-sm">
-          <Search size={16} />
-          {loading ? "Scan en cours..." : "Scanner les matchs"}
+          className="bg-[#3b5bdb] hover:bg-[#2b4bc7] disabled:bg-[#b0b7c3] text-white px-4 py-[6px] rounded-lg text-[12px] flex items-center gap-1.5 font-semibold shadow-sm transition-colors">
+          <Search size={13} />
+          {loading ? "Scan..." : "Scanner"}
         </button>
         {hasScanned && isCached && cachedAt && (
           <button onClick={() => handleAIScan(true)} disabled={loading}
-            className="px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 bg-slate-100 text-slate-600 border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 transition-colors shadow-sm disabled:opacity-50"
+            className="px-3 py-[6px] rounded-lg text-[11px] flex items-center gap-1.5 bg-white text-[#8a919e] border border-[#e3e6eb] hover:bg-[#3b5bdb]/5 hover:text-[#3b5bdb] hover:border-[#3b5bdb]/30 transition-colors disabled:opacity-50"
             title="Forcer un nouveau scan live">
-            <RefreshCw size={14} />
+            <RefreshCw size={12} />
             Actualiser
           </button>
         )}
+
+        {/* Cache status */}
         {hasScanned && (
-          <span className="text-sm text-slate-500 flex items-center gap-2">
+          <>
             {isCached ? (
-              <span className="flex items-center gap-1 text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full border border-slate-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+              <span className="flex items-center gap-1 text-[10px] bg-white text-[#8a919e] px-2 py-1 rounded-full border border-[#e3e6eb]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#b0b7c3]" />
                 Cache {cachedAt && (() => {
                   const ago = Math.round((Date.now() - new Date(cachedAt).getTime()) / 60000);
                   return ago < 1 ? "< 1 min" : `${ago} min`;
                 })()}
               </span>
             ) : (
-              <span className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span className="flex items-center gap-1 text-[10px] bg-[#12b76a]/10 text-[#12b76a] px-2 py-1 rounded-full border border-[#12b76a]/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#12b76a]" />
                 Live
               </span>
             )}
-            <span>
-              <span className="text-slate-900 font-semibold">{filteredAiMatches.length}</span> match{filteredAiMatches.length !== 1 ? "s" : ""} affiches
-              {filteredAiMatches.length !== aiMatches.length ? (
-                <span className="text-slate-400"> · {aiMatches.length} au total ({({ today: "auj.", "48h": "48h", "72h": "72h", week: "7j", month: "1m" } as Record<string,string>)[datePreset] ?? datePreset})</span>
-              ) : aiMatches.length > 0 ? (
-                <span className="text-slate-400"> detectes</span>
-              ) : null}
+          </>
+        )}
+
+        <div className="ml-auto flex items-center gap-3">
+          {/* Results count */}
+          {hasScanned && (
+            <span className="text-[11px] text-[#8a919e]">
+              <span className="text-[#111318] font-semibold">{filteredAiMatches.length}</span> match{filteredAiMatches.length !== 1 ? "s" : ""}
+              {filteredAiMatches.length !== aiMatches.length && (
+                <span className="text-[#b0b7c3]"> / {aiMatches.length}</span>
+              )}
             </span>
-          </span>
-        )}
-        {aiDuration > 0 && !isCached && (
-          <span className="text-xs text-slate-400">Recherche en {aiDuration.toFixed(0)}s</span>
-        )}
+          )}
+          {aiDuration > 0 && !isCached && (
+            <span className="text-[10px] text-[#b0b7c3]">{aiDuration.toFixed(0)}s</span>
+          )}
+
+          {/* Sort */}
+          <div className="flex items-center gap-1.5">
+            <Filter size={11} className="text-[#8a919e]" />
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}
+              className="bg-white border border-[#e3e6eb] rounded-lg px-2 py-[5px] text-[11px] text-[#111318] font-medium focus:ring-2 focus:ring-[#3b5bdb]/30 outline-none">
+              <option value="prob">Probabilite</option>
+              <option value="edge">Edge</option>
+              <option value="date">Date</option>
+              <option value="league">Ligue</option>
+            </select>
+          </div>
+        </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2 text-red-700 text-sm">
-          <AlertTriangle size={16} />
-          {error}
-        </div>
-      )}
+      {/* ═══ BOTTOM: Results (left) + Ticket (right), resizable ═══ */}
+      <div className="flex-1 flex min-h-0 overflow-hidden">
 
-      {/* Results + Ticket Builder */}
-      <div className="flex gap-4 items-start">
-        <div className="flex-1 min-w-0 space-y-2">
+        {/* Match list */}
+        <div className="flex-1 overflow-y-auto px-3 py-2 scanner-scroll">
+          {error && (
+            <div className="bg-[#f04438]/8 border border-[#f04438]/20 rounded-xl p-3 flex items-center gap-2 text-[#f04438] text-[12px] mb-2">
+              <AlertTriangle size={14} />
+              {error}
+            </div>
+          )}
+
           {hiddenMatches.size > 0 && (
-            <button onClick={() => setHiddenMatches(new Set())} className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 font-medium">
+            <button onClick={() => setHiddenMatches(new Set())}
+              className="text-[11px] text-[#3b5bdb] hover:text-[#2b4bc7] flex items-center gap-1 font-semibold mb-1">
               <Eye size={12} /> Afficher les {hiddenMatches.size} matchs masques
             </button>
           )}
 
-          {/* Cache header */}
-          {filteredAiMatches.length > 0 && isCached && cachedAt && (
-            <div className="flex items-center gap-3 text-xs text-slate-400 mb-1">
-              <span className="flex items-center gap-1">
-                <Clock size={11} />
-                Cache du {new Date(cachedAt).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                <span className="text-slate-300">-</span>
-                <span className="capitalize">{sport}</span>
-              </span>
-            </div>
-          )}
-
-          {/* Match cards */}
-          {filteredAiMatches.map((am, i) => {
-            const isFootball = am.sport === "football";
-            const home = isFootball ? (am.home_team || "?") : (am.player1 || "?");
-            const away = isFootball ? (am.away_team || "?") : (am.player2 || "?");
-            const info = isFootball ? (LEAGUE_INFO_BY_NAME[am.league] ?? null) : null;
-            const { dateStr, timeStr } = am.date ? parseBetDate(am.date) : { dateStr: "", timeStr: null };
-            const matchKey = `${home}_${away}`;
-            const odds1x2 = am.odds?.["1x2"] as Record<string, unknown> | undefined;
-            const oddsWinner = am.odds?.["winner"] as Record<string, unknown> | undefined;
-
-            function extractBkOdds(val: unknown): Record<string, number> {
-              if (val && typeof val === "object" && !Array.isArray(val)) {
-                const res: Record<string, number> = {};
-                for (const [bk, o] of Object.entries(val as Record<string, unknown>)) {
-                  const n = Number(o); if (n > 0) res[bk] = n;
-                }
-                return res;
-              }
-              const n = Number(val);
-              return n > 0 ? { "IA": n } : {};
-            }
-
-            const bkMaps: Record<string, Record<string, number>> = {};
-            const rawOddsBase = isFootball ? odds1x2 : oddsWinner;
-            const outcomeKeys = isFootball ? ["H", "D", "A"] : ["P1", "P2"];
-            for (const k of outcomeKeys) bkMaps[k] = extractBkOdds(rawOddsBase?.[k]);
-
-            function bestOddsForKey(k: string): { odds: number; bk: string } {
-              const map = bkMaps[k] || {};
-              let best = { odds: 0, bk: "" };
-              for (const [bk, o] of Object.entries(map)) { if (o > best.odds) best = { odds: o, bk }; }
-              return best;
-            }
-
-            const outcomes = isFootball
-              ? (["H", "D", "A"] as const).map((k) => {
-                  const { odds, bk } = bestOddsForKey(k);
-                  return { key: k, label: k === "H" ? home : k === "D" ? "Nul" : away, odds, bk };
-                })
-              : (["P1", "P2"] as const).map((k) => {
-                  const { odds, bk } = bestOddsForKey(k);
-                  return { key: k, label: k === "P1" ? home : away, odds, bk };
-                });
-
-            const modelProbs: Record<string, number> = isFootball
-              ? { H: am.model_prob_home ?? 0, D: am.model_prob_draw ?? 0, A: am.model_prob_away ?? 0 }
-              : { P1: am.model_prob_home ?? 0, P2: am.model_prob_away ?? 0 };
-
-            const bestOutcome = outcomes.filter(o => o.odds > 0).reduce(
-              (best, o) => {
-                const prob = modelProbs[o.key] || (o.odds > 0 ? 1/o.odds : 0);
-                const bestProb = best ? (modelProbs[best.key] || (best.odds > 0 ? 1/best.odds : 0)) : 0;
-                return prob > bestProb ? o : best;
-              },
-              null as typeof outcomes[0] | null
-            );
-
-            const maxPts = am.sport === "tennis" ? 18 : 20;
-            const qualityTip = `Fiabilite des donnees : ${Math.round((am.data_score ?? 0) * maxPts)}/${maxPts} `
-              + `(${am.data_quality === "green" ? "donnees completes" : am.data_quality === "yellow" ? "partielles" : "minimales"})`;
-
-            return (
-              <div key={i} className="bg-white rounded-xl border shadow-sm transition-all group overflow-hidden border-slate-200 hover:border-slate-300 hover:shadow">
-                <div className="flex items-stretch">
-                  {/* Left: match info + recommendation */}
-                  <div
-                    className="flex items-center gap-2.5 w-[38%] min-w-[260px] shrink-0 px-3 py-2.5 border-r border-slate-100 cursor-grab active:cursor-grabbing rounded-l-xl"
-                    draggable={bestOutcome != null && bestOutcome.odds > 0}
-                    onDragStart={(e) => bestOutcome && handleAIMatchDragStart(e, am, bestOutcome.key)}
-                  >
-                    <div className="text-slate-300 group-hover:text-slate-400 shrink-0"><GripVertical size={14} /></div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setDetailMatch({ am, home, away }); }}
-                          className="text-slate-900 font-semibold text-sm truncate hover:text-blue-600 text-left"
-                          title="Voir les details"
-                        >
-                          {home} vs {away}
-                        </button>
-                        <span className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded font-bold ${
-                          am.data_quality === "green" ? "bg-emerald-100 text-emerald-700" :
-                          am.data_quality === "yellow" ? "bg-amber-100 text-amber-700" :
-                          "bg-red-100 text-red-600"
-                        }`} title={qualityTip}>
-                          {Math.round((am.data_score ?? 0) * maxPts)}/{maxPts}
-                        </span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setDetailMatch({ am, home, away }); }}
-                          className="shrink-0 text-slate-300 group-hover:text-blue-400 transition-colors p-0.5"
-                          title="Voir les details"
-                        >
-                          <Eye size={12} />
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        {timeStr && <span className="text-slate-900 text-xs font-medium">{timeStr}</span>}
-                        <span className="text-slate-400 text-xs">{dateStr}</span>
-                        <span className="text-slate-400 text-[10px]">-</span>
-                        <span className="text-slate-500 text-[10px] truncate">
-                          {isFootball
-                            ? (info ? `${info.flag} ${info.name}` : am.league)
-                            : am.surface ? <span className="text-yellow-600">{am.surface}</span> : am.league
-                          }
-                        </span>
-                      </div>
-                    </div>
-                    {bestOutcome && bestOutcome.odds > 0 && (
-                      <div className="flex-1 flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-0.5">
-                            <Star size={12} className="text-amber-500 fill-amber-500" />
-                            <span className="text-emerald-700 font-bold text-xl leading-none">
-                              {((modelProbs[bestOutcome.key] || 1/bestOutcome.odds) * 100).toFixed(0)}%
-                            </span>
-                          </div>
-                          <div className="text-[10px] font-semibold text-slate-700 mt-0.5 truncate max-w-[90px]">{bestOutcome.label}</div>
-                          {am.edges?.[bestOutcome.key] != null && (
-                            <div className={`text-[9px] font-bold mt-0.5 ${am.edges[bestOutcome.key] > 0 ? "text-emerald-600" : "text-slate-400"}`}>
-                              edge {am.edges[bestOutcome.key] > 0 ? "+" : ""}{(am.edges[bestOutcome.key] * 100).toFixed(1)}%
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Odds columns */}
-                  <div className={`grid flex-1 min-w-0 ${isFootball ? "grid-cols-3" : "grid-cols-2"}`}>
-                    {outcomes.map(({ key, label, odds, bk }) => {
-                      const inTicket = isAiOutcomeInTicket(am, key);
-                      const noOdds = !odds;
-                      const impliedPct = odds > 0 ? (1 / odds * 100).toFixed(0) : null;
-                      const isFavorite = bestOutcome?.key === key;
-                      const edge = am.edges?.[key] ?? null;
-                      const modelProb = modelProbs[key] ?? null;
-                      const modelProbPct = modelProb ? (modelProb * 100).toFixed(0) : null;
-
-                      const allBks = bkMaps[key] || {};
-                      const bkKey = `ai_${home}_${away}_${key}`;
-                      const pickedBk = cardBk[bkKey];
-                      const displayOdds = pickedBk && allBks[pickedBk] ? allBks[pickedBk] : odds;
-                      const displayBk = pickedBk || bk;
-                      const sortedBks = Object.entries(allBks).sort((a, b) => b[1] - a[1]);
-
-                      return (
-                        <div key={key}
-                          className={`flex flex-col items-center text-center px-2 py-2.5 border-r border-slate-100 last:border-r-0 transition-all cursor-pointer ${
-                            noOdds ? "opacity-30 cursor-not-allowed" :
-                            inTicket ? "bg-blue-50 hover:bg-blue-100" :
-                            isFavorite ? "bg-emerald-50/60 hover:bg-emerald-50" : "bg-red-50/30 hover:bg-red-50/50"
-                          }`}
-                          onClick={() => !noOdds && toggleAiOutcomeInTicket(am, key)}
-                          draggable={!noOdds}
-                          onDragStart={(e) => !noOdds && handleAIMatchDragStart(e, am, key)}
-                        >
-                          <div className={`text-xs font-semibold truncate w-full ${
-                            inTicket ? "text-blue-600" : isFavorite ? "text-emerald-700" : "text-slate-700"
-                          }`}>
-                            {label}
-                            {isFavorite && <Star size={9} className="inline ml-0.5 text-amber-500 fill-amber-500" />}
-                          </div>
-                          <div className={`text-lg font-bold mt-1 ${noOdds ? "text-slate-300" : "text-slate-900"}`}>
-                            {noOdds ? "-" : displayOdds.toFixed(2)}
-                          </div>
-                          {!noOdds && sortedBks.length > 0 && (
-                            <select
-                              value={pickedBk || ""}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => { e.stopPropagation(); setCardBk((prev) => ({ ...prev, [bkKey]: e.target.value || "" })); }}
-                              className="mt-1 bg-slate-50 border border-slate-200 rounded text-[9px] text-slate-500 px-1 py-0.5 w-full max-w-[110px] cursor-pointer hover:border-slate-400 outline-none"
-                            >
-                              <option value="">{displayBk || "IA"}</option>
-                              {sortedBks.map(([b, o]) => (
-                                <option key={b} value={b}>{b} ({o.toFixed(2)})</option>
-                              ))}
-                            </select>
-                          )}
-                          {!noOdds && (modelProbPct || impliedPct) && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <span className={`text-[10px] font-semibold ${isFavorite ? "text-emerald-600" : "text-red-400"}`}>
-                                {modelProbPct ?? impliedPct}%
-                              </span>
-                              {edge !== null && (
-                                <span className="text-[9px] text-slate-400">
-                                  {edge > 0 ? "+" : ""}{(edge * 100).toFixed(1)}%
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {inTicket && <span className="mt-0.5 text-[8px] text-blue-500 font-medium">Dans le ticket</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Right: hide button */}
-                  <div className="shrink-0 flex flex-col items-center justify-center px-1.5 py-2">
-                    <button
-                      onClick={() => setHiddenMatches((prev) => new Set(prev).add(matchKey))}
-                      className="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Masquer"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Bottom info row — football */}
-                {isFootball && (am.form_home || am.form_away || am.position_home != null || am.lambda_home != null || am.context || am.motivation) && (
-                  <div className="px-4 py-1.5 border-t border-slate-100 bg-slate-50/60 flex flex-wrap items-center gap-3">
-                    {(am.form_home || am.form_away) && (
-                      <div className="flex items-center gap-1">
-                        {am.form_home && (
-                          <span className="text-[10px] font-mono font-bold tracking-wider">
-                            {am.form_home.split("").map((c, j) => (
-                              <span key={j} className={c === "V" ? "text-green-600" : c === "D" ? "text-red-500" : "text-slate-400"}>{c}</span>
-                            ))}
-                          </span>
-                        )}
-                        {am.form_home && am.form_away && <span className="text-slate-300 text-xs font-bold mx-0.5">|</span>}
-                        {am.form_away && (
-                          <span className="text-[10px] font-mono font-bold tracking-wider">
-                            {am.form_away.split("").map((c, j) => (
-                              <span key={j} className={c === "V" ? "text-green-600" : c === "D" ? "text-red-500" : "text-slate-400"}>{c}</span>
-                            ))}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {am.position_home != null && am.position_away != null && (
-                      <span className="text-[10px] text-slate-500 font-medium">#{am.position_home} vs #{am.position_away}</span>
-                    )}
-                    {am.lambda_home != null && (
-                      <span className="text-[9px] text-purple-500" title="Buts attendus par notre modele">&#955; {am.lambda_home} / {am.lambda_away}</span>
-                    )}
-                    {(am.context || am.motivation) && (
-                      <span className="text-[10px] text-slate-400 italic truncate max-w-xs">
-                        {am.context || am.motivation}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {/* Bottom info row — tennis */}
-                {!isFootball && (am.ranking_p1 != null || am.form_home || am.p1_surface_record || am.p1_serve_pct != null || am.h2h_surface || am.h2h_last3?.length) && (
-                  <div className="px-4 py-1.5 border-t border-slate-100 bg-slate-50/60 flex flex-wrap items-center gap-x-4 gap-y-1">
-                    {/* Rankings */}
-                    {am.ranking_p1 != null && am.ranking_p2 != null && (
-                      <span className="text-[10px] text-slate-500 font-medium" title="Classement ATP/WTA">
-                        #{am.ranking_p1} vs #{am.ranking_p2}
-                      </span>
-                    )}
-                    {/* Forme */}
-                    {(am.form_home || am.form_away) && (
-                      <div className="flex items-center gap-1">
-                        {am.form_home && (
-                          <span className="text-[10px] font-mono font-bold tracking-wider" title={`Forme ${home}`}>
-                            {am.form_home.split("").map((c, j) => (
-                              <span key={j} className={c === "V" ? "text-green-600" : c === "D" ? "text-red-500" : "text-slate-400"}>{c}</span>
-                            ))}
-                          </span>
-                        )}
-                        {am.form_home && am.form_away && <span className="text-slate-300 text-xs font-bold mx-0.5">|</span>}
-                        {am.form_away && (
-                          <span className="text-[10px] font-mono font-bold tracking-wider" title={`Forme ${away}`}>
-                            {am.form_away.split("").map((c, j) => (
-                              <span key={j} className={c === "V" ? "text-green-600" : c === "D" ? "text-red-500" : "text-slate-400"}>{c}</span>
-                            ))}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {/* Surface record */}
-                    {(am.p1_surface_record || am.p2_surface_record) && (
-                      <span className="text-[10px] text-yellow-700" title={`Bilan sur ${am.surface || "surface"}`}>
-                        {am.surface && <span className="text-yellow-600 font-semibold">{am.surface} </span>}
-                        {am.p1_surface_record || "?"} | {am.p2_surface_record || "?"}
-                      </span>
-                    )}
-                    {/* Serve % */}
-                    {am.p1_serve_pct != null && am.p2_serve_pct != null && (
-                      <span className="text-[10px] text-blue-600" title="% de jeux de service gagnés">
-                        Serv. {am.p1_serve_pct}% | {am.p2_serve_pct}%
-                      </span>
-                    )}
-                    {/* Return % */}
-                    {am.p1_return_pct != null && am.p2_return_pct != null && (
-                      <span className="text-[10px] text-indigo-500" title="% de retours gagnés">
-                        Ret. {am.p1_return_pct}% | {am.p2_return_pct}%
-                      </span>
-                    )}
-                    {/* Aces avg */}
-                    {am.p1_aces_avg != null && am.p2_aces_avg != null && (
-                      <span className="text-[10px] text-slate-500" title="Aces par match en moyenne">
-                        Aces {am.p1_aces_avg.toFixed(1)} | {am.p2_aces_avg.toFixed(1)}
-                      </span>
-                    )}
-                    {/* Season record */}
-                    {(am.p1_season_record || am.p2_season_record) && (
-                      <span className="text-[10px] text-slate-400" title="Bilan saison">
-                        Saison {am.p1_season_record || "?"} | {am.p2_season_record || "?"}
-                      </span>
-                    )}
-                    {/* Rest days */}
-                    {am.p1_rest_days != null && am.p2_rest_days != null && (
-                      <span className="text-[10px] text-slate-400" title="Jours de repos">
-                        Repos {am.p1_rest_days}j | {am.p2_rest_days}j
-                      </span>
-                    )}
-                    {/* H2H on surface */}
-                    {am.h2h_surface && (
-                      <span className="text-[10px] text-orange-600 font-medium" title="H2H sur cette surface">
-                        H2H {am.h2h_surface}
-                      </span>
-                    )}
-                    {/* H2H last 3 */}
-                    {am.h2h_last3?.length > 0 && (
-                      <span className="text-[10px] text-slate-400" title="3 derniers H2H">
-                        {am.h2h_last3.join(" · ")}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {/* Match cards — flat list, date in each card */}
+          <div className="space-y-1.5">
+            {filteredAiMatches.map((am, i) => (
+              <MatchCard
+                key={`${am.home_team || am.player1}_${am.away_team || am.player2}_${i}`}
+                am={am}
+                cardBk={cardBk}
+                setCardBk={setCardBk}
+                isAiOutcomeInTicket={isAiOutcomeInTicket}
+                toggleAiOutcomeInTicket={toggleAiOutcomeInTicket}
+                handleAIMatchDragStart={handleAIMatchDragStart}
+                setDetailMatch={setDetailMatch}
+                setHiddenMatches={setHiddenMatches}
+                isInTicket={isMatchInAnyTicket(am)}
+                isSelected={detailMatch?.am === am}
+              />
+            ))}
+          </div>
 
           {hasScanned && aiMatches.length === 0 && !loading && (
-            <div className="text-center py-8 text-slate-400">Aucun match trouve. Essayez d'autres filtres ou relancez un scan.</div>
+            <div className="text-center py-12 text-[#8a919e]">Aucun match trouve. Essayez d'autres filtres ou relancez un scan.</div>
           )}
           {filteredAiMatches.length === 0 && aiMatches.length > 0 && !loading && (
-            <div className="text-center py-8 text-slate-400">
+            <div className="text-center py-12 text-[#8a919e]">
               Aucun match avec ces filtres.
-              <span className="block mt-1 text-xs">({aiMatches.length} matchs en memoire)</span>
+              <span className="block mt-1 text-[11px] text-[#b0b7c3]">({aiMatches.length} matchs en memoire)</span>
             </div>
           )}
           {!hasScanned && !loading && (
-            <div className="text-center py-8 text-slate-400">
-              Selectionnez vos filtres puis cliquez sur Scanner.
+            <div className="text-center py-16 text-[#8a919e]">
+              <ScanSearch size={32} className="mx-auto mb-3 text-[#b0b7c3]" />
+              <p className="text-[13px] font-medium">Selectionnez vos filtres puis cliquez sur Scanner</p>
             </div>
           )}
         </div>
 
-        {/* Ticket builder */}
-        {filteredAiMatches.length > 0 && (
-          <TicketBuilder
-            tickets={tickets}
-            activeTicketIdx={activeTicketIdx}
-            onSetActiveTicket={setActiveTicketIdx}
-            onAddTicket={() => {
-              const n = tickets.length + 1;
-              setTickets([...tickets, { id: `ticket-${n}`, name: `Ticket ${n}`, legs: [], stake: 10, bookmaker: null }]);
-              setActiveTicketIdx(tickets.length);
-            }}
-            onRemoveTicket={(idx) => {
-              const updated = tickets.filter((_, i) => i !== idx);
-              setTickets(updated);
-              if (activeTicketIdx >= updated.length) setActiveTicketIdx(Math.max(0, updated.length - 1));
-            }}
-            onRemoveLeg={(ticketIdx, legId) => {
-              const updated = [...tickets];
-              updated[ticketIdx] = { ...updated[ticketIdx], legs: updated[ticketIdx].legs.filter((l) => l.id !== legId) };
-              setTickets(updated);
-            }}
-            onUpdateStake={(ticketIdx, stake) => {
-              const updated = [...tickets];
-              updated[ticketIdx] = { ...updated[ticketIdx], stake };
-              setTickets(updated);
-            }}
-            onDropBet={(b) => {
-              // Look up all_odds from aiMatches
-              const am = aiMatches.find((m) =>
-                (m.home_team === b.home_team || m.player1 === b.home_team) &&
-                (m.away_team === b.away_team || m.player2 === b.away_team)
-              );
-              let allOdds: Record<string, number> = { [b.bookmaker]: b.best_odds };
-              if (am) {
-                const isFootball = am.sport === "football";
-                const rawOddsBase = isFootball
-                  ? (am.odds?.["1x2"] as Record<string, unknown> | undefined)
-                  : (am.odds?.["winner"] as Record<string, unknown> | undefined);
-                const val = rawOddsBase?.[b.outcome];
-                if (val && typeof val === "object" && !Array.isArray(val)) {
-                  const res: Record<string, number> = {};
-                  for (const [bk, o] of Object.entries(val as Record<string, unknown>)) {
-                    const n = Number(o); if (n > 0) res[bk] = n;
-                  }
-                  if (Object.keys(res).length > 0) allOdds = res;
-                }
-              }
-              setTickets((prev) => {
-                let updated = [...prev];
-                if (updated.length === 0) updated.push({ id: "ticket-1", name: "Ticket 1", legs: [], stake: 10, bookmaker: null });
-                const idx = activeTicketIdx >= updated.length ? 0 : activeTicketIdx;
-                const ticket = { ...updated[idx] };
-                const id = `${b.home_team}_${b.away_team}_${b.outcome}`;
-                if (!ticket.legs.some((l) => l.id === id)) {
-                  const prefix = `${b.home_team}_${b.away_team}_`;
-                  ticket.legs = ticket.legs.filter((l) => !l.id.startsWith(prefix));
-                  const leg: import("@/types").TicketLeg = {
-                    id, home_team: b.home_team, away_team: b.away_team,
-                    league: b.league, date: b.date, outcome: b.outcome,
-                    odds: b.best_odds, model_prob: b.model_prob, bookmaker: b.bookmaker, all_odds: allOdds,
-                  };
-                  ticket.legs = [...ticket.legs, leg];
-                }
-                updated[idx] = ticket;
-                return updated;
-              });
-            }}
-            onUpdateLegOutcome={(ticketIdx, legId, newOutcome) => {
-              setTickets((prev) => {
-                const updated = [...prev];
-                const ticket = { ...updated[ticketIdx] };
-                const leg = ticket.legs.find((l) => l.id === legId);
-                if (!leg) return prev;
-                const am = aiMatches.find((m) =>
-                  (m.home_team === leg.home_team || m.player1 === leg.home_team) &&
-                  (m.away_team === leg.away_team || m.player2 === leg.away_team)
-                );
-                if (!am) return prev;
-                const newLeg = aiMatchToLeg(am, newOutcome);
-                if (!newLeg) return prev;
-                ticket.legs = ticket.legs.map((l) => l.id === legId ? newLeg : l);
-                updated[ticketIdx] = ticket;
-                return updated;
-              });
-            }}
-            onUpdateBookmaker={(ticketIdx, bk) => {
-              setTickets((prev) => {
-                const updated = [...prev];
-                const ticket = { ...updated[ticketIdx], bookmaker: bk };
-                ticket.legs = ticket.legs.map((leg) => {
-                  if (bk === null) {
-                    const best = Object.entries(leg.all_odds).reduce(
-                      (acc, [k, v]) => (v > acc.odds ? { odds: v, bookmaker: k } : acc),
-                      { odds: 0, bookmaker: "" }
-                    );
-                    return { ...leg, odds: best.odds, bookmaker: best.bookmaker };
-                  }
-                  const bkOdds = leg.all_odds[bk];
-                  if (bkOdds) return { ...leg, odds: bkOdds, bookmaker: bk };
-                  return { ...leg, odds: 0, bookmaker: bk };
-                });
-                updated[ticketIdx] = ticket;
-                return updated;
-              });
-            }}
-          />
-        )}
+        {/* Resize handle */}
+        <div
+          className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-[#3b5bdb]/20 active:bg-[#3b5bdb]/30 transition-colors"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            const startX = e.clientX;
+            const container = e.currentTarget.parentElement;
+            const ticketEl = container?.querySelector("[data-ticket-panel]") as HTMLElement | null;
+            if (!ticketEl) return;
+            const startW = ticketEl.offsetWidth;
+            const onMove = (ev: MouseEvent) => {
+              const delta = startX - ev.clientX;
+              const newW = Math.max(200, Math.min(600, startW + delta));
+              ticketEl.style.width = `${newW}px`;
+              ticketEl.style.minWidth = `${newW}px`;
+            };
+            const onUp = () => {
+              document.removeEventListener("mousemove", onMove);
+              document.removeEventListener("mouseup", onUp);
+            };
+            document.addEventListener("mousemove", onMove);
+            document.addEventListener("mouseup", onUp);
+          }}
+        />
+
+        {/* Ticket Builder */}
+        <div data-ticket-panel className="w-[420px] min-w-[420px] shrink-0 border-l border-[#e3e6eb] bg-white overflow-hidden">
+          <TicketBuilder {...ticketCallbacks} />
+        </div>
       </div>
 
-      {/* AI Scan Match Detail Panel */}
+      {/* ═══ DETAIL PANEL (420px, slide-in from right, overlaps everything) ═══ */}
       {detailMatch && (
-        <AIScanMatchDetailPanel
-          am={detailMatch.am}
-          home={detailMatch.home}
-          away={detailMatch.away}
-          onClose={() => setDetailMatch(null)}
-        />
+        <div className="fixed top-14 right-0 w-[420px] h-[calc(100vh-3.5rem)] z-50 animate-slide-in">
+          <AIScanMatchDetailPanel
+            am={detailMatch.am}
+            home={detailMatch.home}
+            away={detailMatch.away}
+            onClose={() => setDetailMatch(null)}
+            inline
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   MatchCard sub-component
+   ═══════════════════════════════════════════════════════════════════ */
+
+function MatchCard({
+  am, cardBk, setCardBk,
+  isAiOutcomeInTicket, toggleAiOutcomeInTicket, handleAIMatchDragStart,
+  setDetailMatch, setHiddenMatches, isInTicket, isSelected,
+}: {
+  am: AIScanMatch;
+  cardBk: Record<string, string>;
+  setCardBk: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  isAiOutcomeInTicket: (am: AIScanMatch, outcome: string) => boolean;
+  toggleAiOutcomeInTicket: (am: AIScanMatch, outcome: string) => void;
+  handleAIMatchDragStart: (e: React.DragEvent, am: AIScanMatch, outcome: string) => void;
+  setDetailMatch: (d: { am: AIScanMatch; home: string; away: string } | null) => void;
+  setHiddenMatches: React.Dispatch<React.SetStateAction<Set<string>>>;
+  isInTicket: boolean;
+  isSelected: boolean;
+}) {
+  const isFootball = am.sport === "football";
+  const home = isFootball ? (am.home_team || "?") : (am.player1 || "?");
+  const away = isFootball ? (am.away_team || "?") : (am.player2 || "?");
+  const info = isFootball ? (LEAGUE_INFO_BY_NAME[am.league] ?? null) : null;
+  const { dateStr, timeStr } = am.date ? parseBetDate(am.date) : { dateStr: "", timeStr: null };
+  const matchKey = `${home}_${away}`;
+
+  const rawOddsBase = isFootball
+    ? (am.odds?.["1x2"] as Record<string, unknown> | undefined)
+    : (am.odds?.["winner"] as Record<string, unknown> | undefined);
+  const outcomeKeys = isFootball ? ["H", "D", "A"] : ["P1", "P2"];
+
+  const bkMaps: Record<string, Record<string, number>> = {};
+  for (const k of outcomeKeys) bkMaps[k] = extractBkOdds(rawOddsBase?.[k]);
+
+  function bestOddsForKey(k: string): { odds: number; bk: string } {
+    const map = bkMaps[k] || {};
+    let best = { odds: 0, bk: "" };
+    for (const [bk, o] of Object.entries(map)) { if (o > best.odds) best = { odds: o, bk }; }
+    return best;
+  }
+
+  const outcomes = isFootball
+    ? (["H", "D", "A"] as const).map((k) => {
+        const { odds, bk } = bestOddsForKey(k);
+        return { key: k, label: k === "H" ? home : k === "D" ? "Nul" : away, odds, bk };
+      })
+    : (["P1", "P2"] as const).map((k) => {
+        const { odds, bk } = bestOddsForKey(k);
+        return { key: k, label: k === "P1" ? home : away, odds, bk };
+      });
+
+  const modelProbs: Record<string, number> = isFootball
+    ? { H: am.model_prob_home ?? 0, D: am.model_prob_draw ?? 0, A: am.model_prob_away ?? 0 }
+    : { P1: am.model_prob_home ?? 0, P2: am.model_prob_away ?? 0 };
+
+  const bestOutcome = outcomes.filter(o => o.odds > 0).reduce(
+    (best, o) => {
+      const prob = modelProbs[o.key] || (o.odds > 0 ? 1/o.odds : 0);
+      const bestProb = best ? (modelProbs[best.key] || (best.odds > 0 ? 1/best.odds : 0)) : 0;
+      return prob > bestProb ? o : best;
+    },
+    null as typeof outcomes[0] | null
+  );
+
+  const maxPts = am.sport === "tennis" ? 18 : 20;
+  const dataScore = Math.round((am.data_score ?? 0) * maxPts);
+  const confidence = Math.max(am.model_prob_home ?? 0, am.model_prob_draw ?? 0, am.model_prob_away ?? 0) * 100;
+
+  // Injury count
+  const injuryCount = ((am.key_absences_home as string[] | undefined)?.length ?? 0) + ((am.key_absences_away as string[] | undefined)?.length ?? 0);
+
+  const cardBorder = isSelected
+    ? "border-[#3b5bdb] shadow-[0_0_0_3px_rgba(59,91,219,.07)]"
+    : isInTicket
+      ? "border-l-[3px] border-l-[#12b76a] border-[#e3e6eb]"
+      : "border-[#e3e6eb] hover:border-[#cdd1d9]";
+
+  return (
+    <div
+      className={`bg-white rounded-xl border-[1.5px] transition-all group overflow-hidden ${cardBorder}`}
+      style={{ boxShadow: "0 1px 4px rgba(16,24,40,.06), 0 4px 16px rgba(16,24,40,.06)" }}
+    >
+      {/* ── Top: mc-info + mc-conf + mc-outcomes ── */}
+      <div className="flex items-stretch">
+        {/* mc-info */}
+        <div className="w-[200px] min-w-[200px] shrink-0 px-3 py-2 border-r border-[#f0f1f3]">
+          {/* Line 1: time + date */}
+          <div className="flex items-center gap-1.5">
+            {timeStr && <span className="text-[#111318] text-[11px] font-semibold font-mono">{timeStr}</span>}
+            {dateStr && <span className="text-[#b0b7c3] text-[10px] font-mono">{dateStr}</span>}
+          </div>
+          {/* Line 2: league/competition */}
+          <div className="text-[#8a919e] text-[10px] truncate mt-0.5">
+            {isFootball
+              ? (info ? `${info.flag} ${info.name}` : am.league)
+              : am.surface ? <><span className="text-[#f79009] font-medium">{am.surface}</span> · {am.league}</> : am.league
+            }
+          </div>
+          {/* Line 3: teams */}
+          <button
+            onClick={() => setDetailMatch({ am, home, away })}
+            className="text-[#111318] font-bold text-[13px] truncate hover:text-[#3b5bdb] text-left transition-colors mt-0.5 w-full"
+            title="Voir les details"
+          >
+            {home} <span className="text-[#b0b7c3] font-normal text-[11px]">vs</span> {away}
+          </button>
+          {/* Line 4: data score + injuries + eye */}
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold font-mono ${
+              am.data_quality === "green" ? "bg-[#12b76a]/10 text-[#12b76a]" :
+              am.data_quality === "yellow" ? "bg-[#f79009]/10 text-[#f79009]" :
+              "bg-[#f04438]/10 text-[#f04438]"
+            }`} title={`Score qualite donnees : ${dataScore}/${maxPts}`}>
+              {dataScore}/{maxPts}
+            </span>
+            {injuryCount > 0 && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-[#f04438]/10 text-[#f04438]"
+                title="Joueurs absents / blesses">
+                +{injuryCount} blesse{injuryCount > 1 ? "s" : ""}
+              </span>
+            )}
+            <button
+              onClick={() => setDetailMatch({ am, home, away })}
+              className="shrink-0 text-[#b0b7c3] opacity-0 group-hover:opacity-100 hover:text-[#3b5bdb] transition-all p-0.5"
+              title="Voir les details"
+            >
+              <Eye size={12} />
+            </button>
+          </div>
+        </div>
+
+        {/* mc-conf (confidence zone) */}
+        <div
+          className="w-[100px] min-w-[100px] shrink-0 flex flex-col items-center justify-center border-r border-[#f0f1f3] cursor-grab active:cursor-grabbing"
+          draggable={bestOutcome != null && bestOutcome.odds > 0}
+          onDragStart={(e) => bestOutcome && handleAIMatchDragStart(e, am, bestOutcome.key)}
+        >
+          {bestOutcome && bestOutcome.odds > 0 ? (
+            <>
+              <div className="text-[24px] font-extrabold text-[#111318] leading-none font-mono">
+                {confidence.toFixed(0)}%
+              </div>
+              <div className="text-[10px] font-semibold text-[#8a919e] mt-0.5">Confiance</div>
+              <div className="text-[10px] font-semibold text-[#111318] mt-0.5 truncate max-w-[90px]">
+                {bestOutcome.label}
+              </div>
+              {am.edges?.[bestOutcome.key] != null && (
+                <div className={`text-[9px] font-bold font-mono mt-0.5 ${am.edges[bestOutcome.key] > 0 ? "text-[#12b76a]" : "text-[#8a919e]"}`}>
+                  {am.edges[bestOutcome.key] > 0 ? "+" : ""}{(am.edges[bestOutcome.key] * 100).toFixed(1)}%
+                </div>
+              )}
+            </>
+          ) : (
+            <span className="text-[#b0b7c3] text-[11px]">N/A</span>
+          )}
+        </div>
+
+        {/* mc-outcomes */}
+        <div className={`grid flex-1 min-w-0 ${isFootball ? "grid-cols-3" : "grid-cols-2"}`}>
+          {outcomes.map(({ key, label, odds, bk }) => {
+            const inTicket = isAiOutcomeInTicket(am, key);
+            const noOdds = !odds;
+            const isFavorite = bestOutcome?.key === key;
+            const edge = am.edges?.[key] ?? null;
+            const modelProb = modelProbs[key] ?? null;
+            const modelProbPct = modelProb ? (modelProb * 100).toFixed(0) : null;
+
+            const allBks = bkMaps[key] || {};
+            const bkKey = `ai_${home}_${away}_${key}`;
+            const pickedBk = cardBk[bkKey];
+            const displayOdds = pickedBk && allBks[pickedBk] ? allBks[pickedBk] : odds;
+            const displayBk = pickedBk || bk;
+            const sortedBks = Object.entries(allBks).sort((a, b) => b[1] - a[1]);
+
+            return (
+              <div key={key}
+                className={`flex flex-col items-center text-center px-2 py-2 border-r border-[#f0f1f3] last:border-r-0 transition-all cursor-pointer ${
+                  noOdds ? "opacity-30 cursor-not-allowed" :
+                  inTicket ? "bg-[#3b5bdb]/5" :
+                  isFavorite ? "bg-[#12b76a]/4" : "hover:bg-[#f4f5f7]"
+                }`}
+                onClick={() => !noOdds && toggleAiOutcomeInTicket(am, key)}
+                draggable={!noOdds}
+                onDragStart={(e) => !noOdds && handleAIMatchDragStart(e, am, key)}
+              >
+                <div className={`text-[11px] font-semibold truncate w-full ${
+                  inTicket ? "text-[#3b5bdb]" : isFavorite ? "text-[#12b76a]" : "text-[#111318]"
+                }`}>
+                  {label}
+                  {isFavorite && <Star size={9} className="inline ml-0.5 text-[#f79009] fill-[#f79009]" />}
+                </div>
+                <div className={`text-[17px] font-bold mt-1 font-mono ${noOdds ? "text-[#b0b7c3]" : "text-[#111318]"}`}>
+                  {noOdds ? "-" : displayOdds.toFixed(2)}
+                </div>
+                {!noOdds && sortedBks.length > 0 && (
+                  <select
+                    value={pickedBk || ""}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => { e.stopPropagation(); setCardBk((prev) => ({ ...prev, [bkKey]: e.target.value || "" })); }}
+                    className="mt-1 bg-[#f4f5f7] border border-[#e3e6eb] rounded text-[9px] text-[#8a919e] px-1 py-0.5 w-full max-w-[100px] cursor-pointer hover:border-[#cdd1d9] outline-none"
+                  >
+                    <option value="">{displayBk || "IA"}</option>
+                    {sortedBks.map(([b, o]) => (
+                      <option key={b} value={b}>{b} ({o.toFixed(2)})</option>
+                    ))}
+                  </select>
+                )}
+                {!noOdds && modelProbPct && (
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className={`text-[10px] font-semibold font-mono ${isFavorite ? "text-[#12b76a]" : "text-[#f04438]"}`}>
+                      {modelProbPct}%
+                    </span>
+                    {edge !== null && (
+                      <span className={`text-[9px] font-mono ${edge > 0 ? "text-[#12b76a]" : "text-[#8a919e]"}`}>
+                        ({edge > 0 ? "+" : ""}{(edge * 100).toFixed(1)}%)
+                      </span>
+                    )}
+                  </div>
+                )}
+                {/* Movement placeholder */}
+                {!noOdds && (
+                  <span className="text-[8px] text-[#b0b7c3] mt-0.5">→ stable</span>
+                )}
+                {inTicket && (
+                  <CheckCircle2 size={12} className="text-[#12b76a] mt-0.5" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Hide button */}
+        <div className="shrink-0 flex flex-col items-center justify-center px-1.5">
+          <button
+            onClick={() => setHiddenMatches((prev) => new Set(prev).add(matchKey))}
+            className="text-[#b0b7c3] hover:text-[#f04438] opacity-0 group-hover:opacity-100 transition-all"
+            title="Masquer"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Bottom row — football ── */}
+      {isFootball && (am.form_home || am.form_away || am.position_home != null || am.lambda_home != null || am.context || am.motivation) && (
+        <div className="px-3 py-1.5 border-t border-[#f0f1f3] bg-[#f9fafb] flex flex-wrap items-center gap-3">
+          {(am.form_home || am.form_away) && (
+            <div className="flex items-center gap-1">
+              {am.form_home && (
+                <span className="text-[10px] font-mono font-bold tracking-wider">
+                  {am.form_home.split("").map((c, j) => (
+                    <span key={j} className={c === "V" ? "text-[#12b76a]" : c === "D" ? "text-[#f04438]" : "text-[#8a919e]"}>{c}</span>
+                  ))}
+                </span>
+              )}
+              {am.form_home && am.form_away && <span className="text-[#e3e6eb] text-[10px] font-bold mx-0.5">|</span>}
+              {am.form_away && (
+                <span className="text-[10px] font-mono font-bold tracking-wider">
+                  {am.form_away.split("").map((c, j) => (
+                    <span key={j} className={c === "V" ? "text-[#12b76a]" : c === "D" ? "text-[#f04438]" : "text-[#8a919e]"}>{c}</span>
+                  ))}
+                </span>
+              )}
+            </div>
+          )}
+          {am.position_home != null && am.position_away != null && (
+            <span className="text-[10px] text-[#8a919e] font-medium">#{am.position_home} vs #{am.position_away}</span>
+          )}
+          {am.lambda_home != null && (
+            <span className="text-[9px] text-purple-500 font-mono" title="Buts attendus (Poisson)">&#955; {am.lambda_home} / {am.lambda_away}</span>
+          )}
+          {(am.context || am.motivation) && (
+            <span className="text-[10px] text-[#8a919e] italic truncate max-w-xs">
+              {am.context || am.motivation}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── Bottom row — tennis ── */}
+      {!isFootball && (am.ranking_p1 != null || am.form_home || am.p1_surface_record || am.p1_serve_pct != null || am.h2h_surface || am.h2h_last3?.length) && (
+        <div className="px-3 py-1.5 border-t border-[#f0f1f3] bg-[#f9fafb] flex flex-wrap items-center gap-x-3 gap-y-1">
+          {am.ranking_p1 != null && am.ranking_p2 != null && (
+            <span className="text-[10px] text-[#8a919e] font-medium" title="Classement ATP/WTA">
+              #{am.ranking_p1} vs #{am.ranking_p2}
+            </span>
+          )}
+          {(am.form_home || am.form_away) && (
+            <div className="flex items-center gap-1">
+              {am.form_home && (
+                <span className="text-[10px] font-mono font-bold tracking-wider" title={`Forme ${home}`}>
+                  {am.form_home.split("").map((c, j) => (
+                    <span key={j} className={c === "V" ? "text-[#12b76a]" : c === "D" ? "text-[#f04438]" : "text-[#8a919e]"}>{c}</span>
+                  ))}
+                </span>
+              )}
+              {am.form_home && am.form_away && <span className="text-[#e3e6eb] text-[10px] font-bold mx-0.5">|</span>}
+              {am.form_away && (
+                <span className="text-[10px] font-mono font-bold tracking-wider" title={`Forme ${away}`}>
+                  {am.form_away.split("").map((c, j) => (
+                    <span key={j} className={c === "V" ? "text-[#12b76a]" : c === "D" ? "text-[#f04438]" : "text-[#8a919e]"}>{c}</span>
+                  ))}
+                </span>
+              )}
+            </div>
+          )}
+          {(am.p1_surface_record || am.p2_surface_record) && (
+            <span className="text-[10px] text-[#f79009]" title={`Bilan sur ${am.surface || "surface"}`}>
+              {am.surface && <span className="font-semibold">{am.surface} </span>}
+              {am.p1_surface_record || "?"} | {am.p2_surface_record || "?"}
+            </span>
+          )}
+          {am.p1_serve_pct != null && am.p2_serve_pct != null && (
+            <span className="text-[10px] text-[#3b5bdb]" title="% jeux de service gagnes">
+              Serv. {am.p1_serve_pct}% | {am.p2_serve_pct}%
+            </span>
+          )}
+          {am.p1_return_pct != null && am.p2_return_pct != null && (
+            <span className="text-[10px] text-indigo-500" title="% retours gagnes">
+              Ret. {am.p1_return_pct}% | {am.p2_return_pct}%
+            </span>
+          )}
+          {am.p1_aces_avg != null && am.p2_aces_avg != null && (
+            <span className="text-[10px] text-[#8a919e]" title="Aces par match">
+              Aces {am.p1_aces_avg.toFixed(1)} | {am.p2_aces_avg.toFixed(1)}
+            </span>
+          )}
+          {(am.p1_season_record || am.p2_season_record) && (
+            <span className="text-[10px] text-[#b0b7c3]" title="Bilan saison">
+              Saison {am.p1_season_record || "?"} | {am.p2_season_record || "?"}
+            </span>
+          )}
+          {am.p1_rest_days != null && am.p2_rest_days != null && (
+            <span className="text-[10px] text-[#b0b7c3]" title="Jours de repos">
+              Repos {am.p1_rest_days}j | {am.p2_rest_days}j
+            </span>
+          )}
+          {am.h2h_surface && (
+            <span className="text-[10px] text-[#f79009] font-medium" title="H2H sur cette surface">
+              H2H {am.h2h_surface}
+            </span>
+          )}
+          {am.h2h_last3?.length > 0 && (
+            <span className="text-[10px] text-[#8a919e]" title="3 derniers H2H">
+              {am.h2h_last3.join(" · ")}
+            </span>
+          )}
+        </div>
       )}
     </div>
   );

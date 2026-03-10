@@ -150,10 +150,10 @@ export default function TicketBuilder({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`w-[26%] min-w-[320px] shrink-0 rounded-xl border-2 flex flex-col max-h-[calc(100vh-12rem)] sticky top-0 transition-all ${
+      className={`flex flex-col h-full transition-all ${
         dragOver
-          ? "border-blue-400 bg-blue-50 shadow-lg shadow-blue-200/30"
-          : "border-slate-200 bg-white shadow-lg"
+          ? "bg-[#3b5bdb]/5"
+          : "bg-white"
       }`}
     >
       {/* Header */}
@@ -225,10 +225,10 @@ export default function TicketBuilder({
               <Target size={20} className={dragOver ? "text-blue-500" : "text-slate-400"} />
             </div>
             <p className="text-xs font-medium">
-              {dragOver ? "Deposer ici !" : "Glissez un match ici"}
+              {dragOver ? "Deposer ici !" : "Aucun pari selectionne"}
             </p>
             <p className="text-[10px] text-slate-400 mt-1">
-              ou cliquez sur un outcome
+              Cliquez sur un outcome pour l'ajouter
             </p>
           </div>
         ) : (

@@ -8,6 +8,7 @@ interface Props {
   home: string;
   away: string;
   onClose: () => void;
+  inline?: boolean;
 }
 
 // ─── Tooltip helper ───────────────────────────────────────────────────────────
@@ -34,7 +35,7 @@ function getTabs(isTennis: boolean): { key: Tab; label: string }[] {
   ];
 }
 
-export default function AIScanMatchDetailPanel({ am, home, away, onClose }: Props) {
+export default function AIScanMatchDetailPanel({ am, home, away, onClose, inline }: Props) {
   const [tab, setTab] = useState<Tab>("analyse");
   const isTennis = am.sport === "tennis";
   const tabs = getTabs(isTennis);
@@ -51,8 +52,11 @@ export default function AIScanMatchDetailPanel({ am, home, away, onClose }: Prop
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-full max-w-2xl bg-white border-l border-slate-200 z-50 flex flex-col shadow-2xl">
+      {!inline && <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />}
+      <div className={inline
+        ? "w-full h-full bg-white border-l border-[#e3e6eb] flex flex-col shadow-xl"
+        : "fixed right-0 top-0 h-full w-full max-w-2xl bg-white border-l border-slate-200 z-50 flex flex-col shadow-2xl"
+      }>
 
         {/* Header */}
         <div className="shrink-0 px-5 py-4 border-b border-slate-200 flex items-start justify-between">
