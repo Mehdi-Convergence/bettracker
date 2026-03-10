@@ -51,6 +51,10 @@ ignore = [
     "F541",  # f-string without placeholders (legacy)
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+env = ["TESTING=1"]
+
 [dependency-groups]
 dev = [
     "matplotlib>=3.10.8",

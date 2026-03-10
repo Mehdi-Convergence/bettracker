@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 from src.models.password_reset import PasswordResetToken
+from tests.conftest import TEST_PASSWORD
 
 
 # --- PATCH /auth/me (update profile) ---
@@ -24,7 +25,7 @@ def test_update_email_duplicate(client, auth_headers):
     # Register another user
     client.post("/api/auth/register", json={
         "email": "other@example.com",
-        "password": "securepass123",
+        "password": TEST_PASSWORD,
         "display_name": "Other",
     })
     resp = client.patch("/api/auth/me", json={"email": "other@example.com"}, headers=auth_headers)
@@ -41,30 +42,30 @@ def test_update_profile_no_auth(client):
 
 def test_change_password_success(client, auth_headers):
     resp = client.post("/api/auth/change-password", json={
-        "current_password": "securepass123",
-        "new_password": "newpassword456",
+        "current_password": TEST_PASSWORD,
+        "new_password": "NewPassword456",
     }, headers=auth_headers)
     assert resp.status_code == 200
 
     # Verify new password works
     login_resp = client.post("/api/auth/login", json={
         "email": "test@example.com",
-        "password": "newpassword456",
+        "password": "NewPassword456",
     })
     assert login_resp.status_code == 200
 
 
 def test_change_password_wrong_current(client, auth_headers):
     resp = client.post("/api/auth/change-password", json={
-        "current_password": "wrongpassword",
-        "new_password": "newpassword456",
+        "current_password": "WrongPass1",
+        "new_password": "NewPassword456",
     }, headers=auth_headers)
     assert resp.status_code == 400
 
 
 def test_change_password_too_short(client, auth_headers):
     resp = client.post("/api/auth/change-password", json={
-        "current_password": "securepass123",
+        "current_password": TEST_PASSWORD,
         "new_password": "short",
     }, headers=auth_headers)
     assert resp.status_code == 422
@@ -104,7 +105,7 @@ def test_reset_password_success(client, auth_headers, db_session):
 
     resp = client.post("/api/auth/reset-password", json={
         "token": token_obj.token,
-        "new_password": "resetpassword789",
+        "new_password": "ResetPassword789",
     })
     assert resp.status_code == 200
 
@@ -117,7 +118,7 @@ def test_reset_password_success(client, auth_headers, db_session):
     # Verify new password works
     login_resp = client.post("/api/auth/login", json={
         "email": "test@example.com",
-        "password": "resetpassword789",
+        "password": "ResetPassword789",
     })
     assert login_resp.status_code == 200
 
@@ -125,7 +126,7 @@ def test_reset_password_success(client, auth_headers, db_session):
 def test_reset_password_invalid_token(client):
     resp = client.post("/api/auth/reset-password", json={
         "token": "invalid-token-xyz",
-        "new_password": "newpassword456",
+        "new_password": "NewPassword456",
     })
     assert resp.status_code == 400
 
@@ -144,7 +145,7 @@ def test_reset_password_expired_token(client, auth_headers, db_session):
 
     resp = client.post("/api/auth/reset-password", json={
         "token": "expired-token-abc",
-        "new_password": "newpassword456",
+        "new_password": "NewPassword456",
     })
     assert resp.status_code == 400
 
@@ -159,7 +160,7 @@ def test_delete_account(client, auth_headers, db_session):
     # User should not be able to login anymore
     login_resp = client.post("/api/auth/login", json={
         "email": "test@example.com",
-        "password": "securepass123",
+        "password": TEST_PASSWORD,
     })
     assert login_resp.status_code == 401
 

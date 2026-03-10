@@ -15,8 +15,15 @@ from src.models.user import User  # noqa: F401
 from src.models.bet import Bet  # noqa: F401
 from src.models.campaign import Campaign  # noqa: F401
 from src.models.password_reset import PasswordResetToken  # noqa: F401
+from src.models.user_preferences import UserPreferences  # noqa: F401
+from src.models.campaign_version import CampaignVersion  # noqa: F401
+from src.models.saved_backtest import SavedBacktest  # noqa: F401
+from src.models.notification import Notification  # noqa: F401
 from src.database import get_db
 from src.main import app
+
+# Password that passes strength validation (uppercase + lowercase + digit, 8+ chars)
+TEST_PASSWORD = "SecurePass1"
 
 
 @pytest.fixture()
@@ -68,12 +75,12 @@ def auth_headers(client):
     """Register a user and return auth headers."""
     client.post("/api/auth/register", json={
         "email": "test@example.com",
-        "password": "securepass123",
+        "password": TEST_PASSWORD,
         "display_name": "Test User",
     })
     resp = client.post("/api/auth/login", json={
         "email": "test@example.com",
-        "password": "securepass123",
+        "password": TEST_PASSWORD,
     })
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
