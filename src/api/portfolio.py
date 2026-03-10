@@ -8,15 +8,19 @@ from sqlalchemy.orm import Session
 
 from src.api.schemas import (
     BetCreateRequest,
+    BetNoteUpdateRequest,
     BetResponse,
+    BetUpdateRequest,
     PortfolioHistoryPoint,
     PortfolioStatsResponse,
 )
 from src.api.deps import require_tier
+from src.api.helpers import bet_to_response as _bet_to_response
 from src.database import get_db
 from src.models.bet import Bet
+from src.models.user import User
 
-router = APIRouter(tags=["portfolio"], dependencies=[Depends(require_tier("pro"))])
+router = APIRouter(tags=["portfolio"])
 
 
 @router.get("/portfolio/bets", response_model=list[BetResponse])
@@ -25,10 +29,11 @@ def list_bets(
     campaign_id: int | None = Query(default=None, description="Filter by campaign ID. Use 0 for manual bets only."),
     limit: int = Query(default=50, le=500),
     offset: int = 0,
+    user: User = Depends(require_tier("pro")),
     db: Session = Depends(get_db),
 ):
     """List all placed bets, optionally filtered by status or campaign."""
-    query = db.query(Bet).filter(Bet.is_backtest == False)
+    query = db.query(Bet).filter(Bet.is_backtest == False, Bet.user_id == user.id)
     if status:
         query = query.filter(Bet.result == status)
     if campaign_id is not None:
@@ -41,15 +46,25 @@ def list_bets(
 
 
 @router.post("/portfolio/bets", response_model=BetResponse)
-def create_bet(request: BetCreateRequest, db: Session = Depends(get_db)):
+def create_bet(
+    request: BetCreateRequest,
+    user: User = Depends(require_tier("pro")),
+    db: Session = Depends(get_db),
+):
     """Record a new bet."""
     if request.campaign_id is not None:
         from src.models.campaign import Campaign
-        campaign = db.query(Campaign).filter(Campaign.id == request.campaign_id).first()
+        campaign = db.query(Campaign).filter(
+            Campaign.id == request.campaign_id, Campaign.user_id == user.id
+        ).first()
         if not campaign:
             raise HTTPException(status_code=404, detail="Campaign not found")
 
+    # Determine source: manual if in a campaign, scanner if standalone
+    source = "manual" if request.campaign_id is not None else "scanner"
+
     bet = Bet(
+        user_id=user.id,
         sport="football",
         match_date=datetime.fromisoformat(request.match_date),
         home_team=request.home_team,
@@ -60,6 +75,9 @@ def create_bet(request: BetCreateRequest, db: Session = Depends(get_db)):
         stake=request.stake,
         result="pending",
         campaign_id=request.campaign_id,
+        source=source,
+        bookmaker=request.bookmaker,
+        note=request.note,
     )
     db.add(bet)
     db.commit()
@@ -67,25 +85,101 @@ def create_bet(request: BetCreateRequest, db: Session = Depends(get_db)):
     return _bet_to_response(bet)
 
 
-@router.patch("/portfolio/bets/{bet_id}")
+@router.patch("/portfolio/bets/{bet_id}", response_model=BetResponse)
 def update_bet_result(
     bet_id: int,
-    result: str,
+    request: BetUpdateRequest,
+    user: User = Depends(require_tier("pro")),
     db: Session = Depends(get_db),
 ):
-    """Update a bet result (won/lost)."""
-    bet = db.query(Bet).filter(Bet.id == bet_id).first()
+    """Update a bet result (won/lost/void/pending)."""
+    bet = db.query(Bet).filter(Bet.id == bet_id, Bet.user_id == user.id).first()
     if not bet:
         raise HTTPException(status_code=404, detail="Bet not found")
 
-    bet.result = result
-    if result == "won":
+    bet.result = request.result
+    if request.result == "won":
         bet.profit_loss = round(bet.stake * (bet.odds_at_bet - 1), 2)
-    elif result == "lost":
+    elif request.result == "lost":
         bet.profit_loss = round(-bet.stake, 2)
-    else:
+    elif request.result == "void":
+        bet.profit_loss = 0.0
+    else:  # pending
         bet.profit_loss = None
 
+    db.commit()
+    db.refresh(bet)
+
+    # Trigger notifications on settled bets
+    if request.result in ("won", "lost"):
+        _check_notifications(db, user, request.result)
+
+    return _bet_to_response(bet)
+
+
+def _check_notifications(db: Session, user: User, result: str) -> None:
+    """Check and create notifications after a bet is settled."""
+    from src.models.user_preferences import UserPreferences
+    from src.services.notifications import create_notification, check_smart_stop
+
+    prefs = db.query(UserPreferences).filter(UserPreferences.user_id == user.id).first()
+
+    if result == "lost" and prefs:
+        # Stop-loss: check daily loss
+        if prefs.daily_stop_loss and prefs.daily_stop_loss > 0:
+            today_losses = (
+                db.query(Bet)
+                .filter(
+                    Bet.user_id == user.id,
+                    Bet.is_backtest == False,
+                    Bet.result == "lost",
+                    Bet.match_date >= datetime.combine(date.today(), datetime.min.time()),
+                )
+                .all()
+            )
+            daily_loss = abs(sum(b.profit_loss or 0 for b in today_losses))
+            if daily_loss >= prefs.daily_stop_loss:
+                create_notification(
+                    db, user.id, "stop_loss",
+                    "Stop-loss atteint",
+                    f"Votre perte du jour ({daily_loss:.2f}€) a atteint votre limite de {prefs.daily_stop_loss:.2f}€.",
+                    {"daily_loss": daily_loss, "threshold": prefs.daily_stop_loss},
+                )
+
+        # Low bankroll
+        if prefs.low_bankroll_alert and prefs.low_bankroll_alert > 0 and prefs.initial_bankroll:
+            all_settled = (
+                db.query(Bet)
+                .filter(Bet.user_id == user.id, Bet.is_backtest == False, Bet.result.in_(["won", "lost"]))
+                .all()
+            )
+            total_pnl = sum(b.profit_loss or 0 for b in all_settled)
+            current_bankroll = prefs.initial_bankroll + total_pnl
+            if current_bankroll <= prefs.low_bankroll_alert:
+                create_notification(
+                    db, user.id, "low_bankroll",
+                    "Bankroll basse",
+                    f"Votre bankroll est à {current_bankroll:.2f}€, sous votre seuil d'alerte de {prefs.low_bankroll_alert:.2f}€.",
+                    {"current_bankroll": round(current_bankroll, 2), "threshold": prefs.low_bankroll_alert},
+                )
+
+    # Smart stop: check last 20 bets ROI
+    check_smart_stop(db, user.id)
+    db.commit()
+
+
+@router.patch("/portfolio/bets/{bet_id}/note", response_model=BetResponse)
+def update_bet_note(
+    bet_id: int,
+    request: BetNoteUpdateRequest,
+    user: User = Depends(require_tier("pro")),
+    db: Session = Depends(get_db),
+):
+    """Update a bet's personal note."""
+    bet = db.query(Bet).filter(Bet.id == bet_id, Bet.user_id == user.id).first()
+    if not bet:
+        raise HTTPException(status_code=404, detail="Bet not found")
+    bet.note = request.note
     db.commit()
     db.refresh(bet)
     return _bet_to_response(bet)
@@ -95,10 +189,11 @@ def update_bet_result(
 def get_portfolio_stats(
     from_date: date | None = Query(default=None, description="Filter bets from this date (inclusive)"),
     to_date: date | None = Query(default=None, description="Filter bets up to this date (inclusive)"),
+    user: User = Depends(require_tier("pro")),
     db: Session = Depends(get_db),
 ):
     """Get portfolio statistics, optionally filtered by date range."""
-    query = db.query(Bet).filter(Bet.is_backtest == False)
+    query = db.query(Bet).filter(Bet.is_backtest == False, Bet.user_id == user.id)
     if from_date:
         query = query.filter(Bet.match_date >= datetime.combine(from_date, datetime.min.time()))
     if to_date:
@@ -145,6 +240,7 @@ def get_portfolio_stats(
             prev_to = from_date - timedelta(days=1)
             prev_query = db.query(Bet).filter(
                 Bet.is_backtest == False,
+                Bet.user_id == user.id,
                 Bet.match_date >= datetime.combine(prev_from, datetime.min.time()),
                 Bet.match_date <= datetime.combine(prev_to, datetime.max.time()),
             )
@@ -204,11 +300,13 @@ def get_portfolio_stats(
 def get_portfolio_history(
     from_date: date | None = Query(default=None, description="Filter from this date"),
     to_date: date | None = Query(default=None, description="Filter up to this date"),
+    user: User = Depends(require_tier("pro")),
     db: Session = Depends(get_db),
 ):
     """Get P&L history as cumulative points grouped by date."""
     query = db.query(Bet).filter(
         Bet.is_backtest == False,
+        Bet.user_id == user.id,
         Bet.result.in_(["won", "lost"]),
     )
     if from_date:
@@ -245,21 +343,15 @@ def get_portfolio_history(
     return points
 
 
-
-def _bet_to_response(b: Bet) -> BetResponse:
-    return BetResponse(
-        id=b.id,
-        sport=b.sport or "football",
-        home_team=b.home_team,
-        away_team=b.away_team,
-        league=b.league or "",
-        match_date=b.match_date.isoformat(),
-        outcome_bet=b.outcome_bet,
-        odds_at_bet=b.odds_at_bet,
-        stake=b.stake,
-        result=b.result or "pending",
-        profit_loss=b.profit_loss,
-        campaign_id=b.campaign_id,
-        combo_group=b.combo_group,
-        created_at=b.created_at.isoformat() if b.created_at else "",
-    )
+@router.delete("/portfolio/bets/{bet_id}", status_code=204)
+def delete_bet(
+    bet_id: int,
+    user: User = Depends(require_tier("pro")),
+    db: Session = Depends(get_db),
+):
+    """Delete a bet (mistake, duplicate, etc.)."""
+    bet = db.query(Bet).filter(Bet.id == bet_id, Bet.user_id == user.id).first()
+    if not bet:
+        raise HTTPException(status_code=404, detail="Bet not found")
+    db.delete(bet)
+    db.commit()

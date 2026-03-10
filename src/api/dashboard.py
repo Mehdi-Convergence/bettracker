@@ -8,29 +8,37 @@ from src.api.schemas import CampaignSummaryItem, DashboardSummaryResponse
 from src.database import get_db
 from src.models.bet import Bet
 from src.models.campaign import Campaign
+from src.models.user import User
 
-router = APIRouter(tags=["dashboard"], dependencies=[Depends(require_tier("pro"))])
+router = APIRouter(tags=["dashboard"])
 
 
 @router.get("/dashboard/summary", response_model=DashboardSummaryResponse)
-def get_dashboard_summary(db: Session = Depends(get_db)):
+def get_dashboard_summary(
+    user: User = Depends(require_tier("pro")),
+    db: Session = Depends(get_db),
+):
     """Return a high-level dashboard summary with campaign details."""
-    active_campaigns_list = db.query(Campaign).filter(Campaign.status == "active").all()
+    active_campaigns_list = (
+        db.query(Campaign)
+        .filter(Campaign.status == "active", Campaign.user_id == user.id)
+        .all()
+    )
 
     pending_bets = (
         db.query(Bet)
-        .filter(Bet.is_backtest == False, Bet.result == "pending")
+        .filter(Bet.is_backtest == False, Bet.result == "pending", Bet.user_id == user.id)
         .count()
     )
 
     won = (
         db.query(Bet)
-        .filter(Bet.is_backtest == False, Bet.result == "won")
+        .filter(Bet.is_backtest == False, Bet.result == "won", Bet.user_id == user.id)
         .count()
     )
     lost = (
         db.query(Bet)
-        .filter(Bet.is_backtest == False, Bet.result == "lost")
+        .filter(Bet.is_backtest == False, Bet.result == "lost", Bet.user_id == user.id)
         .count()
     )
 

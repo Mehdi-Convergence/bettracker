@@ -1,44 +1,63 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Rocket, TrendingUp, TrendingDown, Wallet, RefreshCw, Check, Loader2,
-  Pause, Play, Settings, Plus, Target, Trash2, ChevronDown, ChevronUp, Layers,
+  Rocket, Wallet, Check, Loader2, Layers,
+  Pause, Play, Plus, Target, Trash2,
+  Search, LayoutGrid, Columns3, MoreVertical, Copy, Archive,
+  Zap, X, Shield, SlidersHorizontal, Calendar, Bell,
 } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import {
-  getCampaigns, createCampaign, getCampaignDetail, getCampaignRecommendations,
-  acceptCampaignRecommendation, getCampaignHistory, updateCampaign,
-  getCampaignBets, updateCampaignBet, deleteCampaignBet,
+  getCampaigns, createCampaign, getCampaignDetail, updateCampaign,
 } from "@/services/api";
-import { LEAGUE_INFO } from "@/types";
-import { PageHeader, Button, Alert, Card, Badge } from "@/components/ui";
-import type {
-  Campaign as CampaignType, CampaignDetail, CampaignRecommendation,
-  CampaignRecommendationsResponse, BankrollPoint,
-} from "@/types";
+import KanbanBoard from "@/components/KanbanBoard";
+import type { KanbanColumn, KanbanCardData } from "@/components/KanbanBoard";
+import type { Campaign as CampaignType } from "@/types";
+import { GREEN, RED, AMBER, STATUS_CFG } from "@/utils/campaign";
+import { useTour } from "@/hooks/useTour";
+import SpotlightTour from "@/components/SpotlightTour";
+import { campaignsTour } from "@/tours/index";
 
+// ── Design tokens ──
+const ACCENT = "#3b5bdb";
+
+// ── Campaign card colors (cycle) ──
+const CARD_ACCENTS = [ACCENT, "#7c3aed", "#0ea5e9", "#e11d48", "#059669", "#d97706"];
+
+// ── Sport icons ──
+function sportIcon(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.includes("tennis")) return "\uD83C\uDFBE";
+  if (lower.includes("basket")) return "\uD83C\uDFC0";
+  return "\u26BD";
+}
+
+// ══════════════════════════════════════════════
+// MAIN COMPONENT
+// ══════════════════════════════════════════════
 export default function Campaign() {
-  // Data
+  const navigate = useNavigate();
+  const { showTour, completeTour } = useTour("campaigns");
+
+  // ── Data ──
   const [campaigns, setCampaigns] = useState<CampaignType[]>([]);
-  const [detail, setDetail] = useState<CampaignDetail | null>(null);
-  const [recos, setRecos] = useState<CampaignRecommendationsResponse | null>(null);
-  const [history, setHistory] = useState<BankrollPoint[]>([]);
-  const [bets, setBets] = useState<import("@/types").Bet[]>([]);
 
-  // UI
+  // ── UI state ──
   const [loading, setLoading] = useState(true);
-  const [recsLoading, setRecsLoading] = useState(false);
-  const [acceptingIdx, setAcceptingIdx] = useState<number | null>(null);
   const [error, setError] = useState("");
-  const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [showConfig, setShowConfig] = useState(false);
-  const [demoMode] = useState(false);
-  const [showBets, setShowBets] = useState(false);
-  const [updatingBetId, setUpdatingBetId] = useState<number | null>(null);
-  const [deletingBetId, setDeletingBetId] = useState<number | null>(null);
-  const [recoDatePreset, setRecoDatePreset] = useState("7j");
 
-  // Form state
+  // ── Views ──
+  const [viewMode, setViewMode] = useState<"grid" | "kanban">("grid");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // ── Stepper step ──
+  const [stepperStep, setStepperStep] = useState(0);
+
+  // ── Form state (create) — fields supported by backend ──
   const [form, setForm] = useState({
     name: "Strategie Alpha",
     initial_bankroll: 200,
@@ -55,650 +74,1016 @@ export default function Campaign() {
     target_bankroll: null as number | null,
   });
 
-  const activeCampaign = campaigns.find((c) => c.status === "active") || campaigns[0] || null;
+  // ── Extended form (UI-only, not persisted yet) ──
+  const [extForm, setExtForm] = useState({
+    description: "",
+    sports: ["football"] as string[],
+    icon: "\u26BD",
+    color: ACCENT,
+    staking_strategy: "flat" as "flat" | "pct_bankroll" | "kelly_half" | "kelly_dynamic",
+    max_stake: null as number | null,
+    stop_loss_daily: null as number | null,
+    stop_loss_total: null as number | null,
+    smart_stop: 5,
+    clv_rule: false,
+    stake_variation: 0,
+    data_quality_min: 12,
+    bet_types: ["1X2"] as string[],
+    anti_duplicate: true,
+    max_same_player: 3,
+    start_date: "",
+    duration_days: 30,
+    frequency: "daily" as "daily" | "continuous",
+    active_days: [1, 2, 3, 4, 5, 6, 7] as number[],
+    alert_email: true,
+    alert_push: false,
+    alert_sms: false,
+  });
 
+  // ── Detail campaign stats map ──
+  const [campaignStats, setCampaignStats] = useState<Record<number, import("@/types").CampaignStats>>({});
+
+  // ── Load campaigns ──
   useEffect(() => { loadCampaigns(); }, []);
-  useEffect(() => {
-    if (activeCampaign) {
-      loadDetail(activeCampaign.id);
-      loadRecommendations(activeCampaign.id);
-      loadHistory(activeCampaign.id);
-      loadBets(activeCampaign.id);
-    }
-  }, [activeCampaign?.id]);
 
+  // ── Load stats for all campaigns ──
+  useEffect(() => {
+    campaigns.forEach((c) => {
+      if (!campaignStats[c.id]) {
+        getCampaignDetail(c.id).then((d) =>
+          setCampaignStats((prev) => ({ ...prev, [c.id]: d.stats }))
+        ).catch(() => {});
+      }
+    });
+  }, [campaigns]);
+
+  // ── Close menu on outside click ──
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    }
+    if (openMenuId !== null) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [openMenuId]);
+
+  // ── API calls ──
   async function loadCampaigns() {
     setLoading(true);
-    try { const data = await getCampaigns(); setCampaigns(data); if (data.length === 0) setShowCreate(true); }
+    try { setCampaigns(await getCampaigns()); }
     catch { setError("Impossible de charger les campagnes."); }
     setLoading(false);
   }
-  async function loadDetail(id: number) { try { setDetail(await getCampaignDetail(id)); } catch { /* silent */ } }
-  async function loadRecommendations(id: number) {
-    setRecsLoading(true);
-    try { setRecos(await getCampaignRecommendations(id, demoMode)); } catch { /* silent */ }
-    setRecsLoading(false);
-  }
-  async function loadHistory(id: number) { try { setHistory(await getCampaignHistory(id)); } catch { /* silent */ } }
-  async function loadBets(id: number) { try { setBets(await getCampaignBets(id)); } catch { /* silent */ } }
-
-  async function handleUpdateBet(betId: number, result: string) {
-    if (!activeCampaign) return;
-    setUpdatingBetId(betId);
-    try {
-      const updated = await updateCampaignBet(activeCampaign.id, betId, result);
-      setBets((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
-      loadDetail(activeCampaign.id);
-      loadHistory(activeCampaign.id);
-    } catch { setError("Impossible de mettre a jour le pari."); }
-    setUpdatingBetId(null);
-  }
-
-  async function handleDeleteBet(betId: number) {
-    if (!activeCampaign) return;
-    setDeletingBetId(betId);
-    try {
-      await deleteCampaignBet(activeCampaign.id, betId);
-      setBets((prev) => prev.filter((b) => b.id !== betId));
-      loadDetail(activeCampaign.id);
-      loadHistory(activeCampaign.id);
-    } catch { setError("Impossible de supprimer le pari."); }
-    setDeletingBetId(null);
-  }
-
   async function handleCreate() {
     setCreating(true); setError("");
-    try { await createCampaign(form); setShowCreate(false); await loadCampaigns(); }
-    catch (e) { setError((e as Error).message); }
+    try {
+      await createCampaign(form);
+      setShowCreateModal(false);
+      await loadCampaigns();
+    } catch (e) { setError((e as Error).message); }
     setCreating(false);
   }
 
-  async function handleAccept(reco: CampaignRecommendation, idx: number) {
-    if (!activeCampaign) return;
-    setAcceptingIdx(idx);
-    try {
-      await acceptCampaignRecommendation(activeCampaign.id, {
-        home_team: reco.home_team, away_team: reco.away_team, league: reco.league,
-        match_date: reco.date, outcome: reco.outcome, odds: reco.best_odds, stake: reco.suggested_stake,
-      });
-      if (recos) setRecos({ ...recos, recommendations: recos.recommendations.filter((_, i) => i !== idx) });
-      loadDetail(activeCampaign.id);
-      loadHistory(activeCampaign.id);
-    } catch { setError("Impossible d'enregistrer le pari."); }
-    setAcceptingIdx(null);
-  }
-
-  async function handleTogglePause() {
-    if (!activeCampaign) return;
-    const newStatus = activeCampaign.status === "active" ? "paused" : "active";
-    try { await updateCampaign(activeCampaign.id, { status: newStatus }); await loadCampaigns(); }
+  async function handleTogglePause(campaignId: number, currentStatus: string) {
+    const newStatus = currentStatus === "active" ? "paused" : "active";
+    try { await updateCampaign(campaignId, { status: newStatus }); await loadCampaigns(); }
     catch { setError("Impossible de modifier le statut."); }
+    setOpenMenuId(null);
   }
 
-  function handleSkip(idx: number) {
-    if (!recos) return;
-    setRecos({ ...recos, recommendations: recos.recommendations.filter((_, i) => i !== idx) });
-  }
-
-  const stats = detail?.stats;
-  const inputCls = "w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
-
-  // Date filter for recommendations
-  const filteredRecos = useMemo(() => {
-    if (!recos) return [];
-    const all = recos.recommendations;
-    const now = new Date();
-    const cutoff = new Date(now);
-    if (recoDatePreset === "auj") cutoff.setDate(cutoff.getDate() + 1);
-    else if (recoDatePreset === "48h") cutoff.setDate(cutoff.getDate() + 2);
-    else if (recoDatePreset === "72h") cutoff.setDate(cutoff.getDate() + 3);
-    else if (recoDatePreset === "7j") cutoff.setDate(cutoff.getDate() + 7);
-    else if (recoDatePreset === "1m") cutoff.setDate(cutoff.getDate() + 30);
-    else return all;
-    return all.filter((r) => { const d = new Date(r.date); return d >= now && d <= cutoff; });
-  }, [recos, recoDatePreset]);
-
-  // Combo suggestions
-  const combos = useMemo(() => {
-    if (!activeCampaign?.combo_mode || filteredRecos.length < 2) return [];
-    const maxLegs = activeCampaign.combo_max_legs ?? 2;
-    const minOdds = activeCampaign.combo_min_odds ?? 1.5;
-    const maxOdds = activeCampaign.combo_max_odds ?? 10.0;
-    const topN = activeCampaign.combo_top_n ?? 3;
-    const pool = filteredRecos.slice(0, 12);
-    function getCombinations<T>(arr: T[], k: number): T[][] {
-      if (k === 1) return arr.map((x) => [x]);
-      const res: T[][] = [];
-      for (let i = 0; i <= arr.length - k; i++) getCombinations(arr.slice(i + 1), k - 1).forEach((c) => res.push([arr[i], ...c]));
-      return res;
+  // ── Filtered campaigns ──
+  const filteredCampaigns = useMemo(() => {
+    let list = campaigns;
+    if (statusFilter !== "all") list = list.filter((c) => c.status === statusFilter);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((c) => c.name.toLowerCase().includes(q));
     }
-    const result: { legs: CampaignRecommendation[]; combinedOdds: number; combinedProb: number }[] = [];
-    for (let size = 2; size <= Math.min(maxLegs, pool.length); size++) {
-      for (const combo of getCombinations(pool, size)) {
-        const combinedOdds = combo.reduce((acc, r) => acc * r.best_odds, 1);
-        if (combinedOdds >= minOdds && combinedOdds <= maxOdds) {
-          const combinedProb = combo.reduce((acc, r) => acc * r.model_prob, 1);
-          result.push({ legs: combo, combinedOdds, combinedProb });
-        }
-      }
-    }
-    result.sort((a, b) => b.combinedProb * b.combinedOdds - a.combinedProb * a.combinedOdds);
-    return result.slice(0, topN);
-  }, [filteredRecos, activeCampaign]);
+    return list;
+  }, [campaigns, statusFilter, searchQuery]);
 
+  const activeCampaignCount = campaigns.filter((c) => c.status === "active").length;
+
+  // ══════════════════════════════════════════════
+  // LOADING STATE
+  // ══════════════════════════════════════════════
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="animate-spin text-blue-500" size={32} />
+        <Loader2 className="animate-spin" size={32} style={{ color: ACCENT }} />
       </div>
     );
   }
 
-  // ----- CREATE FORM -----
-  if (showCreate || !activeCampaign) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Campagne" description="Creez votre strategie automatisee" />
-
-        <Card padding="lg" className="max-w-3xl">
-          <h3 className="text-slate-900 font-semibold mb-4 flex items-center gap-2">
-            <Plus size={16} className="text-blue-500" />
-            Nouvelle campagne
-          </h3>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Nom de la campagne</label>
-              <input type="text" value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className={`${inputCls} max-w-xs`}
-                placeholder="ex: Strategie Alpha" />
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Bankroll (EUR)</label>
-                <input type="number" value={form.initial_bankroll}
-                  onChange={(e) => setForm({ ...form, initial_bankroll: Number(e.target.value) })}
-                  className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Mise (%)</label>
-                <input type="number" step="0.01" value={form.flat_stake}
-                  onChange={(e) => setForm({ ...form, flat_stake: Number(e.target.value) })}
-                  className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Edge min</label>
-                <input type="number" step="0.01" value={form.min_edge}
-                  onChange={(e) => setForm({ ...form, min_edge: Number(e.target.value) })}
-                  className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Confiance min</label>
-                <input type="number" step="0.05" value={form.min_model_prob}
-                  onChange={(e) => setForm({ ...form, min_model_prob: Number(e.target.value) })}
-                  className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Cote min</label>
-                <input type="number" step="0.1" placeholder="vide = tout" value={form.min_odds ?? ""}
-                  onChange={(e) => setForm({ ...form, min_odds: e.target.value ? Number(e.target.value) : null })}
-                  className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Cote max</label>
-                <input type="number" step="0.1" placeholder="vide = tout" value={form.max_odds ?? ""}
-                  onChange={(e) => setForm({ ...form, max_odds: e.target.value ? Number(e.target.value) : null })}
-                  className={inputCls} />
-              </div>
-            </div>
-
-            {/* Combo mode */}
-            <div className="pt-3 border-t border-slate-200">
-              <label className="flex items-center gap-2 text-sm text-slate-700 mb-3 cursor-pointer">
-                <input type="checkbox" checked={form.combo_mode}
-                  onChange={(e) => setForm({ ...form, combo_mode: e.target.checked })}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                Mode Combis
-              </label>
-              {form.combo_mode && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">Max legs</label>
-                    <input type="number" min={2} max={4} value={form.combo_max_legs}
-                      onChange={(e) => setForm({ ...form, combo_max_legs: Number(e.target.value) })}
-                      className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">Cote min combo</label>
-                    <input type="number" step="0.1" value={form.combo_min_odds}
-                      onChange={(e) => setForm({ ...form, combo_min_odds: Number(e.target.value) })}
-                      className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">Cote max combo</label>
-                    <input type="number" step="0.1" value={form.combo_max_odds}
-                      onChange={(e) => setForm({ ...form, combo_max_odds: Number(e.target.value) })}
-                      className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">Top N par jour</label>
-                    <input type="number" min={1} max={5} value={form.combo_top_n}
-                      onChange={(e) => setForm({ ...form, combo_top_n: Number(e.target.value) })}
-                      className={inputCls} />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Target */}
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Objectif bankroll (optionnel)</label>
-              <input type="number" placeholder="ex: 500" value={form.target_bankroll ?? ""}
-                onChange={(e) => setForm({ ...form, target_bankroll: e.target.value ? Number(e.target.value) : null })}
-                className={`${inputCls} w-40`} />
-            </div>
-
-            {error && <Alert variant="error">{error}</Alert>}
-
-            <Button onClick={handleCreate} loading={creating} disabled={!form.name.trim()}
-              icon={<Rocket size={16} />}>
-              {creating ? "Creation..." : "Creer la campagne"}
-            </Button>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  // ----- ACTIVE CAMPAIGN DASHBOARD -----
-  const outcomeLabel = (o: string) => o === "H" ? "Dom" : o === "D" ? "Nul" : "Ext";
-  const outcomeBadgeVariant = (o: string) => o === "H" ? "blue" as const : o === "D" ? "amber" as const : "red" as const;
-  const round2 = (n: number) => Math.round(n * 100) / 100;
+  // ══════════════════════════════════════════════
+  // GRID VIEW
+  // ══════════════════════════════════════════════
+  const inputCls = "w-full bg-white border border-[#e3e6eb] rounded-lg px-3 py-1.5 text-sm text-[#111318] focus:outline-none focus:ring-2 focus:ring-[#3b5bdb] focus:border-[#3b5bdb]";
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Campagne" description="Votre strategie automatisee" />
-
-      {/* Campaign header bar */}
-      <Card className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
-            <Rocket size={18} className="text-blue-600" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-slate-900 font-semibold">{activeCampaign.name}</span>
-              <Badge variant={activeCampaign.status === "active" ? "emerald" : "slate"} size="xs">
-                {activeCampaign.status === "active" ? "Active" : "Pause"}
-              </Badge>
-            </div>
-            <div className="text-xs text-slate-400 mt-0.5">
-              Mise {(activeCampaign.flat_stake * 100).toFixed(0)}% · Edge min {(activeCampaign.min_edge * 100).toFixed(0)}%
-              {activeCampaign.min_model_prob && ` · Confiance ${(activeCampaign.min_model_prob * 100).toFixed(0)}%`}
-              {activeCampaign.target_bankroll && ` · Objectif ${activeCampaign.target_bankroll}EUR`}
-            </div>
-          </div>
+    <div className="space-y-5">
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#111318]">Campagnes</h1>
+          <p className="text-sm text-[#8a919e] mt-0.5">Gérez vos stratégies de paris automatisées</p>
         </div>
+        <button data-tour="create-btn" onClick={() => setShowCreateModal(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors cursor-pointer hover:opacity-90"
+          style={{ backgroundColor: ACCENT }}>
+          <Plus size={16} />
+          Créer une campagne
+        </button>
+      </div>
+
+      {/* ── Quota banner ── */}
+      <div data-tour="quota-bar" className="bg-gradient-to-r from-[#3b5bdb]/5 to-[#7c3aed]/5 rounded-xl border border-[#3b5bdb]/15 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={handleTogglePause}
-            icon={activeCampaign.status === "active" ? <Pause size={12} /> : <Play size={12} />}>
-            {activeCampaign.status === "active" ? "Pause" : "Reprendre"}
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => setShowConfig(!showConfig)}
-            icon={<Settings size={12} />}>
-            Config
-          </Button>
+          <Zap size={16} style={{ color: ACCENT }} />
+          <span className="text-sm text-[#111318]">
+            <strong>{activeCampaignCount}</strong> / 5 campagnes actives
+          </span>
+          <span className="text-xs text-[#8a919e]">Plan Pro</span>
         </div>
-      </Card>
+        <div className="w-32 h-1.5 bg-[#e3e6eb] rounded-full overflow-hidden">
+          <div className="h-full rounded-full transition-all" style={{
+            width: `${Math.min(100, (activeCampaignCount / 5) * 100)}%`,
+            backgroundColor: activeCampaignCount >= 5 ? RED : ACCENT,
+          }} />
+        </div>
+      </div>
 
-      {/* Config panel */}
-      {showConfig && (
-        <Card>
-          <h3 className="text-slate-900 font-semibold mb-3 text-sm">Parametres de la strategie</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 text-sm">
-            <ConfigItem label="Bankroll initiale" value={`${activeCampaign.initial_bankroll} EUR`} />
-            <ConfigItem label="Mise" value={`${(activeCampaign.flat_stake * 100).toFixed(1)}%`} />
-            <ConfigItem label="Edge min" value={`${(activeCampaign.min_edge * 100).toFixed(1)}%`} />
-            <ConfigItem label="Confiance min" value={activeCampaign.min_model_prob ? `${(activeCampaign.min_model_prob * 100).toFixed(0)}%` : "—"} />
-            <ConfigItem label="Cote min" value={activeCampaign.min_odds?.toFixed(2) ?? "—"} />
-            <ConfigItem label="Cote max" value={activeCampaign.max_odds?.toFixed(2) ?? "—"} />
-            <ConfigItem label="Mode combo" value={activeCampaign.combo_mode ? "Oui" : "Non"} />
-            {activeCampaign.target_bankroll && <ConfigItem label="Objectif" value={`${activeCampaign.target_bankroll} EUR`} />}
-          </div>
-        </Card>
-      )}
+      {/* ── Search + Filter + View Toggle ── */}
+      <div className="flex items-center justify-between gap-4">
+        {/* Search */}
+        <div data-tour="search-bar" className="relative flex-1 max-w-xs">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8a919e]" />
+          <input type="text" placeholder="Rechercher une campagne..."
+            value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 rounded-lg text-sm bg-white border border-[#e3e6eb] text-[#111318] focus:outline-none focus:ring-2 focus:ring-[#3b5bdb]/30 focus:border-[#3b5bdb] placeholder:text-[#8a919e]"
+            style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }} />
+        </div>
 
-      {/* Stats cards */}
-      {stats && (
-        <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <LocalStatCard label="Bankroll actuelle" value={`${stats.current_bankroll.toFixed(0)}EUR`}
-              icon={Wallet} color="text-amber-500" />
-            <LocalStatCard label="Profit/Perte"
-              value={`${stats.total_pnl >= 0 ? "+" : ""}${stats.total_pnl.toFixed(2)}EUR`}
-              icon={stats.total_pnl >= 0 ? TrendingUp : TrendingDown}
-              color={stats.total_pnl >= 0 ? "text-emerald-600" : "text-red-500"} />
-            <LocalStatCard label="Taux de reussite"
-              value={stats.won + stats.lost > 0 ? `${(stats.win_rate * 100).toFixed(1)}%` : "—"}
-              icon={Target} color="text-blue-600" />
-            <LocalStatCard label="ROI"
-              value={stats.total_staked > 0 ? `${stats.roi_pct >= 0 ? "+" : ""}${stats.roi_pct.toFixed(1)}%` : "—"}
-              icon={TrendingUp} color={stats.roi_pct >= 0 ? "text-emerald-600" : "text-red-500"} />
-          </div>
+        {/* Filter pills */}
+        <div data-tour="status-filters" className="flex items-center gap-1 bg-[#f4f5f7] rounded-lg p-0.5">
+          {([
+            { key: "all", label: "Toutes" },
+            { key: "active", label: "Actives" },
+            { key: "paused", label: "En pause" },
+            { key: "archived", label: "Archivées" },
+          ] as const).map((f) => (
+            <button key={f.key} onClick={() => setStatusFilter(f.key)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
+                statusFilter === f.key
+                  ? "bg-white text-[#3b5bdb] shadow-sm"
+                  : "text-[#8a919e] hover:text-[#111318]"
+              }`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
 
-          {(stats.won > 0 || stats.lost > 0) && (
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <MiniStat label="Paris total" value={`${stats.total_bets}`} />
-              <MiniStat label="En attente" value={`${stats.pending_bets}`} />
-              <MiniStat label="Gagnes" value={`${stats.won}`} color="text-emerald-600" />
-              <MiniStat label="Perdus" value={`${stats.lost}`} color="text-red-500" />
-              <MiniStat label="Total mise" value={`${stats.total_staked.toFixed(0)}EUR`} />
+        {/* View toggle */}
+        <div data-tour="view-toggle" className="flex items-center bg-[#f4f5f7] rounded-lg p-0.5">
+          <button onClick={() => setViewMode("grid")}
+            className={`p-1.5 rounded-md transition-all cursor-pointer ${viewMode === "grid" ? "bg-white shadow-sm text-[#3b5bdb]" : "text-[#8a919e] hover:text-[#111318]"}`}>
+            <LayoutGrid size={16} />
+          </button>
+          <button onClick={() => setViewMode("kanban")}
+            className={`p-1.5 rounded-md transition-all cursor-pointer ${viewMode === "kanban" ? "bg-white shadow-sm text-[#3b5bdb]" : "text-[#8a919e] hover:text-[#111318]"}`}>
+            <Columns3 size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Grid ── */}
+      {viewMode === "grid" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredCampaigns.map((campaign, idx) => {
+            const statusCfg = STATUS_CFG[campaign.status] || STATUS_CFG.active;
+            const cStats = campaignStats[campaign.id];
+            const accent = CARD_ACCENTS[idx % CARD_ACCENTS.length];
+
+            return (
+              <div key={campaign.id}
+                {...(idx === 0 ? { "data-tour": "campaign-card" } : {})}
+                className="group bg-white rounded-xl border border-[#e3e6eb] overflow-hidden hover:border-[#3b5bdb]/30 transition-all cursor-pointer"
+                style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)", animation: `fadeUp 0.4s ease both ${idx * 0.05}s` }}
+                onClick={() => navigate(`/campaign/${campaign.id}`)}>
+                {/* Accent top bar */}
+                <div className="h-1" style={{ backgroundColor: accent }} />
+
+                <div className="p-4">
+                  {/* Header: icon + name + status + menu */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0"
+                        style={{ backgroundColor: `${accent}15` }}>
+                        {sportIcon(campaign.name)}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-semibold text-[#111318] truncate">{campaign.name}</h3>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${statusCfg.bg} ${statusCfg.text}`}>
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusCfg.dot,
+                              ...(campaign.status === "active" ? { animation: "pulse 2s infinite" } : {}) }} />
+                            {statusCfg.label}
+                          </span>
+                          {campaign.combo_mode && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 text-purple-600">
+                              Combis
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Menu ⋮ */}
+                    <div className="relative" ref={openMenuId === campaign.id ? menuRef : undefined}>
+                      <button {...(idx === 0 ? { "data-tour": "campaign-menu" } : {})} onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === campaign.id ? null : campaign.id); }}
+                        className="p-1 rounded-md text-[#8a919e] hover:bg-slate-100 transition-colors cursor-pointer opacity-0 group-hover:opacity-100">
+                        <MoreVertical size={16} />
+                      </button>
+                      {openMenuId === campaign.id && (
+                        <div className="absolute right-0 top-8 w-44 bg-white rounded-lg border border-[#e3e6eb] py-1 z-50"
+                          style={{ boxShadow: "0 4px 16px rgba(16,24,40,.1)" }}
+                          onClick={(e) => e.stopPropagation()}>
+                          <MenuBtn icon={<Copy size={14} />} label="Dupliquer" onClick={() => setOpenMenuId(null)} />
+                          <MenuBtn icon={campaign.status === "active" ? <Pause size={14} /> : <Play size={14} />}
+                            label={campaign.status === "active" ? "Mettre en pause" : "Reprendre"}
+                            onClick={() => handleTogglePause(campaign.id, campaign.status)} />
+                          <MenuBtn icon={<Archive size={14} />} label="Archiver" onClick={() => setOpenMenuId(null)} />
+                          <div className="border-t border-[#e3e6eb] my-1" />
+                          <MenuBtn icon={<Trash2 size={14} />} label="Supprimer" danger onClick={() => setOpenMenuId(null)} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Config tags */}
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    <ConfigTag label={`Mise ${(campaign.flat_stake * 100).toFixed(0)}%`} />
+                    <ConfigTag label={`Edge \u2265 ${(campaign.min_edge * 100).toFixed(0)}%`} />
+                    {campaign.min_model_prob && <ConfigTag label={`Conf. \u2265 ${(campaign.min_model_prob * 100).toFixed(0)}%`} />}
+                    {campaign.min_odds && <ConfigTag label={`Cote \u2265 ${campaign.min_odds.toFixed(1)}`} />}
+                    {campaign.max_odds && <ConfigTag label={`Cote \u2264 ${campaign.max_odds.toFixed(1)}`} />}
+                  </div>
+
+                  {/* KPI row */}
+                  {cStats ? (
+                    <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[#e3e6eb]">
+                      <KpiCell label="ROI" value={`${cStats.roi_pct >= 0 ? "+" : ""}${cStats.roi_pct.toFixed(1)}%`}
+                        color={cStats.roi_pct >= 0 ? GREEN : RED} />
+                      <KpiCell label="Paris" value={`${cStats.total_bets}`} />
+                      <KpiCell label="P&L" value={`${cStats.total_pnl >= 0 ? "+" : ""}${cStats.total_pnl.toFixed(0)}\u20AC`}
+                        color={cStats.total_pnl >= 0 ? GREEN : RED} />
+                    </div>
+                  ) : (
+                    <div className="pt-3 border-t border-[#e3e6eb]">
+                      <div className="h-8 flex items-center justify-center">
+                        <Loader2 size={14} className="animate-spin text-[#8a919e]" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* CTA Card — Create */}
+          <div onClick={() => setShowCreateModal(true)}
+            className="rounded-xl border-2 border-dashed border-[#e3e6eb] hover:border-[#3b5bdb]/40 flex flex-col items-center justify-center py-10 cursor-pointer transition-all group"
+            style={{ minHeight: 200 }}>
+            <div className="w-12 h-12 rounded-xl bg-[#f4f5f7] group-hover:bg-[#3b5bdb]/10 flex items-center justify-center transition-colors mb-3">
+              <Plus size={24} className="text-[#8a919e] group-hover:text-[#3b5bdb] transition-colors" />
             </div>
-          )}
-        </>
-      )}
-
-      {/* Bankroll chart */}
-      {history.length > 1 && (
-        <Card>
-          <h3 className="text-slate-900 font-semibold mb-3">Evolution de la bankroll</h3>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={history}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="date" stroke="#94a3b8" tick={{ fontSize: 10 }} />
-                <YAxis stroke="#94a3b8" tick={{ fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }} />
-                <Line type="monotone" dataKey="bankroll" stroke="#3b82f6" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+            <span className="text-sm font-semibold text-[#8a919e] group-hover:text-[#3b5bdb] transition-colors">
+              Créer une campagne
+            </span>
+            <span className="text-xs text-[#8a919e] mt-1">
+              {5 - activeCampaignCount} emplacement{5 - activeCampaignCount > 1 ? "s" : ""} disponible{5 - activeCampaignCount > 1 ? "s" : ""}
+            </span>
           </div>
-        </Card>
+        </div>
       )}
 
-      {/* Recommendations */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
-        <div className="p-4 border-b border-slate-200">
-          <div className="flex items-center justify-between mb-3">
+      {/* ── Kanban view ── */}
+      {viewMode === "kanban" && (
+        <CampaignKanban
+          campaigns={filteredCampaigns}
+          campaignStats={campaignStats}
+          onSelectCampaign={(id) => navigate(`/campaign/${id}`)}
+        />
+      )}
+
+      {/* ══════════════════════════════════════════════ */}
+      {/* CREATE MODAL — 4-STEP STEPPER */}
+      {/* ══════════════════════════════════════════════ */}
+      {showCreateModal && (
+        <CreateStepperModal
+          step={stepperStep}
+          setStep={setStepperStep}
+          form={form}
+          setForm={setForm}
+          extForm={extForm}
+          setExtForm={setExtForm}
+          inputCls={inputCls}
+          creating={creating}
+          error={error}
+          onClose={() => { setShowCreateModal(false); setStepperStep(0); }}
+          onCreate={handleCreate}
+        />
+      )}
+
+      {error && !showCreateModal && (
+        <div className="rounded-xl p-3 text-sm border bg-red-50 text-red-800 border-red-200">{error}</div>
+      )}
+
+      {showTour && <SpotlightTour steps={campaignsTour} onComplete={completeTour} />}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════
+// SUB-COMPONENTS
+// ══════════════════════════════════════════════
+
+// ══════════════════════════════════════════════
+// CAMPAIGN KANBAN
+// ══════════════════════════════════════════════
+
+interface CampaignKanbanCard extends KanbanCardData {
+  campaign: CampaignType;
+  stats?: import("@/types").CampaignStats;
+}
+
+const KANBAN_COLUMNS: KanbanColumn[] = [
+  {
+    id: "proposed",
+    title: "Proposés",
+    icon: <Target size={16} />,
+    color: ACCENT,
+    emptyText: "Aucune recommandation en attente",
+  },
+  {
+    id: "active",
+    title: "En cours",
+    icon: <Play size={16} />,
+    color: GREEN,
+    emptyText: "Aucun pari en cours",
+  },
+  {
+    id: "resolved",
+    title: "Résolus",
+    icon: <Check size={16} />,
+    color: "#8a919e",
+    emptyText: "Aucun pari résolu",
+  },
+];
+
+function CampaignKanban({ campaigns, campaignStats, onSelectCampaign }: {
+  campaigns: CampaignType[];
+  campaignStats: Record<number, import("@/types").CampaignStats>;
+  onSelectCampaign: (id: number) => void;
+}) {
+  // Map campaigns into kanban cards based on status
+  const kanbanCards: CampaignKanbanCard[] = campaigns.map((c) => {
+    let columnId = "active";
+    if (c.status === "paused") columnId = "proposed";
+    else if (c.status === "archived") columnId = "resolved";
+    return { id: String(c.id), columnId, campaign: c, stats: campaignStats[c.id] };
+  });
+
+  return (
+    <KanbanBoard<CampaignKanbanCard>
+      columns={KANBAN_COLUMNS}
+      cards={kanbanCards}
+      renderCard={(card) => {
+        const c = card.campaign;
+        const s = card.stats;
+        const statusCfg = STATUS_CFG[c.status] || STATUS_CFG.active;
+
+        return (
+          <div onClick={() => onSelectCampaign(c.id)}
+            className="bg-white rounded-xl border border-[#e3e6eb] p-3 hover:border-[#3b5bdb]/30 transition-all cursor-pointer"
+            style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-lg">{sportIcon(c.name)}</span>
+                <span className="text-sm font-semibold text-[#111318] truncate">{c.name}</span>
+              </div>
+              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${statusCfg.bg} ${statusCfg.text}`}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusCfg.dot }} />
+                {statusCfg.label}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              <ConfigTag label={`Mise ${(c.flat_stake * 100).toFixed(0)}%`} />
+              <ConfigTag label={`Edge \u2265 ${(c.min_edge * 100).toFixed(0)}%`} />
+            </div>
+
+            {s ? (
+              <div className="grid grid-cols-3 gap-1 pt-2 border-t border-[#e3e6eb]">
+                <KpiCell label="ROI" value={`${s.roi_pct >= 0 ? "+" : ""}${s.roi_pct.toFixed(1)}%`}
+                  color={s.roi_pct >= 0 ? GREEN : RED} />
+                <KpiCell label="Paris" value={`${s.total_bets}`} />
+                <KpiCell label="P&L" value={`${s.total_pnl >= 0 ? "+" : ""}${s.total_pnl.toFixed(0)}\u20AC`}
+                  color={s.total_pnl >= 0 ? GREEN : RED} />
+              </div>
+            ) : (
+              <div className="pt-2 border-t border-[#e3e6eb] flex justify-center">
+                <Loader2 size={12} className="animate-spin text-[#8a919e]" />
+              </div>
+            )}
+          </div>
+        );
+      }}
+    />
+  );
+}
+
+function ConfigTag({ label }: { label: string }) {
+  return (
+    <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#f4f5f7] text-[#8a919e] border border-[#e3e6eb]">
+      {label}
+    </span>
+  );
+}
+
+function KpiCell({ label, value, color = "#111318" }: { label: string; value: string; color?: string }) {
+  return (
+    <div className="text-center">
+      <div className="text-sm font-bold font-[var(--font-mono)]" style={{ color }}>{value}</div>
+      <div className="text-[10px] text-[#8a919e]">{label}</div>
+    </div>
+  );
+}
+
+function MenuBtn({ icon, label, onClick, danger = false }: {
+  icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean;
+}) {
+  return (
+    <button onClick={onClick}
+      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors cursor-pointer ${
+        danger
+          ? "text-red-600 hover:bg-red-50"
+          : "text-[#111318] hover:bg-[#f4f5f7]"
+      }`}>
+      <span className={danger ? "text-red-400" : "text-[#8a919e]"}>{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+// ══════════════════════════════════════════════
+// STEPPER MODAL
+// ══════════════════════════════════════════════
+
+const STEPPER_STEPS = [
+  { label: "Identité & Sport", icon: <Rocket size={16} /> },
+  { label: "Bankroll & Mise", icon: <Wallet size={16} /> },
+  { label: "Filtres & Combis", icon: <SlidersHorizontal size={16} /> },
+  { label: "Planning & Récap", icon: <Calendar size={16} /> },
+];
+
+const SPORTS = [
+  { key: "football", label: "Football", icon: "\u26BD" },
+  { key: "tennis", label: "Tennis", icon: "\uD83C\uDFBE" },
+  { key: "basket", label: "Basketball", icon: "\uD83C\uDFC0" },
+];
+
+const STAKING_STRATEGIES = [
+  { key: "flat", label: "Mise fixe", desc: "Pourcentage fixe de la bankroll initiale" },
+  { key: "pct_bankroll", label: "% Bankroll", desc: "Pourcentage de la bankroll courante" },
+  { key: "kelly_half", label: "Kelly ½", desc: "Demi-critère de Kelly conservateur" },
+  { key: "kelly_dynamic", label: "Kelly dynamique", desc: "Kelly adapté selon la confiance" },
+] as const;
+
+const BET_TYPES = ["1X2", "Double chance", "BTTS", "Over/Under 2.5", "Handicap", "Corners", "Mi-temps"];
+
+const ACCENT_COLORS = [ACCENT, "#7c3aed", "#0ea5e9", "#e11d48", "#059669", "#d97706", "#6366f1", "#ec4899"];
+const CAMPAIGN_ICONS = ["\u26BD", "\uD83C\uDFBE", "\uD83C\uDFC0", "\uD83C\uDFC6", "\uD83D\uDE80", "\uD83D\uDCCA", "\uD83C\uDFAF", "\u2B50"];
+
+interface StepperProps {
+  step: number;
+  setStep: (s: number) => void;
+  form: {
+    name: string; initial_bankroll: number; flat_stake: number; min_edge: number;
+    min_model_prob: number; min_odds: number | null; max_odds: number | null;
+    combo_mode: boolean; combo_max_legs: number; combo_min_odds: number; combo_max_odds: number;
+    combo_top_n: number; target_bankroll: number | null;
+  };
+  setForm: (f: StepperProps["form"]) => void;
+  extForm: {
+    description: string; sports: string[]; icon: string; color: string;
+    staking_strategy: "flat" | "pct_bankroll" | "kelly_half" | "kelly_dynamic";
+    max_stake: number | null; stop_loss_daily: number | null; stop_loss_total: number | null;
+    smart_stop: number; clv_rule: boolean; stake_variation: number;
+    data_quality_min: number; bet_types: string[]; anti_duplicate: boolean; max_same_player: number;
+    start_date: string; duration_days: number; frequency: "daily" | "continuous";
+    active_days: number[]; alert_email: boolean; alert_push: boolean; alert_sms: boolean;
+  };
+  setExtForm: (f: StepperProps["extForm"]) => void;
+  inputCls: string;
+  creating: boolean;
+  error: string;
+  onClose: () => void;
+  onCreate: () => void;
+}
+
+function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm, inputCls, creating, error, onClose, onCreate }: StepperProps) {
+  const isLastStep = step === 3;
+
+  function toggleSport(key: string) {
+    setExtForm({
+      ...extForm,
+      sports: extForm.sports.includes(key)
+        ? extForm.sports.filter((s) => s !== key)
+        : [...extForm.sports, key],
+    });
+  }
+
+  function toggleBetType(bt: string) {
+    setExtForm({
+      ...extForm,
+      bet_types: extForm.bet_types.includes(bt)
+        ? extForm.bet_types.filter((b) => b !== bt)
+        : [...extForm.bet_types, bt],
+    });
+  }
+
+  function toggleDay(d: number) {
+    setExtForm({
+      ...extForm,
+      active_days: extForm.active_days.includes(d)
+        ? extForm.active_days.filter((x) => x !== d)
+        : [...extForm.active_days, d].sort(),
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="relative bg-white rounded-2xl w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col"
+        style={{ boxShadow: "0 4px 32px rgba(16,24,40,.15)" }}
+        onClick={(e) => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#e3e6eb] shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${ACCENT}15` }}>
+              <Rocket size={18} style={{ color: ACCENT }} />
+            </div>
             <div>
-              <h3 className="text-slate-900 font-semibold">Recommandations</h3>
-              {recos && (
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {filteredRecos.length} affiché{filteredRecos.length > 1 ? "s" : ""} · {recos.recommendations.length} détecté{recos.recommendations.length > 1 ? "s" : ""} sur {recos.total_scanned} matchs
-                </p>
-              )}
+              <h2 className="text-lg font-bold text-[#111318]">Nouvelle campagne</h2>
+              <p className="text-xs text-[#8a919e]">Étape {step + 1} sur 4 — {STEPPER_STEPS[step].label}</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => activeCampaign && loadRecommendations(activeCampaign.id)}
-              loading={recsLoading} icon={<RefreshCw size={12} />}>
-              Actualiser
-            </Button>
           </div>
-          {/* Date presets */}
-          <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5 w-fit">
-            {(["auj", "48h", "72h", "7j", "1m", "tout"] as const).map((p) => (
-              <button key={p} onClick={() => setRecoDatePreset(p)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                  recoDatePreset === p ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                }`}>
-                {p === "auj" ? "Auj." : p === "tout" ? "Tout" : p}
-              </button>
+          <button onClick={onClose}
+            className="p-1.5 rounded-lg text-[#8a919e] hover:bg-slate-100 transition-colors cursor-pointer">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Stepper bar */}
+        <div className="px-6 py-3 border-b border-[#e3e6eb] shrink-0">
+          <div className="flex items-center gap-1">
+            {STEPPER_STEPS.map((s, i) => (
+              <div key={i} className="flex items-center flex-1">
+                <button onClick={() => i <= step && setStep(i)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    i === step
+                      ? "bg-[#3b5bdb]/10 text-[#3b5bdb]"
+                      : i < step
+                        ? "text-[#12b76a] cursor-pointer hover:bg-emerald-50"
+                        : "text-[#8a919e]"
+                  }`}>
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                    i === step ? "bg-[#3b5bdb] text-white"
+                      : i < step ? "bg-[#12b76a] text-white" : "bg-[#e3e6eb] text-[#8a919e]"
+                  }`}>
+                    {i < step ? <Check size={10} /> : i + 1}
+                  </span>
+                  <span className="hidden md:inline">{s.label}</span>
+                </button>
+                {i < 3 && <div className={`flex-1 h-0.5 mx-1 rounded-full ${i < step ? "bg-[#12b76a]" : "bg-[#e3e6eb]"}`} />}
+              </div>
             ))}
           </div>
         </div>
 
-        {recsLoading && !recos ? (
-          <div className="p-8 flex items-center justify-center">
-            <Loader2 className="animate-spin text-blue-500" size={24} />
-          </div>
-        ) : recos && filteredRecos.length === 0 ? (
-          <div className="p-8 text-center text-slate-400 text-sm">
-            Aucune recommandation sur cette période. Élargissez la fenêtre ou ajustez vos paramètres.
-          </div>
-        ) : recos ? (
-          <div className="divide-y divide-slate-100">
-            {filteredRecos.map((reco, idx) => {
-              const info = LEAGUE_INFO[reco.league];
-              const fmtDate = reco.date.includes("T")
-                ? new Date(reco.date).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
-                : reco.date;
-              const isAccepting = acceptingIdx === idx;
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
-              return (
-                <div key={`${reco.home_team}-${reco.away_team}-${idx}`} className="p-4 hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-900 font-semibold text-sm">{reco.home_team} vs {reco.away_team}</span>
-                        <Badge variant={outcomeBadgeVariant(reco.outcome)} size="xs">
-                          {outcomeLabel(reco.outcome)}
-                        </Badge>
-                      </div>
-                      <div className="text-xs text-slate-400 mt-0.5">
-                        {info ? `${info.flag} ${info.name}` : reco.league} · {fmtDate}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 shrink-0">
-                      <div className="text-center">
-                        <div className="text-amber-600 font-bold text-lg">{reco.best_odds.toFixed(2)}</div>
-                        <div className="text-[10px] text-slate-400">{reco.bookmaker}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-emerald-600 font-bold text-sm">{(reco.model_prob * 100).toFixed(0)}%</div>
-                        <div className="text-[10px] text-slate-400">modele</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-emerald-600 font-bold text-sm">+{(reco.edge * 100).toFixed(1)}%</div>
-                        <div className="text-[10px] text-slate-400">edge</div>
-                      </div>
-                      <div className="text-center bg-slate-50 rounded-lg px-3 py-1.5 border border-slate-200">
-                        <div className="text-slate-900 font-bold text-sm">{reco.suggested_stake.toFixed(2)}EUR</div>
-                        <div className="text-[10px] text-slate-400">mise</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4 shrink-0">
-                      <Button size="sm" onClick={() => handleAccept(reco, idx)} loading={isAccepting}
-                        icon={<Check size={12} />}>
-                        {isAccepting ? "..." : "Accepter"}
-                      </Button>
-                      <button onClick={() => handleSkip(idx)}
-                        className="px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer">
-                        Passer
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-      </div>
-
-      {/* Combo suggestions */}
-      {activeCampaign.combo_mode && combos.length > 0 && (
-        <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
-          <div className="p-4 border-b border-slate-200 flex items-center gap-2">
-            <Layers size={16} className="text-purple-500" />
-            <div>
-              <h3 className="text-slate-900 font-semibold">Combis suggérés</h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {combos.length} combi{combos.length > 1 ? "s" : ""} · {activeCampaign.combo_max_legs} legs max · cotes {activeCampaign.combo_min_odds?.toFixed(1)}–{activeCampaign.combo_max_odds?.toFixed(1)}
-              </p>
-            </div>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {combos.map((combo, ci) => {
-              const suggestedStake = recos ? round2(recos.current_bankroll * activeCampaign.flat_stake) : 0;
-              return (
-                <div key={ci} className="p-4 hover:bg-purple-50/30 transition-colors">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0 space-y-1">
-                      {combo.legs.map((leg, li) => {
-                        const info = LEAGUE_INFO[leg.league];
-                        const fmtDate = leg.date.includes("T")
-                          ? new Date(leg.date).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
-                          : leg.date;
-                        return (
-                          <div key={li} className="flex items-center gap-2 text-xs">
-                            <span className="text-slate-300 shrink-0 font-mono">{li + 1}.</span>
-                            <span className="font-medium text-slate-800 truncate">{leg.home_team} vs {leg.away_team}</span>
-                            <Badge variant={outcomeBadgeVariant(leg.outcome)} size="xs">
-                              {outcomeLabel(leg.outcome)}
-                            </Badge>
-                            <span className="text-amber-600 font-semibold shrink-0">@ {leg.best_odds.toFixed(2)}</span>
-                            <span className="text-slate-400 shrink-0">{info ? `${info.flag} ${info.name}` : leg.league} · {fmtDate}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="flex items-center gap-4 shrink-0">
-                      <div className="text-center">
-                        <div className="text-purple-600 font-bold text-lg">{combo.combinedOdds.toFixed(2)}</div>
-                        <div className="text-[10px] text-slate-400">cote combi</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-emerald-600 font-bold text-sm">{(combo.combinedProb * 100).toFixed(1)}%</div>
-                        <div className="text-[10px] text-slate-400">prob</div>
-                      </div>
-                      <div className="text-center bg-purple-50 rounded-lg px-3 py-1.5 border border-purple-100">
-                        <div className="text-slate-900 font-bold text-sm">{suggestedStake.toFixed(2)}EUR</div>
-                        <div className="text-[10px] text-slate-400">mise</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Bets list */}
-      {bets.length > 0 && (
-        <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
-          <button onClick={() => setShowBets((v) => !v)}
-            className="w-full p-4 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer">
-            <div>
-              <span className="text-slate-900 font-semibold">Mes paris</span>
-              <span className="ml-2 text-xs text-slate-400">
-                {bets.filter((b) => b.result === "pending").length} en attente · {bets.length} total
-              </span>
-            </div>
-            {showBets ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-          </button>
-
-          {showBets && (
-            <div className="border-t border-slate-100">
-              <div className="divide-y divide-slate-50">
-                {bets.map((bet) => {
-                  const isPending = bet.result === "pending";
-                  const isUpdating = updatingBetId === bet.id;
-                  const isDeleting = deletingBetId === bet.id;
-                  const fmtDate = bet.match_date.includes("T")
-                    ? new Date(bet.match_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })
-                    : bet.match_date.slice(0, 10);
-                  const info = LEAGUE_INFO[bet.league];
-
-                  return (
-                    <div key={bet.id} className={`px-4 py-3 flex items-center gap-3 ${isDeleting ? "opacity-40" : ""}`}>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs text-slate-400 shrink-0">{fmtDate}</span>
-                          <span className="text-sm text-slate-900 font-medium truncate">
-                            {bet.home_team} vs {bet.away_team}
-                          </span>
-                          <Badge variant={outcomeBadgeVariant(bet.outcome_bet)} size="xs">
-                            {outcomeLabel(bet.outcome_bet)}
-                          </Badge>
-                        </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">
-                          {info ? `${info.flag} ${info.name}` : bet.league} · cote {bet.odds_at_bet.toFixed(2)} · mise {bet.stake.toFixed(2)}EUR
-                        </div>
-                      </div>
-
-                      {isPending ? (
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {isUpdating ? (
-                            <Loader2 size={14} className="animate-spin text-slate-400" />
-                          ) : (
-                            <>
-                              <button onClick={() => handleUpdateBet(bet.id, "won")}
-                                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors border border-emerald-200 cursor-pointer">
-                                Gagne
-                              </button>
-                              <button onClick={() => handleUpdateBet(bet.id, "lost")}
-                                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-red-50 text-red-700 hover:bg-red-100 transition-colors border border-red-200 cursor-pointer">
-                                Perdu
-                              </button>
-                              <button onClick={() => handleUpdateBet(bet.id, "void")}
-                                className="px-2.5 py-1 rounded text-[11px] font-semibold bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors border border-slate-200 cursor-pointer">
-                                Annule
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Badge variant={bet.result === "won" ? "emerald" : bet.result === "void" ? "slate" : "red"} size="sm">
-                            {bet.result === "won" ? "Gagne" : bet.result === "void" ? "Annule" : "Perdu"}
-                          </Badge>
-                          {bet.profit_loss !== null && (
-                            <span className={`text-sm font-bold ${bet.profit_loss >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                              {bet.profit_loss >= 0 ? "+" : ""}{bet.profit_loss.toFixed(2)}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      <button onClick={() => handleDeleteBet(bet.id)} disabled={isDeleting || isUpdating}
-                        className="shrink-0 p-1.5 rounded text-slate-300 hover:text-red-400 hover:bg-red-50 transition-colors cursor-pointer">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  );
-                })}
+          {/* ── STEP 1: Identité & Sport ── */}
+          {step === 0 && (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Nom de la campagne</label>
+                <input type="text" value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className={inputCls} placeholder="ex: Strategie Alpha Value" />
               </div>
-            </div>
+              <div>
+                <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Description (optionnel)</label>
+                <textarea value={extForm.description}
+                  onChange={(e) => setExtForm({ ...extForm, description: e.target.value })}
+                  className={`${inputCls} resize-none`} rows={2}
+                  placeholder="Décrivez votre stratégie en quelques mots..." />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#8a919e] mb-2">Sports</label>
+                <div className="flex flex-wrap gap-2">
+                  {SPORTS.map((sp) => (
+                    <button key={sp.key} onClick={() => toggleSport(sp.key)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all cursor-pointer ${
+                        extForm.sports.includes(sp.key)
+                          ? "border-[#3b5bdb] bg-[#3b5bdb]/10 text-[#3b5bdb]"
+                          : "border-[#e3e6eb] text-[#8a919e] hover:border-[#3b5bdb]/40"
+                      }`}>
+                      <span>{sp.icon}</span> {sp.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-2">Icône</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {CAMPAIGN_ICONS.map((ic) => (
+                      <button key={ic} onClick={() => setExtForm({ ...extForm, icon: ic })}
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center text-lg border transition-all cursor-pointer ${
+                          extForm.icon === ic ? "border-[#3b5bdb] bg-[#3b5bdb]/10" : "border-[#e3e6eb] hover:border-[#3b5bdb]/40"
+                        }`}>
+                        {ic}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-2">Couleur accent</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ACCENT_COLORS.map((c) => (
+                      <button key={c} onClick={() => setExtForm({ ...extForm, color: c })}
+                        className={`w-9 h-9 rounded-lg border-2 transition-all cursor-pointer ${
+                          extForm.color === c ? "border-[#111318] scale-110" : "border-transparent hover:scale-105"
+                        }`}
+                        style={{ backgroundColor: c }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── STEP 2: Bankroll & Mise ── */}
+          {step === 1 && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Bankroll initiale (\u20AC)</label>
+                  <input type="number" value={form.initial_bankroll}
+                    onChange={(e) => setForm({ ...form, initial_bankroll: Number(e.target.value) })}
+                    className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Objectif bankroll (\u20AC)</label>
+                  <input type="number" placeholder="optionnel" value={form.target_bankroll ?? ""}
+                    onChange={(e) => setForm({ ...form, target_bankroll: e.target.value ? Number(e.target.value) : null })}
+                    className={inputCls} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#8a919e] mb-2">Stratégie de mise</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {STAKING_STRATEGIES.map((st) => (
+                    <button key={st.key} onClick={() => setExtForm({ ...extForm, staking_strategy: st.key })}
+                      className={`text-left p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                        extForm.staking_strategy === st.key
+                          ? "border-[#3b5bdb] bg-[#3b5bdb]/5"
+                          : "border-[#e3e6eb] hover:border-[#3b5bdb]/30"
+                      }`}>
+                      <div className="text-sm font-semibold text-[#111318]">{st.label}</div>
+                      <div className="text-xs text-[#8a919e] mt-0.5">{st.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">
+                    {extForm.staking_strategy === "flat" ? "Mise (%)" : "Fraction"}
+                  </label>
+                  <input type="number" step="0.01" value={form.flat_stake}
+                    onChange={(e) => setForm({ ...form, flat_stake: Number(e.target.value) })}
+                    className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Mise max (\u20AC)</label>
+                  <input type="number" placeholder="illimité" value={extForm.max_stake ?? ""}
+                    onChange={(e) => setExtForm({ ...extForm, max_stake: e.target.value ? Number(e.target.value) : null })}
+                    className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Variation mise (±%)</label>
+                  <input type="number" value={extForm.stake_variation}
+                    onChange={(e) => setExtForm({ ...extForm, stake_variation: Number(e.target.value) })}
+                    className={inputCls} />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-[#e3e6eb]">
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield size={14} className="text-red-500" />
+                  <span className="text-sm font-semibold text-[#111318]">Protection du capital</span>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Stop-loss journalier (\u20AC)</label>
+                    <input type="number" placeholder="désactivé" value={extForm.stop_loss_daily ?? ""}
+                      onChange={(e) => setExtForm({ ...extForm, stop_loss_daily: e.target.value ? Number(e.target.value) : null })}
+                      className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Stop-loss total (\u20AC)</label>
+                    <input type="number" placeholder="désactivé" value={extForm.stop_loss_total ?? ""}
+                      onChange={(e) => setExtForm({ ...extForm, stop_loss_total: e.target.value ? Number(e.target.value) : null })}
+                      className={inputCls} />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">
+                    Arrêt intelligent après <strong className="text-[#111318]">{extForm.smart_stop}</strong> pertes consécutives
+                  </label>
+                  <input type="range" min={2} max={15} value={extForm.smart_stop}
+                    onChange={(e) => setExtForm({ ...extForm, smart_stop: Number(e.target.value) })}
+                    className="w-full accent-[#3b5bdb]" />
+                </div>
+                <label className="flex items-center gap-2 text-sm text-[#111318] mt-3 cursor-pointer">
+                  <input type="checkbox" checked={extForm.clv_rule}
+                    onChange={(e) => setExtForm({ ...extForm, clv_rule: e.target.checked })}
+                    className="rounded border-[#e3e6eb] text-[#3b5bdb] focus:ring-[#3b5bdb]" />
+                  Arrêter si CLV négatif sur 50 derniers paris
+                </label>
+              </div>
+            </>
+          )}
+
+          {/* ── STEP 3: Filtres & Combis ── */}
+          {step === 2 && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">
+                    Confiance min : <strong className="text-[#111318]">{(form.min_model_prob * 100).toFixed(0)}%</strong>
+                  </label>
+                  <input type="range" min={0.40} max={0.85} step={0.01} value={form.min_model_prob}
+                    onChange={(e) => setForm({ ...form, min_model_prob: Number(e.target.value) })}
+                    className="w-full accent-[#3b5bdb]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">
+                    Edge min : <strong className="text-[#111318]">{(form.min_edge * 100).toFixed(0)}%</strong>
+                  </label>
+                  <input type="range" min={0} max={0.15} step={0.005} value={form.min_edge}
+                    onChange={(e) => setForm({ ...form, min_edge: Number(e.target.value) })}
+                    className="w-full accent-[#3b5bdb]" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Cote min</label>
+                  <input type="number" step="0.1" placeholder="tout" value={form.min_odds ?? ""}
+                    onChange={(e) => setForm({ ...form, min_odds: e.target.value ? Number(e.target.value) : null })}
+                    className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Cote max</label>
+                  <input type="number" step="0.1" placeholder="tout" value={form.max_odds ?? ""}
+                    onChange={(e) => setForm({ ...form, max_odds: e.target.value ? Number(e.target.value) : null })}
+                    className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">
+                    Qualité données min : <strong className="text-[#111318]">{extForm.data_quality_min}/20</strong>
+                  </label>
+                  <input type="range" min={5} max={20} value={extForm.data_quality_min}
+                    onChange={(e) => setExtForm({ ...extForm, data_quality_min: Number(e.target.value) })}
+                    className="w-full accent-[#3b5bdb]" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#8a919e] mb-2">Types de paris</label>
+                <div className="flex flex-wrap gap-2">
+                  {BET_TYPES.map((bt) => (
+                    <button key={bt} onClick={() => toggleBetType(bt)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
+                        extForm.bet_types.includes(bt)
+                          ? "border-[#3b5bdb] bg-[#3b5bdb]/10 text-[#3b5bdb]"
+                          : "border-[#e3e6eb] text-[#8a919e] hover:border-[#3b5bdb]/40"
+                      }`}>
+                      {bt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <label className="flex items-center gap-2 text-sm text-[#111318] cursor-pointer">
+                  <input type="checkbox" checked={extForm.anti_duplicate}
+                    onChange={(e) => setExtForm({ ...extForm, anti_duplicate: e.target.checked })}
+                    className="rounded border-[#e3e6eb] text-[#3b5bdb] focus:ring-[#3b5bdb]" />
+                  Anti-doublon
+                </label>
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Max même joueur/équipe</label>
+                  <input type="number" min={1} max={10} value={extForm.max_same_player}
+                    onChange={(e) => setExtForm({ ...extForm, max_same_player: Number(e.target.value) })}
+                    className={inputCls} />
+                </div>
+              </div>
+
+              {/* Combis */}
+              <div className="pt-3 border-t border-[#e3e6eb]">
+                <label className="flex items-center gap-2 text-sm font-semibold text-[#111318] mb-3 cursor-pointer">
+                  <input type="checkbox" checked={form.combo_mode}
+                    onChange={(e) => setForm({ ...form, combo_mode: e.target.checked })}
+                    className="rounded border-[#e3e6eb] text-[#3b5bdb] focus:ring-[#3b5bdb]" />
+                  <Layers size={14} className="text-purple-500" />
+                  Mode Combis
+                </label>
+                {form.combo_mode && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Max legs</label>
+                      <input type="number" min={2} max={4} value={form.combo_max_legs}
+                        onChange={(e) => setForm({ ...form, combo_max_legs: Number(e.target.value) })}
+                        className={inputCls} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Cote min combo</label>
+                      <input type="number" step="0.1" value={form.combo_min_odds}
+                        onChange={(e) => setForm({ ...form, combo_min_odds: Number(e.target.value) })}
+                        className={inputCls} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Cote max combo</label>
+                      <input type="number" step="0.1" value={form.combo_max_odds}
+                        onChange={(e) => setForm({ ...form, combo_max_odds: Number(e.target.value) })}
+                        className={inputCls} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Top N / jour</label>
+                      <input type="number" min={1} max={5} value={form.combo_top_n}
+                        onChange={(e) => setForm({ ...form, combo_top_n: Number(e.target.value) })}
+                        className={inputCls} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ── STEP 4: Planning & Récap ── */}
+          {step === 3 && (
+            <>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Date de début</label>
+                  <input type="date" value={extForm.start_date}
+                    onChange={(e) => setExtForm({ ...extForm, start_date: e.target.value })}
+                    className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Durée (jours)</label>
+                  <input type="number" min={1} value={extForm.duration_days}
+                    onChange={(e) => setExtForm({ ...extForm, duration_days: Number(e.target.value) })}
+                    className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Fréquence</label>
+                  <div className="flex gap-2">
+                    {(["daily", "continuous"] as const).map((f) => (
+                      <button key={f} onClick={() => setExtForm({ ...extForm, frequency: f })}
+                        className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
+                          extForm.frequency === f
+                            ? "border-[#3b5bdb] bg-[#3b5bdb]/10 text-[#3b5bdb]"
+                            : "border-[#e3e6eb] text-[#8a919e]"
+                        }`}>
+                        {f === "daily" ? "Quotidien" : "Continu"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[#8a919e] mb-2">Jours actifs</label>
+                <div className="flex gap-2">
+                  {([
+                    { d: 1, l: "L" }, { d: 2, l: "M" }, { d: 3, l: "Me" }, { d: 4, l: "J" },
+                    { d: 5, l: "V" }, { d: 6, l: "S" }, { d: 7, l: "D" },
+                  ] as const).map(({ d, l }) => (
+                    <button key={d} onClick={() => toggleDay(d)}
+                      className={`w-9 h-9 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                        extForm.active_days.includes(d)
+                          ? "border-[#3b5bdb] bg-[#3b5bdb]/10 text-[#3b5bdb]"
+                          : "border-[#e3e6eb] text-[#8a919e]"
+                      }`}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Alerts */}
+              <div className="pt-3 border-t border-[#e3e6eb]">
+                <div className="flex items-center gap-2 mb-3">
+                  <Bell size={14} style={{ color: ACCENT }} />
+                  <span className="text-sm font-semibold text-[#111318]">Alertes</span>
+                </div>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-sm text-[#111318] cursor-pointer">
+                    <input type="checkbox" checked={extForm.alert_email}
+                      onChange={(e) => setExtForm({ ...extForm, alert_email: e.target.checked })}
+                      className="rounded border-[#e3e6eb] text-[#3b5bdb] focus:ring-[#3b5bdb]" />
+                    Email
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-[#111318] cursor-pointer">
+                    <input type="checkbox" checked={extForm.alert_push}
+                      onChange={(e) => setExtForm({ ...extForm, alert_push: e.target.checked })}
+                      className="rounded border-[#e3e6eb] text-[#3b5bdb] focus:ring-[#3b5bdb]" />
+                    Push
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-[#111318] cursor-pointer">
+                    <input type="checkbox" checked={extForm.alert_sms}
+                      onChange={(e) => setExtForm({ ...extForm, alert_sms: e.target.checked })}
+                      className="rounded border-[#e3e6eb] text-[#3b5bdb] focus:ring-[#3b5bdb]" />
+                    SMS
+                  </label>
+                </div>
+              </div>
+
+              {/* Recap */}
+              <div className="pt-3 border-t border-[#e3e6eb]">
+                <h4 className="text-sm font-semibold text-[#111318] mb-3">Récapitulatif</h4>
+                <div className="bg-[#f4f5f7] rounded-xl p-4 space-y-2 text-sm">
+                  <RecapRow label="Nom" value={form.name || "—"} />
+                  <RecapRow label="Sports" value={extForm.sports.map((s) => SPORTS.find((sp) => sp.key === s)?.label || s).join(", ")} />
+                  <RecapRow label="Bankroll" value={`${form.initial_bankroll}\u20AC`} />
+                  <RecapRow label="Stratégie" value={STAKING_STRATEGIES.find((s) => s.key === extForm.staking_strategy)?.label || ""} />
+                  <RecapRow label="Mise" value={`${(form.flat_stake * 100).toFixed(1)}%`} />
+                  <RecapRow label="Edge min" value={`${(form.min_edge * 100).toFixed(0)}%`} />
+                  <RecapRow label="Confiance min" value={`${(form.min_model_prob * 100).toFixed(0)}%`} />
+                  {form.min_odds && <RecapRow label="Cote min" value={form.min_odds.toFixed(1)} />}
+                  {form.max_odds && <RecapRow label="Cote max" value={form.max_odds.toFixed(1)} />}
+                  {form.combo_mode && <RecapRow label="Combis" value={`Max ${form.combo_max_legs} legs`} />}
+                  <RecapRow label="Durée" value={`${extForm.duration_days} jours`} />
+                  {extForm.stop_loss_total && <RecapRow label="Stop-loss total" value={`${extForm.stop_loss_total}\u20AC`} />}
+                </div>
+              </div>
+            </>
+          )}
+
+          {error && (
+            <div className="rounded-lg p-3 text-sm border bg-red-50 text-red-800 border-red-200">{error}</div>
           )}
         </div>
-      )}
 
-      {error && <Alert variant="error">{error}</Alert>}
-    </div>
-  );
-}
-
-// ----- Sub-components (kept local as backup) -----
-
-function LocalStatCard({ label, value, icon: Icon, color }: {
-  label: string; value: string; icon: React.ElementType; color: string;
-}) {
-  return (
-    <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm text-slate-500">{label}</span>
-        <Icon size={18} className={color} />
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-[#e3e6eb] shrink-0">
+          <button onClick={() => step > 0 ? setStep(step - 1) : onClose()}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-[#8a919e] hover:bg-slate-100 transition-colors cursor-pointer">
+            {step > 0 ? "Retour" : "Annuler"}
+          </button>
+          <button onClick={() => isLastStep ? onCreate() : setStep(step + 1)}
+            disabled={creating || (step === 0 && !form.name.trim())}
+            className="inline-flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold text-white transition-colors cursor-pointer hover:opacity-90 disabled:opacity-60"
+            style={{ backgroundColor: ACCENT }}>
+            {isLastStep ? (
+              creating ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} />
+            ) : null}
+            {isLastStep ? (creating ? "Création..." : "Créer la campagne") : "Continuer"}
+          </button>
+        </div>
       </div>
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
     </div>
   );
 }
 
-function MiniStat({ label, value, color = "text-slate-900" }: { label: string; value: string; color?: string }) {
+function RecapRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className={`text-lg font-bold ${color}`}>{value}</p>
-    </div>
-  );
-}
-
-function ConfigItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-[10px] text-slate-400">{label}</div>
-      <div className="text-sm text-slate-900 font-medium">{value}</div>
+    <div className="flex items-center justify-between">
+      <span className="text-[#8a919e]">{label}</span>
+      <span className="font-medium text-[#111318]">{value}</span>
     </div>
   );
 }

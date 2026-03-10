@@ -1,23 +1,31 @@
-"""Backtest API: run parametric backtests via the API."""
+"""Backtest API: run parametric backtests, save/load results."""
 
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
-from src.api.deps import require_tier
+from src.api.deps import get_current_user, require_tier
 from src.api.schemas import (
     BacktestRequest,
     BacktestResponse,
     BacktestMetricsResponse,
     BacktestBetResponse,
+    SaveBacktestRequest,
+    SavedBacktestResponse,
+    SavedBacktestSummary,
 )
 from src.backtest.engine import BacktestEngine
 from src.backtest.metrics import BacktestMetrics
+from src.database import get_db
+from src.models.saved_backtest import SavedBacktest
+from src.models.user import User
 
-router = APIRouter(tags=["backtest"], dependencies=[Depends(require_tier("premium"))])
+router = APIRouter(tags=["backtest"])
 
 
-@router.post("/backtest/run", response_model=BacktestResponse)
+@router.post("/backtest/run", response_model=BacktestResponse, dependencies=[Depends(require_tier("pro"))])
 def run_backtest(request: BacktestRequest):
     """Run a backtest with custom parameters."""
     import pandas as pd
@@ -26,17 +34,26 @@ def run_backtest(request: BacktestRequest):
     if not features_path.exists():
         raise HTTPException(status_code=503, detail="Features not found. Run build_features first.")
 
-    df = pd.read_parquet(features_path)
+    try:
+        df = pd.read_parquet(features_path)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Fichier features corrompu. Relancez build_features.")
 
     engine = BacktestEngine(
+        staking_strategy=request.staking_strategy,
+        flat_stake_amount=request.flat_stake_amount,
+        pct_bankroll=request.pct_bankroll,
+        kelly_fraction=request.kelly_fraction,
+        max_stake_pct=request.max_stake_pct,
         initial_bankroll=request.initial_bankroll,
-        flat_stake=request.flat_stake,
         min_edge=request.min_edge,
         min_model_prob=request.min_model_prob,
         max_odds=request.max_odds,
         min_odds=request.min_odds,
         allowed_outcomes=request.allowed_outcomes,
         excluded_leagues=request.excluded_leagues,
+        stop_loss_daily_pct=request.stop_loss_daily_pct,
+        stop_loss_total_pct=request.stop_loss_total_pct,
         combo_mode=request.combo_mode,
         combo_max_legs=request.combo_max_legs,
         combo_min_odds=request.combo_min_odds,
@@ -47,7 +64,7 @@ def run_backtest(request: BacktestRequest):
     result = engine.run(df, request.test_seasons)
 
     if not result["bets"]:
-        raise HTTPException(status_code=404, detail="No bets placed with these parameters.")
+        raise HTTPException(status_code=404, detail="Aucun pari généré avec ces paramètres. Élargissez vos filtres.")
 
     metrics_calc = BacktestMetrics()
     metrics = metrics_calc.compute_all(result["bets"], request.initial_bankroll)
@@ -69,6 +86,8 @@ def run_backtest(request: BacktestRequest):
             won=b["won"],
             pnl=b["pnl"],
             bankroll_after=b["bankroll_after"],
+            edge=b.get("edge", 0.0),
+            clv=b.get("clv"),
             num_legs=b.get("num_legs"),
         )
         for b in result["bets"]
@@ -91,6 +110,7 @@ def run_backtest(request: BacktestRequest):
             avg_edge=metrics["avg_edge"],
             avg_odds=metrics["avg_odds"],
             avg_clv=metrics.get("avg_clv"),
+            avg_ev_per_bet=metrics.get("avg_ev_per_bet", 0.0),
         ),
         bets=bets_response,
         bankroll_curve=[round(b, 2) for b in bankroll_curve],
@@ -98,19 +118,107 @@ def run_backtest(request: BacktestRequest):
     )
 
 
-@router.get("/backtest/results")
-def list_backtest_results():
-    """List available backtest configurations."""
-    return {
-        "message": "Use POST /api/backtest/run with parameters to run a backtest.",
-        "example": {
-            "initial_bankroll": 200,
-            "flat_stake": 0.05,
-            "min_edge": 0.02,
-            "min_model_prob": 0.55,
-            "combo_mode": True,
-            "combo_max_legs": 2,
-            "combo_min_odds": 1.8,
-            "combo_max_odds": 3.0,
-        },
-    }
+@router.post("/backtest/save", response_model=SavedBacktestSummary)
+def save_backtest(
+    request: SaveBacktestRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Save a backtest result for later retrieval."""
+    saved = SavedBacktest(
+        user_id=user.id,
+        name=request.name,
+        sport=request.sport,
+        params=json.dumps(request.params),
+        metrics=json.dumps(request.metrics),
+        bets=json.dumps(request.bets),
+        bankroll_curve=json.dumps(request.bankroll_curve),
+        config=json.dumps(request.config),
+    )
+    db.add(saved)
+    db.commit()
+    db.refresh(saved)
+
+    return SavedBacktestSummary(
+        id=saved.id,
+        name=saved.name,
+        sport=saved.sport,
+        roi_pct=request.metrics.get("roi_pct", 0.0),
+        total_bets=request.metrics.get("total_bets", 0),
+        created_at=str(saved.created_at),
+    )
+
+
+@router.get("/backtest/saved", response_model=list[SavedBacktestSummary])
+def list_saved_backtests(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List all saved backtests for the current user."""
+    rows = (
+        db.query(SavedBacktest)
+        .filter(SavedBacktest.user_id == user.id)
+        .order_by(SavedBacktest.created_at.desc())
+        .all()
+    )
+    results = []
+    for r in rows:
+        metrics = json.loads(r.metrics)
+        results.append(SavedBacktestSummary(
+            id=r.id,
+            name=r.name,
+            sport=r.sport,
+            roi_pct=metrics.get("roi_pct", 0.0),
+            total_bets=metrics.get("total_bets", 0),
+            created_at=str(r.created_at),
+        ))
+    return results
+
+
+@router.get("/backtest/saved/{backtest_id}", response_model=SavedBacktestResponse)
+def get_saved_backtest(
+    backtest_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Load a saved backtest by ID."""
+    row = (
+        db.query(SavedBacktest)
+        .filter(SavedBacktest.id == backtest_id, SavedBacktest.user_id == user.id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Backtest introuvable")
+
+    try:
+        return SavedBacktestResponse(
+            id=row.id,
+            name=row.name,
+            sport=row.sport,
+            params=json.loads(row.params),
+            metrics=json.loads(row.metrics),
+            bets=json.loads(row.bets),
+            bankroll_curve=json.loads(row.bankroll_curve),
+            config=json.loads(row.config),
+            created_at=str(row.created_at),
+        )
+    except (json.JSONDecodeError, KeyError):
+        raise HTTPException(status_code=500, detail="Données du backtest corrompues")
+
+
+@router.delete("/backtest/saved/{backtest_id}", status_code=204)
+def delete_saved_backtest(
+    backtest_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a saved backtest."""
+    row = (
+        db.query(SavedBacktest)
+        .filter(SavedBacktest.id == backtest_id, SavedBacktest.user_id == user.id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Backtest introuvable")
+    db.delete(row)
+    db.commit()

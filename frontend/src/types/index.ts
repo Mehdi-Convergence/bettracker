@@ -1,3 +1,13 @@
+export interface AppNotification {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export interface UserStats {
   total_bets: number;
   roi_pct: number;
@@ -51,6 +61,7 @@ export interface BacktestMetrics {
   avg_edge: number;
   avg_odds: number;
   avg_clv: number | null;
+  avg_ev_per_bet: number;
 }
 
 export interface BacktestBet {
@@ -64,6 +75,8 @@ export interface BacktestBet {
   won: boolean;
   pnl: number;
   bankroll_after: number;
+  edge: number;
+  clv: number | null;
   num_legs: number | null;
 }
 
@@ -72,6 +85,51 @@ export interface BacktestResponse {
   bets: BacktestBet[];
   bankroll_curve: number[];
   config: Record<string, unknown>;
+}
+
+export type StakingStrategy = "flat" | "half_kelly" | "pct_bankroll" | "kelly_dynamic";
+
+export interface BacktestParams {
+  initial_bankroll: number;
+  staking_strategy: StakingStrategy;
+  flat_stake_amount: number | null;
+  pct_bankroll: number;
+  kelly_fraction: number;
+  max_stake_pct: number;
+  min_edge: number;
+  min_model_prob: number | null;
+  max_odds: number | null;
+  min_odds: number | null;
+  stop_loss_daily_pct: number | null;
+  stop_loss_total_pct: number | null;
+  combo_mode: boolean;
+  combo_max_legs: number;
+  combo_min_odds: number;
+  combo_max_odds: number;
+  combo_top_n: number;
+  test_seasons: string[];
+  sport: string;
+}
+
+export interface SavedBacktestSummary {
+  id: number;
+  name: string;
+  sport: string;
+  roi_pct: number;
+  total_bets: number;
+  created_at: string;
+}
+
+export interface SavedBacktestFull {
+  id: number;
+  name: string;
+  sport: string;
+  params: Record<string, unknown>;
+  metrics: BacktestMetrics;
+  bets: BacktestBet[];
+  bankroll_curve: number[];
+  config: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface SportBreakdown {
@@ -133,11 +191,18 @@ export interface Bet {
   match_date: string;
   outcome_bet: string;
   odds_at_bet: number;
+  odds_at_close: number | null;
   stake: number;
   result: string;
   profit_loss: number | null;
+  clv: number | null;
   campaign_id: number | null;
   combo_group: string | null;
+  source: "algo" | "manual" | "scanner" | null;
+  bookmaker: string | null;
+  edge_at_bet: number | null;
+  note: string | null;
+  campaign_version: number | null;
   created_at: string;
 }
 
@@ -164,11 +229,11 @@ export const LEAGUE_INFO: Record<string, LeagueInfo> = {
   E1:  { name: "Championship",          country: "Angleterre", flag: "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F", division: 2 },
   D2:  { name: "2. Bundesliga",         country: "Allemagne",  flag: "\uD83C\uDDE9\uD83C\uDDEA", division: 2 },
   I2:  { name: "Serie B",               country: "Italie",     flag: "\uD83C\uDDEE\uD83C\uDDF9", division: 2 },
-  SP2: { name: "Segunda Divisi\u00f3n", country: "Espagne",    flag: "\uD83C\uDDEA\uD83C\uDDF8", division: 2 },
+  SP2: { name: "Segunda División", country: "Espagne",    flag: "\uD83C\uDDEA\uD83C\uDDF8", division: 2 },
   F2:  { name: "Ligue 2",               country: "France",     flag: "\uD83C\uDDEB\uD83C\uDDF7", division: 2 },
   P1:  { name: "Primeira Liga",         country: "Portugal",   flag: "\uD83C\uDDF5\uD83C\uDDF9", division: 1 },
   B1:  { name: "Jupiler Pro League",    country: "Belgique",   flag: "\uD83C\uDDE7\uD83C\uDDEA", division: 1 },
-  T1:  { name: "S\u00fcper Lig",        country: "Turquie",    flag: "\uD83C\uDDF9\uD83C\uDDF7", division: 1 },
+  T1:  { name: "Süper Lig",        country: "Turquie",    flag: "\uD83C\uDDF9\uD83C\uDDF7", division: 1 },
   G1:  { name: "Super League 1",        country: "Grece",      flag: "\uD83C\uDDEC\uD83C\uDDF7", division: 1 },
   SC0: { name: "Premiership",           country: "Ecosse",     flag: "\uD83C\uDFF4\uDB40\uDC67\uDB40\uDC62\uDB40\uDC73\uDB40\uDC63\uDB40\uDC74\uDB40\uDC7F", division: 1 },
   // --- Coupes domestiques (division 0) ---
@@ -223,7 +288,7 @@ export interface Ticket {
 export interface Campaign {
   id: number;
   name: string;
-  status: "active" | "paused" | "archived";
+  status: "active" | "paused" | "archived" | "stoploss";
   initial_bankroll: number;
   flat_stake: number;
   min_edge: number;
@@ -241,6 +306,15 @@ export interface Campaign {
   created_at: string;
 }
 
+export interface SourceSubStats {
+  roi_pct: number;
+  total_bets: number;
+  win_rate: number;
+  avg_clv: number | null;
+  total_staked: number;
+  total_pnl: number;
+}
+
 export interface CampaignStats {
   total_bets: number;
   pending_bets: number;
@@ -253,6 +327,26 @@ export interface CampaignStats {
   current_bankroll: number;
   longest_winning_streak: number;
   longest_losing_streak: number;
+  avg_clv: number | null;
+  max_drawdown_pct: number;
+  max_drawdown_amount: number;
+  ev_expected: number;
+  algo_stats: SourceSubStats | null;
+  manual_stats: SourceSubStats | null;
+}
+
+export interface CampaignVersion {
+  id: number;
+  campaign_id: number;
+  version: number;
+  snapshot: Record<string, unknown>;
+  changed_at: string;
+  change_summary: string;
+}
+
+export interface CampaignVersionList {
+  versions: CampaignVersion[];
+  current_version: number;
 }
 
 export interface CampaignDetail {
@@ -392,6 +486,38 @@ export interface AIScanResponse {
   cached: boolean;
   cached_at: string | null;
   research_duration_seconds: number;
+}
+
+// --- User Preferences ---
+
+export interface UserPreferences {
+  // Bankroll
+  initial_bankroll: number;
+  default_stake: number;
+  stake_as_percentage: boolean;
+  stake_percentage: number;
+  daily_stop_loss: number;
+  stop_loss_unit: string; // "pct" | "eur"
+  low_bankroll_alert: number;
+  // Notifications in-app — 5 events
+  notif_new_ticket: boolean;
+  notif_stop_loss: boolean;
+  notif_smart_stop: boolean;
+  notif_campaign_ending: boolean;
+  notif_low_bankroll: boolean;
+  // Share
+  share_pseudo: string;
+  share_show_stake: boolean;
+  share_show_gain_euros: boolean;
+  share_show_bookmaker: boolean;
+  share_show_clv: boolean;
+  // Display
+  theme: string;
+  language: string;
+  currency: string;
+  odds_format: string;
+  default_tickets_view: string;
+  default_campaigns_view: string;
 }
 
 export interface AIResearchResponse {

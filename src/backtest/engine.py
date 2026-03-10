@@ -1,4 +1,6 @@
-"""Backtesting engine: chronological simulation with Kelly sizing."""
+"""Backtesting engine: chronological simulation with multiple staking strategies."""
+
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -16,16 +18,23 @@ class BacktestEngine:
 
     def __init__(
         self,
+        # Staking
+        staking_strategy: str = "half_kelly",  # flat | half_kelly | pct_bankroll | kelly_dynamic
+        flat_stake_amount: float | None = None,  # € for flat mode
+        pct_bankroll: float = 0.02,  # for pct_bankroll mode
         kelly_fraction: float = settings.KELLY_FRACTION,
         max_stake_pct: float = settings.MAX_STAKE_PERCENT,
+        # Filters
         min_edge: float = settings.MIN_EDGE_THRESHOLD,
         initial_bankroll: float = settings.INITIAL_BANKROLL,
         allowed_outcomes: list[str] | None = None,
         excluded_leagues: list[str] | None = None,
-        flat_stake: float | None = None,
         max_odds: float | None = None,
         min_odds: float | None = None,
         min_model_prob: float | None = None,
+        # Stop-loss
+        stop_loss_daily_pct: float | None = None,
+        stop_loss_total_pct: float | None = None,
         # Combo mode
         combo_mode: bool = False,
         combo_max_legs: int = 4,
@@ -33,28 +42,74 @@ class BacktestEngine:
         combo_max_odds: float = 3.0,
         combo_top_n: int = 3,
     ):
+        self.staking_strategy = staking_strategy
+        self.flat_stake_amount = flat_stake_amount
+        self.pct_bankroll = pct_bankroll
         self.kelly_fraction = kelly_fraction
         self.max_stake_pct = max_stake_pct
         self.min_edge = min_edge
         self.initial_bankroll = initial_bankroll
-        self.allowed_outcomes = allowed_outcomes  # e.g. ["D"] for draw-only
-        self.excluded_leagues = excluded_leagues  # e.g. ["F1"] to exclude Ligue 1
-        self.flat_stake = flat_stake  # e.g. 0.01 for 1% flat stake
-        self.max_odds = max_odds  # e.g. 2.0 to cap odds
-        self.min_odds = min_odds  # e.g. 2.0 for minimum odds
-        self.min_model_prob = min_model_prob  # e.g. 0.50 for 50% min confidence
+        self.allowed_outcomes = allowed_outcomes
+        self.excluded_leagues = excluded_leagues
+        self.max_odds = max_odds
+        self.min_odds = min_odds
+        self.min_model_prob = min_model_prob
+        self.stop_loss_daily_pct = stop_loss_daily_pct
+        self.stop_loss_total_pct = stop_loss_total_pct
         # Combo
         self.combo_mode = combo_mode
         self.combo_max_legs = combo_max_legs
         self.combo_min_odds = combo_min_odds
         self.combo_max_odds = combo_max_odds
         self.combo_top_n = combo_top_n
-        # CLV filter: only bet when opening odds >= closing odds (bookmaker confirms our view)
+        # CLV filter
         self.require_positive_clv = False
+
+    def _compute_stake(self, bankroll: float, model_prob: float, odds: float) -> float:
+        """Compute stake amount based on the selected staking strategy."""
+        if self.staking_strategy == "flat":
+            amount = self.flat_stake_amount or 20.0
+            return min(amount, bankroll * self.max_stake_pct)
+
+        if self.staking_strategy == "pct_bankroll":
+            return bankroll * self.pct_bankroll
+
+        if self.staking_strategy in ("half_kelly", "kelly_dynamic"):
+            fraction = self.kelly_fraction
+            if self.staking_strategy == "kelly_dynamic":
+                # Dynamic: scale kelly fraction by confidence (higher prob → more aggressive)
+                fraction = self.kelly_fraction * min(model_prob / 0.55, 1.5)
+            b = odds - 1.0
+            p = model_prob
+            q = 1.0 - p
+            full_kelly = (b * p - q) / b
+            if full_kelly <= 0:
+                return 0.0
+            stake_pct = full_kelly * fraction
+            stake_pct = min(stake_pct, self.max_stake_pct)
+            return bankroll * stake_pct
+
+        # Fallback: pct_bankroll
+        return bankroll * self.pct_bankroll
+
+    def _check_stop_loss_total(self, bankroll: float) -> bool:
+        """Return True if total stop-loss triggered."""
+        if self.stop_loss_total_pct is None:
+            return False
+        loss_pct = (self.initial_bankroll - bankroll) / self.initial_bankroll
+        return loss_pct >= self.stop_loss_total_pct
+
+    def _check_stop_loss_daily(self, day_pnl: float, bankroll_start_of_day: float) -> bool:
+        """Return True if daily stop-loss triggered."""
+        if self.stop_loss_daily_pct is None:
+            return False
+        if bankroll_start_of_day <= 0:
+            return True
+        loss_pct = -day_pnl / bankroll_start_of_day
+        return loss_pct >= self.stop_loss_daily_pct
 
     def run(self, features_df: pd.DataFrame, test_seasons: list[str]) -> dict:
         """Run walk-forward backtest: train on past, predict and bet on test seasons."""
-        # Filter out excluded leagues from both training and test data
         if self.excluded_leagues:
             features_df = features_df[~features_df["league"].isin(self.excluded_leagues)]
         all_seasons = sorted(features_df["season"].unique())
@@ -62,7 +117,6 @@ class BacktestEngine:
         model = FootballModel()
 
         for test_season in test_seasons:
-            # Train seasons = all seasons before test season
             train_seasons = [s for s in all_seasons if s < test_season]
             if len(train_seasons) < 2:
                 console.print(f"[yellow]Skipping {test_season}: not enough training seasons[/yellow]")
@@ -71,21 +125,16 @@ class BacktestEngine:
             train_df = features_df[features_df["season"].isin(train_seasons)]
             test_df = features_df[features_df["season"] == test_season].sort_values("date")
 
-            # Prepare training data
             X_train_full = train_df[MODEL_FEATURES].values
             y_train_full = train_df["ftr"].map(LABEL_MAP).values
 
             console.print(f"\n[bold]Backtest season: {test_season}[/bold]")
             console.print(f"  Train: {len(X_train_full)} -> Test: {len(test_df)}")
 
-            # Train without calibration (raw XGBoost softprob)
             model.train(X_train_full, y_train_full)
-
-            # Predict on test set
             X_test = test_df[MODEL_FEATURES].values
             probas = model.predict_proba(X_test)
 
-            # Simulate betting
             if self.combo_mode:
                 season_bets = self._simulate_season_combos(test_df, probas)
             else:
@@ -101,14 +150,19 @@ class BacktestEngine:
             "initial_bankroll": self.initial_bankroll,
             "combo_mode": self.combo_mode,
             "config": {
+                "staking_strategy": self.staking_strategy,
                 "kelly_fraction": self.kelly_fraction,
                 "max_stake_pct": self.max_stake_pct,
                 "min_edge": self.min_edge,
                 "allowed_outcomes": self.allowed_outcomes,
                 "excluded_leagues": self.excluded_leagues,
-                "flat_stake": self.flat_stake,
+                "flat_stake_amount": self.flat_stake_amount,
+                "pct_bankroll": self.pct_bankroll,
                 "max_odds": self.max_odds,
+                "min_odds": self.min_odds,
                 "min_model_prob": self.min_model_prob,
+                "stop_loss_daily_pct": self.stop_loss_daily_pct,
+                "stop_loss_total_pct": self.stop_loss_total_pct,
                 "combo_mode": self.combo_mode,
                 "combo_max_legs": self.combo_max_legs,
                 "combo_min_odds": self.combo_min_odds,
@@ -127,15 +181,33 @@ class BacktestEngine:
             ("A", 2, "_odds_away", "_odds_away_close"),
         ]
 
-        for i, (_, row) in enumerate(test_df.iterrows()):
-            proba = probas[i]
+        # Track daily P&L for stop-loss
+        current_day = None
+        day_pnl = 0.0
+        bankroll_start_of_day = bankroll
+        daily_stopped = False
 
-            # Find best edge across all outcomes for this match
+        for i, (_, row) in enumerate(test_df.iterrows()):
+            # Total stop-loss check
+            if self._check_stop_loss_total(bankroll):
+                break
+
+            # Daily stop-loss tracking
+            match_day = str(row["date"])[:10]
+            if match_day != current_day:
+                current_day = match_day
+                day_pnl = 0.0
+                bankroll_start_of_day = bankroll
+                daily_stopped = False
+
+            if daily_stopped:
+                continue
+
+            proba = probas[i]
             best_bet = None
             best_edge = 0.0
 
             for outcome, idx, odds_col, close_col in outcomes_map:
-                # Filter by allowed outcomes
                 if self.allowed_outcomes and outcome not in self.allowed_outcomes:
                     continue
 
@@ -144,47 +216,45 @@ class BacktestEngine:
                     continue
                 if market_odds <= 1.0:
                     continue
-
-                # Filter by max odds
                 if self.max_odds is not None and market_odds > self.max_odds:
+                    continue
+                if self.min_odds is not None and market_odds < self.min_odds:
                     continue
 
                 implied_prob = 1.0 / market_odds
                 model_prob = proba[idx]
 
-                # Filter by min model probability
                 if self.min_model_prob is not None and model_prob < self.min_model_prob:
                     continue
 
-                edge = model_prob - implied_prob
-
-                # CLV filter: skip if bookmaker moved odds against us (open < close)
+                # CLV filter
                 if self.require_positive_clv:
                     close_odds = row.get(close_col)
                     if close_odds is not None and not (isinstance(close_odds, float) and np.isnan(close_odds)) and close_odds > 1:
                         if market_odds < close_odds:
                             continue
 
+                edge = model_prob - implied_prob
                 if edge > self.min_edge and edge > best_edge:
                     best_edge = edge
                     best_bet = (outcome, idx, odds_col, close_col, market_odds, model_prob, implied_prob, edge)
 
-            # Place only the best bet for this match (if any)
             if best_bet is not None:
                 outcome, idx, odds_col, close_col, market_odds, model_prob, implied_prob, edge = best_bet
 
-                if self.flat_stake is not None:
-                    stake_pct = self.flat_stake
-                else:
-                    stake_pct = self._kelly_stake(model_prob, market_odds)
-                    if stake_pct <= 0:
-                        continue
+                stake = self._compute_stake(bankroll, model_prob, market_odds)
+                if stake <= 0:
+                    continue
 
-                stake = bankroll * stake_pct
                 actual_result = row["ftr"]
                 won = actual_result == outcome
                 pnl = (stake * (market_odds - 1)) if won else (-stake)
                 bankroll += pnl
+                day_pnl += pnl
+
+                # Check daily stop-loss after this bet
+                if self._check_stop_loss_daily(day_pnl, bankroll_start_of_day):
+                    daily_stopped = True
 
                 # CLV
                 close_odds = row.get(close_col)
@@ -202,7 +272,7 @@ class BacktestEngine:
                     "edge": round(float(edge), 4),
                     "odds": float(market_odds),
                     "stake": round(float(stake), 2),
-                    "stake_pct": round(float(stake_pct), 4),
+                    "stake_pct": round(float(stake / bankroll) if bankroll > 0 else 0, 4),
                     "won": won,
                     "pnl": round(float(pnl), 2),
                     "clv": round(float(clv), 6) if clv is not None else None,
@@ -222,7 +292,6 @@ class BacktestEngine:
             ("A", 2, "_odds_away", "_odds_away_close"),
         ]
 
-        # Build all candidate legs with their row index
         all_legs = []
         for i, (_, row) in enumerate(test_df.iterrows()):
             proba = probas[i]
@@ -271,11 +340,8 @@ class BacktestEngine:
         if not all_legs:
             return bets
 
-        # Group legs by date
-        from collections import defaultdict
         legs_by_date = defaultdict(list)
         for date, leg in all_legs:
-            # Normalize date to date-only string for grouping
             date_key = str(date)[:10]
             legs_by_date[date_key].append(leg)
 
@@ -286,10 +352,12 @@ class BacktestEngine:
             min_leg_prob=self.min_model_prob or 0.50,
         )
 
-        # Process each date chronologically
         for date_key in sorted(legs_by_date.keys()):
-            day_legs = legs_by_date[date_key]
+            # Total stop-loss
+            if self._check_stop_loss_total(bankroll):
+                break
 
+            day_legs = legs_by_date[date_key]
             if len(day_legs) < 2:
                 continue
 
@@ -297,12 +365,12 @@ class BacktestEngine:
             if not combos:
                 continue
 
-            # Take top N combos by EV
             top_combos = combo_engine.rank_combos(combos, top_n=self.combo_top_n)
 
             for combo in top_combos:
-                stake_pct = self.flat_stake if self.flat_stake is not None else 0.05
-                stake = bankroll * stake_pct
+                stake = self._compute_stake(bankroll, combo.combined_prob, combo.combined_odds)
+                if stake <= 0:
+                    continue
                 combo.stake = round(stake, 2)
                 combo = combo_engine.resolve_combo(combo)
                 bankroll += combo.pnl
@@ -329,7 +397,7 @@ class BacktestEngine:
                     "edge": combo.ev,
                     "odds": combo.combined_odds,
                     "stake": combo.stake,
-                    "stake_pct": round(stake_pct, 4),
+                    "stake_pct": round(stake / bankroll, 4) if bankroll > 0 else 0,
                     "won": combo.won,
                     "pnl": combo.pnl,
                     "clv": None,
@@ -339,16 +407,3 @@ class BacktestEngine:
                 })
 
         return bets
-
-    def _kelly_stake(self, prob: float, odds: float) -> float:
-        """Fractional Kelly criterion, capped."""
-        b = odds - 1.0
-        p = prob
-        q = 1.0 - p
-
-        full_kelly = (b * p - q) / b
-        if full_kelly <= 0:
-            return 0.0
-
-        fractional = full_kelly * self.kelly_fraction
-        return min(fractional, self.max_stake_pct)

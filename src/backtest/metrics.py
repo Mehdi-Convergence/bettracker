@@ -56,6 +56,9 @@ class BacktestMetrics:
             # Staking
             "avg_stake_pct": round(float(np.mean([b["stake_pct"] for b in bets])) * 100, 2),
             "max_stake_pct": round(float(max(b["stake_pct"] for b in bets)) * 100, 2),
+
+            # EV moyen par pari
+            "avg_ev_per_bet": round(total_pnl / len(bets), 2) if bets else 0.0,
         }
 
     def _max_drawdown(self, bankroll_curve: list[float]) -> float:

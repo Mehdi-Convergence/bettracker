@@ -1,7 +1,19 @@
 """Pydantic schemas for API request/response models."""
 
+import re
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+
+def _check_password_strength(v: str) -> str:
+    """Shared password complexity check."""
+    if not re.search(r"[A-Z]", v):
+        raise ValueError("Le mot de passe doit contenir au moins une majuscule")
+    if not re.search(r"[a-z]", v):
+        raise ValueError("Le mot de passe doit contenir au moins une minuscule")
+    if not re.search(r"\d", v):
+        raise ValueError("Le mot de passe doit contenir au moins un chiffre")
+    return v
 
 
 # --- Auth schemas ---
@@ -11,6 +23,11 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     display_name: str = Field(min_length=1, max_length=100)
+
+    @field_validator("password")
+    @classmethod
+    def check_password_strength(cls, v: str) -> str:
+        return _check_password_strength(v)
 
 
 class LoginRequest(BaseModel):
@@ -36,6 +53,17 @@ class UserResponse(BaseModel):
     is_active: bool
     trial_ends_at: str | None = None
     created_at: str
+    onboarding_completed: bool = False
+    visited_modules: list[str] = []
+
+
+class OnboardingRequest(BaseModel):
+    bankroll: float = Field(gt=0)
+    default_stake_pct: float = Field(gt=0, le=100)
+
+
+class TourVisitedRequest(BaseModel):
+    module: str = Field(min_length=1, max_length=50)
 
 
 class UpdateProfileRequest(BaseModel):
@@ -47,6 +75,11 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=8, max_length=128)
 
+    @field_validator("new_password")
+    @classmethod
+    def check_password_strength(cls, v: str) -> str:
+        return _check_password_strength(v)
+
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
@@ -55,6 +88,11 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def check_password_strength(cls, v: str) -> str:
+        return _check_password_strength(v)
 
 
 class MessageResponse(BaseModel):
@@ -154,20 +192,31 @@ class ComboSimulateResponse(BaseModel):
 
 
 class BacktestRequest(BaseModel):
-    initial_bankroll: float = Field(default=200.0, gt=0)
-    flat_stake: float = Field(default=0.05, gt=0, le=0.5)
-    min_edge: float = Field(default=0.02, ge=0)
+    initial_bankroll: float = Field(default=500.0, gt=0)
+    # Staking strategy: "flat" | "half_kelly" | "pct_bankroll" | "kelly_dynamic"
+    staking_strategy: str = Field(default="half_kelly")
+    flat_stake_amount: float | None = Field(default=None)  # € amount for flat mode
+    pct_bankroll: float = Field(default=0.02, gt=0, le=0.2)  # % of bankroll for pct mode
+    kelly_fraction: float = Field(default=0.5, gt=0, le=1.0)
+    max_stake_pct: float = Field(default=0.10, gt=0, le=0.5)
+    min_edge: float = Field(default=0.05, ge=0)
     min_model_prob: float | None = Field(default=0.55)
     max_odds: float | None = None
     min_odds: float | None = None
     allowed_outcomes: list[str] | None = None
     excluded_leagues: list[str] | None = None
+    # Stop loss
+    stop_loss_daily_pct: float | None = None  # e.g. 0.15 = 15%
+    stop_loss_total_pct: float | None = None  # e.g. 0.40 = 40%
+    # Combo
     combo_mode: bool = False
     combo_max_legs: int = Field(default=4, ge=2, le=6)
     combo_min_odds: float = Field(default=1.8, gt=1.0)
     combo_max_odds: float = Field(default=3.0, gt=1.0)
     combo_top_n: int = Field(default=3, ge=1, le=10)
+    # Period
     test_seasons: list[str] = Field(default=["2324", "2425"])
+    sport: str = Field(default="football")
 
 
 class BacktestBetResponse(BaseModel):
@@ -181,6 +230,8 @@ class BacktestBetResponse(BaseModel):
     won: bool
     pnl: float
     bankroll_after: float
+    edge: float = 0.0
+    clv: float | None = None
     num_legs: int | None = None
 
 
@@ -200,6 +251,7 @@ class BacktestMetricsResponse(BaseModel):
     avg_edge: float
     avg_odds: float
     avg_clv: float | None = None
+    avg_ev_per_bet: float = 0.0  # EV moyen par pari
 
 
 class BacktestResponse(BaseModel):
@@ -207,6 +259,37 @@ class BacktestResponse(BaseModel):
     bets: list[BacktestBetResponse]
     bankroll_curve: list[float]
     config: dict
+
+
+class SaveBacktestRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=150)
+    sport: str = Field(default="football")
+    params: dict  # original BacktestRequest as dict
+    metrics: dict  # BacktestMetricsResponse as dict
+    bets: list[dict]  # list of BacktestBetResponse as dicts
+    bankroll_curve: list[float]
+    config: dict
+
+
+class SavedBacktestResponse(BaseModel):
+    id: int
+    name: str
+    sport: str
+    params: dict
+    metrics: dict
+    bets: list[dict]
+    bankroll_curve: list[float]
+    config: dict
+    created_at: str
+
+
+class SavedBacktestSummary(BaseModel):
+    id: int
+    name: str
+    sport: str
+    roi_pct: float
+    total_bets: int
+    created_at: str
 
 
 # --- Portfolio schemas ---
@@ -223,6 +306,8 @@ class BetCreateRequest(BaseModel):
     is_combo: bool = False
     combo_legs: list[dict] | None = None
     campaign_id: int | None = None
+    bookmaker: str | None = None
+    note: str | None = None
 
 
 class BetResponse(BaseModel):
@@ -234,11 +319,18 @@ class BetResponse(BaseModel):
     match_date: str
     outcome_bet: str
     odds_at_bet: float
+    odds_at_close: float | None = None
     stake: float
     result: str
     profit_loss: float | None = None
+    clv: float | None = None
     campaign_id: int | None = None
     combo_group: str | None = None
+    source: str | None = None
+    bookmaker: str | None = None
+    edge_at_bet: float | None = None
+    note: str | None = None
+    campaign_version: int | None = None
     created_at: str
 
 
@@ -357,6 +449,12 @@ class CampaignStatsResponse(BaseModel):
     current_bankroll: float
     longest_winning_streak: int
     longest_losing_streak: int
+    avg_clv: float | None = None
+    max_drawdown_pct: float = 0.0
+    max_drawdown_amount: float = 0.0
+    ev_expected: float = 0.0
+    algo_stats: dict | None = None
+    manual_stats: dict | None = None
 
 
 class CampaignDetailResponse(BaseModel):
@@ -386,13 +484,17 @@ class CampaignRecommendationsResponse(BaseModel):
 
 
 class BetUpdateRequest(BaseModel):
-    result: str  # "won", "lost", "void", "pending"
+    result: str = Field(pattern="^(won|lost|void|pending)$")
+
+
+class BetNoteUpdateRequest(BaseModel):
+    note: str = Field(max_length=500)
 
 
 class CampaignAcceptRequest(BaseModel):
-    home_team: str
-    away_team: str
-    league: str
+    home_team: str = Field(min_length=1)
+    away_team: str = Field(min_length=1)
+    league: str = Field(min_length=1)
     match_date: str
     outcome: str = Field(pattern="^[HDA]$")
     odds: float = Field(gt=1.0)
@@ -531,3 +633,79 @@ class AIResearchResponse(BaseModel):
     cached: bool = False
     cached_at: str | None = None
     research_duration_seconds: float = 0.0
+
+
+# --- Campaign Version schemas ---
+
+
+class CampaignVersionResponse(BaseModel):
+    id: int
+    campaign_id: int
+    version: int
+    snapshot: dict
+    changed_at: str
+    change_summary: str
+
+
+class CampaignVersionListResponse(BaseModel):
+    versions: list[CampaignVersionResponse]
+    current_version: int
+
+
+# --- User Preferences schemas ---
+
+
+class UserPreferencesResponse(BaseModel):
+    # Bankroll
+    initial_bankroll: float
+    default_stake: float
+    stake_as_percentage: bool
+    stake_percentage: float
+    daily_stop_loss: float
+    stop_loss_unit: str
+    low_bankroll_alert: float
+    # Notifications in-app
+    notif_new_ticket: bool
+    notif_stop_loss: bool
+    notif_smart_stop: bool
+    notif_campaign_ending: bool
+    notif_low_bankroll: bool
+    # Share
+    share_pseudo: str
+    share_show_stake: bool
+    share_show_gain_euros: bool
+    share_show_bookmaker: bool
+    share_show_clv: bool
+    # Display
+    theme: str
+    language: str
+    currency: str
+    odds_format: str
+    default_tickets_view: str
+    default_campaigns_view: str
+
+
+class UserPreferencesUpdateRequest(BaseModel):
+    initial_bankroll: float | None = None
+    default_stake: float | None = None
+    stake_as_percentage: bool | None = None
+    stake_percentage: float | None = None
+    daily_stop_loss: float | None = None
+    stop_loss_unit: str | None = None
+    low_bankroll_alert: float | None = None
+    notif_new_ticket: bool | None = None
+    notif_stop_loss: bool | None = None
+    notif_smart_stop: bool | None = None
+    notif_campaign_ending: bool | None = None
+    notif_low_bankroll: bool | None = None
+    share_pseudo: str | None = None
+    share_show_stake: bool | None = None
+    share_show_gain_euros: bool | None = None
+    share_show_bookmaker: bool | None = None
+    share_show_clv: bool | None = None
+    theme: str | None = None
+    language: str | None = None
+    currency: str | None = None
+    odds_format: str | None = None
+    default_tickets_view: str | None = None
+    default_campaigns_view: str | None = None

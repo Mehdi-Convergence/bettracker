@@ -9,6 +9,9 @@ import TicketBuilder from "@/components/TicketBuilder";
 import AIScanMatchDetailPanel from "@/components/AIScanMatchDetailPanel";
 import type { ValueBet, Ticket, AIScanMatch } from "@/types";
 import { LEAGUE_INFO } from "@/types";
+import { useTour } from "@/hooks/useTour";
+import SpotlightTour from "@/components/SpotlightTour";
+import { scannerTour } from "@/tours/index";
 
 /* ═══════════════════════════════════════════════════════════════════
    Constants
@@ -163,6 +166,8 @@ function dayLabel(dateStr: string): string {
    ═══════════════════════════════════════════════════════════════════ */
 
 export default function Scanner() {
+  const { showTour, completeTour } = useTour("scanner");
+
   /* ── State ── */
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -718,7 +723,7 @@ export default function Scanner() {
         <div className="px-5 py-2.5 border-b border-[#f0f1f3]">
           <div className="flex gap-2.5 items-end flex-wrap">
             {/* Sport pills */}
-            <div>
+            <div data-tour="sport-toggle">
               <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Sport</label>
               <div className="flex gap-1">
                 {(["football", "tennis"] as const).map((s) => (
@@ -749,7 +754,7 @@ export default function Scanner() {
             </div>
 
             {/* Period pills */}
-            <div>
+            <div data-tour="date-presets">
               <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">
                 <Calendar size={9} className="inline mr-0.5" />Periode
               </label>
@@ -823,7 +828,7 @@ export default function Scanner() {
         </div>
 
         {/* Row 2: Leagues + toggle filters */}
-        <div className="px-5 py-2.5">
+        <div data-tour="filters" className="px-5 py-2.5">
           <div className="flex items-center gap-3 flex-wrap">
             {sport === "tennis" ? (
             <>
@@ -925,6 +930,7 @@ export default function Scanner() {
 
             {/* Toggle filters */}
             <button
+              data-tour="value-toggle"
               onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
               className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${
                 valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
@@ -1080,7 +1086,7 @@ export default function Scanner() {
 
       {/* Action Bar */}
       <div className="shrink-0 px-5 py-2 bg-[#f4f5f7] border-b border-[#e3e6eb] flex items-center gap-3">
-        <button onClick={() => handleAIScan()} disabled={loading}
+        <button data-tour="refresh-btn" onClick={() => handleAIScan()} disabled={loading}
           className="bg-[#3b5bdb] hover:bg-[#2b4bc7] disabled:bg-[#b0b7c3] text-white px-4 py-[6px] rounded-lg text-[12px] flex items-center gap-1.5 font-semibold shadow-sm transition-colors">
           <Search size={13} />
           {loading ? "Scan..." : "Scanner"}
@@ -1166,6 +1172,7 @@ export default function Scanner() {
             {filteredAiMatches.map((am, i) => (
               <MatchCard
                 key={`${am.home_team || am.player1}_${am.away_team || am.player2}_${i}`}
+                dataTour={i === 0 ? "match-card" : undefined}
                 am={am}
                 cardBk={cardBk}
                 setCardBk={setCardBk}
@@ -1223,14 +1230,14 @@ export default function Scanner() {
         />
 
         {/* Ticket Builder */}
-        <div data-ticket-panel className="w-[420px] min-w-[420px] shrink-0 border-l border-[#e3e6eb] bg-white overflow-hidden">
+        <div data-ticket-panel data-tour="ticket-tab" className="w-[420px] min-w-[420px] shrink-0 border-l border-[#e3e6eb] bg-white overflow-hidden">
           <TicketBuilder {...ticketCallbacks} />
         </div>
       </div>
 
       {/* ═══ DETAIL PANEL (420px, slide-in from right, overlaps everything) ═══ */}
       {detailMatch && (
-        <div className="fixed top-14 right-0 w-[420px] h-[calc(100vh-3.5rem)] z-50 animate-slide-in">
+        <div data-tour="detail-panel" className="fixed top-14 right-0 w-[420px] h-[calc(100vh-3.5rem)] z-50 animate-slide-in">
           <AIScanMatchDetailPanel
             am={detailMatch.am}
             home={detailMatch.home}
@@ -1240,6 +1247,8 @@ export default function Scanner() {
           />
         </div>
       )}
+
+      {showTour && <SpotlightTour steps={scannerTour} onComplete={completeTour} />}
     </div>
   );
 }
@@ -1252,7 +1261,7 @@ export default function Scanner() {
 function MatchCard({
   am, cardBk, setCardBk,
   isAiOutcomeInTicket, toggleAiOutcomeInTicket, handleAIMatchDragStart,
-  setDetailMatch, setHiddenMatches, isInTicket, isSelected,
+  setDetailMatch, setHiddenMatches, isInTicket, isSelected, dataTour,
 }: {
   am: AIScanMatch;
   cardBk: Record<string, string>;
@@ -1264,6 +1273,7 @@ function MatchCard({
   setHiddenMatches: React.Dispatch<React.SetStateAction<Set<string>>>;
   isInTicket: boolean;
   isSelected: boolean;
+  dataTour?: string;
 }) {
   const isFootball = am.sport === "football";
   const home = isFootball ? (am.home_team || "?") : (am.player1 || "?");
@@ -1325,6 +1335,7 @@ function MatchCard({
 
   return (
     <div
+      data-tour={dataTour}
       className={`bg-white rounded-xl border-[1.5px] transition-all group overflow-hidden ${cardBorder}`}
       style={{ boxShadow: "0 1px 4px rgba(16,24,40,.06), 0 4px 16px rgba(16,24,40,.06)" }}
     >
@@ -1379,6 +1390,7 @@ function MatchCard({
 
         {/* mc-conf (confidence zone) */}
         <div
+          {...(dataTour ? { "data-tour": "confidence-stars" } : {})}
           className="w-[100px] min-w-[100px] shrink-0 flex flex-col items-center justify-center border-r border-[#f0f1f3] cursor-grab active:cursor-grabbing"
           draggable={bestOutcome != null && bestOutcome.odds > 0}
           onDragStart={(e) => bestOutcome && handleAIMatchDragStart(e, am, bestOutcome.key)}
@@ -1404,7 +1416,7 @@ function MatchCard({
         </div>
 
         {/* mc-outcomes */}
-        <div className={`grid flex-1 min-w-0 ${isFootball ? "grid-cols-3" : "grid-cols-2"}`}>
+        <div {...(dataTour ? { "data-tour": "outcome-buttons" } : {})} className={`grid flex-1 min-w-0 ${isFootball ? "grid-cols-3" : "grid-cols-2"}`}>
           {outcomes.map(({ key, label, odds, bk }) => {
             const inTicket = isAiOutcomeInTicket(am, key);
             const noOdds = !odds;
@@ -1442,6 +1454,7 @@ function MatchCard({
                 </div>
                 {!noOdds && sortedBks.length > 0 && (
                   <select
+                    {...(dataTour && isFavorite ? { "data-tour": "bookmaker-select" } : {})}
                     value={pickedBk || ""}
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => { e.stopPropagation(); setCardBk((prev) => ({ ...prev, [bkKey]: e.target.value || "" })); }}
@@ -1454,7 +1467,7 @@ function MatchCard({
                   </select>
                 )}
                 {!noOdds && modelProbPct && (
-                  <div className="flex items-center gap-1 mt-1">
+                  <div {...(dataTour && isFavorite ? { "data-tour": "edge-display" } : {})} className="flex items-center gap-1 mt-1">
                     <span className={`text-[10px] font-semibold font-mono ${isFavorite ? "text-[#12b76a]" : "text-[#f04438]"}`}>
                       {modelProbPct}%
                     </span>

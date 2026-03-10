@@ -62,22 +62,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       : res.statusText;
     throw new Error(msg);
   }
+  if (res.status === 204) return undefined as T;
   return res.json();
-}
-
-// Combos
-export function generateCombos(body: unknown) {
-  return request<import("../types").Combo[]>("/combos/generate", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export function simulateCombo(body: unknown) {
-  return request<{ combined_odds: number; combined_prob: number; ev: number; stake: number; potential_gain: number; num_legs: number }>("/combos/simulate", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
 }
 
 // Backtest
@@ -86,6 +72,33 @@ export function runBacktest(body: unknown) {
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+export function saveBacktest(body: {
+  name: string;
+  sport: string;
+  params: Record<string, unknown>;
+  metrics: Record<string, unknown>;
+  bets: Record<string, unknown>[];
+  bankroll_curve: number[];
+  config: Record<string, unknown>;
+}) {
+  return request<import("../types").SavedBacktestSummary>("/backtest/save", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function getSavedBacktests() {
+  return request<import("../types").SavedBacktestSummary[]>("/backtest/saved");
+}
+
+export function getSavedBacktest(id: number) {
+  return request<import("../types").SavedBacktestFull>(`/backtest/saved/${id}`);
+}
+
+export function deleteSavedBacktest(id: number) {
+  return request<void>(`/backtest/saved/${id}`, { method: "DELETE" });
 }
 
 // Portfolio
@@ -181,6 +194,14 @@ export function getCampaignBets(id: number) {
   return request<import("../types").Bet[]>(`/campaigns/${id}/bets`);
 }
 
+export function getCampaignVersions(id: number) {
+  return request<import("../types").CampaignVersionList>(`/campaigns/${id}/versions`);
+}
+
+export function getCampaignVersion(id: number, version: number) {
+  return request<import("../types").CampaignVersion>(`/campaigns/${id}/versions/${version}`);
+}
+
 export function updateCampaignBet(campaignId: number, betId: number, result: string) {
   return request<import("../types").Bet>(`/campaigns/${campaignId}/bets/${betId}`, {
     method: "PATCH",
@@ -192,6 +213,24 @@ export function deleteCampaignBet(campaignId: number, betId: number) {
   return request<void>(`/campaigns/${campaignId}/bets/${betId}`, { method: "DELETE" });
 }
 
+export function updatePortfolioBet(betId: number, result: string) {
+  return request<import("../types").Bet>(`/portfolio/bets/${betId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ result }),
+  });
+}
+
+export function updateBetNote(betId: number, note: string) {
+  return request<import("../types").Bet>(`/portfolio/bets/${betId}/note`, {
+    method: "PATCH",
+    body: JSON.stringify({ note }),
+  });
+}
+
+export function deletePortfolioBet(betId: number) {
+  return request<void>(`/portfolio/bets/${betId}`, { method: "DELETE" });
+}
+
 // AI Research (Claude Code powered)
 export function aiScan(params: { sport: string; leagues?: string; timeframe?: string; force?: boolean; cacheOnly?: boolean }) {
   const qs = new URLSearchParams();
@@ -201,17 +240,6 @@ export function aiScan(params: { sport: string; leagues?: string; timeframe?: st
   if (params.force) qs.set("force", "true");
   if (params.cacheOnly) qs.set("cache_only", "true");
   return request<import("../types").AIScanResponse>(`/scanner/ai-scan?${qs}`);
-}
-
-export function aiResearch(params: { sport: string; home: string; away: string; competition: string; date: string; force?: boolean }) {
-  const qs = new URLSearchParams();
-  qs.set("sport", params.sport);
-  qs.set("home", params.home);
-  qs.set("away", params.away);
-  qs.set("competition", params.competition);
-  qs.set("date", params.date);
-  if (params.force) qs.set("force", "true");
-  return request<import("../types").AIResearchResponse>(`/scanner/ai-research?${qs}`);
 }
 
 // User stats
@@ -250,4 +278,52 @@ export function resetPassword(token: string, newPassword: string) {
 
 export function deleteAccount() {
   return request<{ message: string }>("/auth/me", { method: "DELETE" });
+}
+
+// User preferences
+export function getPreferences() {
+  return request<import("../types").UserPreferences>("/settings/preferences");
+}
+
+export function updatePreferences(body: Partial<import("../types").UserPreferences>) {
+  return request<import("../types").UserPreferences>("/settings/preferences", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+// Notifications
+export function getNotifications() {
+  return request<import("../types").AppNotification[]>("/notifications");
+}
+
+export function getUnreadCount() {
+  return request<{ count: number }>("/notifications/unread-count");
+}
+
+export function markNotificationRead(id: number) {
+  return request<import("../types").AppNotification>(`/notifications/${id}/read`, { method: "PATCH" });
+}
+
+export function markAllNotificationsRead() {
+  return request<void>("/notifications/read-all", { method: "POST" });
+}
+
+// Onboarding & Tour
+export function completeOnboarding(bankroll: number, default_stake_pct: number) {
+  return request<unknown>("/auth/onboarding", {
+    method: "POST",
+    body: JSON.stringify({ bankroll, default_stake_pct }),
+  });
+}
+
+export function skipOnboarding() {
+  return request<unknown>("/auth/onboarding/skip", { method: "POST" });
+}
+
+export function markTourVisited(module: string) {
+  return request<{ message: string }>("/auth/tour-visited", {
+    method: "POST",
+    body: JSON.stringify({ module }),
+  });
 }

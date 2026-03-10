@@ -19,10 +19,12 @@ from src.api.schemas import (
     ForgotPasswordRequest,
     LoginRequest,
     MessageResponse,
+    OnboardingRequest,
     RefreshRequest,
     RegisterRequest,
     ResetPasswordRequest,
     TokenResponse,
+    TourVisitedRequest,
     UpdateProfileRequest,
     UserResponse,
     UserStatsResponse,
@@ -53,7 +55,7 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
     """Create a new user account with a 7-day free trial."""
     existing = db.query(User).filter(User.email == body.email.lower(), User.is_active == True).first()
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cet email est déjà utilisé")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Inscription impossible. Vérifiez vos informations.")
 
     user = User(
         email=body.email.lower(),
@@ -65,6 +67,9 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    from src.services.email import send_welcome_email
+    send_welcome_email(user.email, user.display_name)
 
     return _user_to_response(user)
 
@@ -78,8 +83,8 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email ou mot de passe incorrect")
 
     return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
+        access_token=create_access_token(user.id, user.token_version),
+        refresh_token=create_refresh_token(user.id, user.token_version),
     )
 
 
@@ -87,14 +92,17 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
 @limiter.limit("20/minute")
 def refresh(request: Request, body: RefreshRequest, db: Session = Depends(get_db)):
     """Exchange a refresh token for a new access + refresh token pair."""
-    user_id = _decode_token(body.refresh_token, expected_type="refresh")
+    payload = _decode_token(body.refresh_token, expected_type="refresh")
+    user_id = int(payload["sub"])
     user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalide")
+    if payload.get("ver") != user.token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expirée")
 
     return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
+        access_token=create_access_token(user.id, user.token_version),
+        refresh_token=create_refresh_token(user.id, user.token_version),
     )
 
 
@@ -137,6 +145,7 @@ def change_password(
     if not _verify_password(body.current_password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mot de passe actuel incorrect")
     user.hashed_password = _hash_password(body.new_password)
+    user.token_version += 1
     db.commit()
     return MessageResponse(message="Mot de passe modifie avec succes")
 
@@ -159,8 +168,10 @@ def forgot_password(
         )
         db.add(reset)
         db.commit()
-        # TODO: envoyer par email quand le service sera en place
-        logger.info("Password reset requested for %s (token generated)", user.email)
+        from src.services.email import send_reset_password_email
+        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        send_reset_password_email(user.email, user.display_name, reset_url)
+        logger.info("Password reset requested for user_id=%d", user.id)
     return MessageResponse(message="Si un compte existe avec cet email, un lien de reinitialisation a ete envoye.")
 
 
@@ -192,6 +203,7 @@ def reset_password(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token invalide ou expire")
 
     user.hashed_password = _hash_password(body.new_password)
+    user.token_version += 1
     db.delete(reset)
     db.commit()
     return MessageResponse(message="Mot de passe reinitialise avec succes")
@@ -205,7 +217,7 @@ def get_user_stats(
     """Return profile stats for the current user."""
     from src.models.bet import Bet
 
-    bets = db.query(Bet).filter(Bet.is_backtest == False).all()
+    bets = db.query(Bet).filter(Bet.is_backtest == False, Bet.user_id == user.id).all()
     settled = [b for b in bets if b.result in ("won", "lost")]
     total_staked = sum(b.stake for b in settled)
     total_pnl = sum(b.profit_loss or 0 for b in settled)
@@ -230,7 +242,70 @@ def delete_account(
     return MessageResponse(message="Compte desactive")
 
 
+@router.post("/auth/logout-all", response_model=MessageResponse)
+def logout_all(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Invalidate all existing sessions by incrementing token_version."""
+    user.token_version += 1
+    db.commit()
+    return MessageResponse(message="Toutes les sessions ont ete deconnectees")
+
+
+@router.post("/auth/onboarding", response_model=UserResponse)
+def complete_onboarding(
+    body: OnboardingRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Complete onboarding: save bankroll + stake and mark as done."""
+    from src.models.user_preferences import UserPreferences
+
+    prefs = db.query(UserPreferences).filter(UserPreferences.user_id == user.id).first()
+    if not prefs:
+        prefs = UserPreferences(user_id=user.id)
+        db.add(prefs)
+    prefs.initial_bankroll = body.bankroll
+    prefs.stake_percentage = body.default_stake_pct
+    prefs.stake_as_percentage = True
+    user.onboarding_completed = True
+    db.commit()
+    db.refresh(user)
+    return _user_to_response(user)
+
+
+@router.post("/auth/onboarding/skip", response_model=UserResponse)
+def skip_onboarding(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Skip onboarding without saving preferences."""
+    user.onboarding_completed = True
+    db.commit()
+    db.refresh(user)
+    return _user_to_response(user)
+
+
+@router.post("/auth/tour-visited", response_model=MessageResponse)
+def mark_tour_visited(
+    body: TourVisitedRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Mark a module's tour as visited."""
+    current = user.visited_modules or ""
+    visited = [m for m in current.split(",") if m]
+    if body.module not in visited:
+        visited.append(body.module)
+        user.visited_modules = ",".join(visited)
+        db.commit()
+    return MessageResponse(message="ok")
+
+
 def _user_to_response(user: User) -> UserResponse:
+    visited_str = user.visited_modules or ""
+    visited_list = [m for m in visited_str.split(",") if m]
     return UserResponse(
         id=user.id,
         email=user.email,
@@ -239,4 +314,6 @@ def _user_to_response(user: User) -> UserResponse:
         is_active=user.is_active,
         trial_ends_at=user.trial_ends_at.isoformat() if user.trial_ends_at else None,
         created_at=user.created_at.isoformat() if user.created_at else "",
+        onboarding_completed=user.onboarding_completed,
+        visited_modules=visited_list,
     )

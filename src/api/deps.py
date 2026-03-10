@@ -16,22 +16,22 @@ security = HTTPBearer(auto_error=False)
 TIER_LEVELS = {"free": 0, "pro": 1, "premium": 2}
 
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(user_id: int, token_version: int = 0) -> str:
     """Create a short-lived access token."""
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": str(user_id), "exp": expire, "type": "access"}
+    payload = {"sub": str(user_id), "exp": expire, "type": "access", "ver": token_version}
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
-def create_refresh_token(user_id: int) -> str:
+def create_refresh_token(user_id: int, token_version: int = 0) -> str:
     """Create a long-lived refresh token."""
     expire = datetime.now(timezone.utc) + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
-    payload = {"sub": str(user_id), "exp": expire, "type": "refresh"}
+    payload = {"sub": str(user_id), "exp": expire, "type": "refresh", "ver": token_version}
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
-def _decode_token(token: str, expected_type: str = "access") -> int:
-    """Decode and validate a JWT token. Returns user_id."""
+def _decode_token(token: str, expected_type: str = "access") -> dict:
+    """Decode and validate a JWT token. Returns the full payload dict."""
     try:
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
     except JWTError:
@@ -41,7 +41,7 @@ def _decode_token(token: str, expected_type: str = "access") -> int:
     user_id = payload.get("sub")
     if user_id is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalide")
-    return int(user_id)
+    return payload
 
 
 def get_current_user(
@@ -51,10 +51,13 @@ def get_current_user(
     """Extract and validate current user from JWT Bearer token."""
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentification requise")
-    user_id = _decode_token(credentials.credentials, expected_type="access")
+    payload = _decode_token(credentials.credentials, expected_type="access")
+    user_id = int(payload["sub"])
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Utilisateur introuvable")
+    if payload.get("ver") != user.token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expirée")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Compte désactivé")
     return user

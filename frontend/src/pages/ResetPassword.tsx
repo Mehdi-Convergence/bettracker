@@ -18,7 +18,19 @@ export default function ResetPassword() {
     e.preventDefault();
     setError("");
     if (password.length < 8) {
-      setError("Le mot de passe doit contenir au moins 8 caracteres");
+      setError("Min. 8 caractères");
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      setError("Le mot de passe doit contenir une majuscule");
+      return;
+    }
+    if (!/[a-z]/.test(password)) {
+      setError("Le mot de passe doit contenir une minuscule");
+      return;
+    }
+    if (!/\d/.test(password)) {
+      setError("Le mot de passe doit contenir un chiffre");
       return;
     }
     if (password !== confirm) {

@@ -18,7 +18,6 @@ class Settings(BaseSettings):
     # Strategy Config
     ALLOWED_OUTCOMES: list[str] = ["H", "D", "A"]  # All outcomes
     EXCLUDED_LEAGUES: list[str] = []  # No exclusions
-    FLAT_STAKE: float = 0.05  # 5% flat stake
 
     # ELO Config
     ELO_K_FACTOR: float = 32.0
@@ -40,6 +39,11 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",
     ]
+
+    # Email (Resend — optional, graceful skip if empty)
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = "BetTracker <noreply@bettracker.com>"
+    FRONTEND_URL: str = "http://localhost:5173"
 
     # Auth / JWT (no default — MUST be set via env or .env)
     JWT_SECRET_KEY: str = ""

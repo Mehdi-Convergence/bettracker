@@ -1,7 +1,7 @@
 [project]
 name = "bettracker"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Sports betting value bet detection — FastAPI + React + ML"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -33,6 +33,7 @@ dependencies = [
     "redis>=5.0.0",
     "slowapi>=0.1.9",
     "psycopg2-binary>=2.9.0",
+    "resend>=2.0.0",
 ]
 
 [tool.ruff]

@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BetTracker — Détail Ticket</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f5f7;--white:#fff;--surface2:#f4f5f7;
+  --border:#e3e6eb;--border2:#cdd1d9;
+  --text:#111318;--text2:#3c4149;--muted:#8a919e;--muted2:#b0b7c3;
+  --sb:#1e2535;--sb-border:rgba(255,255,255,.07);
+  --sb-text:rgba(255,255,255,.48);--sb-text2:rgba(255,255,255,.82);
+  --sb-hover:rgba(255,255,255,.05);--sb-active:rgba(255,255,255,.09);
+  --accent:#3b5bdb;--accent-bg:rgba(59,91,219,.07);--accent-bd:rgba(59,91,219,.18);
+  --green:#12b76a;--green-bg:rgba(18,183,106,.08);--green-bd:rgba(18,183,106,.2);
+  --red:#f04438;--red-bg:rgba(240,68,56,.07);--red-bd:rgba(240,68,56,.2);
+  --amber:#f79009;--amber-bg:rgba(247,144,9,.08);--amber-bd:rgba(247,144,9,.2);
+  --purple:#7c3aed;--purple-bg:rgba(124,58,237,.07);--purple-bd:rgba(124,58,237,.2);
+  --radius:12px;
+  --sh-sm:0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04);
+  --sh:0 4px 16px rgba(16,24,40,.08);
+  --sh-lg:0 16px 48px rgba(16,24,40,.2);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+.app{display:flex;height:100vh}
+
+/* SIDEBAR */
+.sidebar{width:228px;min-width:228px;background:var(--sb);display:flex;flex-direction:column;z-index:10}
+.sb-logo{height:56px;padding:0 18px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--sb-border)}
+.logo-mark{width:28px;height:28px;background:#4f8cff;border-radius:7px;display:flex;align-items:center;justify-content:center}
+.logo-text{font-weight:800;font-size:15px;letter-spacing:-.03em;color:#fff}
+.logo-text em{color:#7eb8ff;font-style:normal}
+.sb-nav{flex:1;padding:10px 8px;display:flex;flex-direction:column;gap:1px}
+.sb-label{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.2);padding:10px 10px 5px}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13.5px;font-weight:400;color:var(--sb-text);transition:all .12s}
+.ni:hover{background:var(--sb-hover);color:var(--sb-text2)}
+.ni.on{background:var(--sb-active);color:#fff;font-weight:600}
+.nic{width:16px;height:16px;flex-shrink:0;opacity:.45}
+.ni:hover .nic,.ni.on .nic{opacity:1}
+.nbadge{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 6px;border-radius:20px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.7)}
+.nbadge.amb{background:rgba(247,144,9,.2);color:#fbb040}
+.ndiv{height:1px;background:var(--sb-border);margin:6px 8px}
+.ni.ai{background:rgba(79,140,255,.12);color:#7eb8ff;font-weight:600;border:1px solid rgba(79,140,255,.18)}
+.ni.out{color:rgba(240,68,56,.65)!important}
+.ni.out:hover{background:rgba(240,68,56,.08);color:#f04438!important}
+.sb-bottom{border-top:1px solid var(--sb-border);padding:8px}
+.uchip{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;cursor:pointer}
+.ucav{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#4f8cff,#a78bfa);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.ucname{font-size:13px;font-weight:600;color:rgba(255,255,255,.82)}
+.ucplan{font-size:10.5px;color:#7eb8ff;font-family:'JetBrains Mono',monospace;text-transform:uppercase}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.topbar{height:56px;min-height:56px;border-bottom:1px solid var(--border);background:var(--white);display:flex;align-items:center;padding:0 24px;flex-shrink:0}
+.bc{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.bcs{color:var(--muted2)}
+.bcc{color:var(--text);font-weight:600}
+
+/* DEMO BAR */
+.demo-bar{background:linear-gradient(135deg,#1e2535,#2d3a52);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.06)}
+.demo-bar span{font-size:12px;color:rgba(255,255,255,.55)}
+.demo-btn{padding:5px 13px;border-radius:7px;border:1.5px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.6);font-size:12px;font-weight:500;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .12s}
+.demo-btn:hover{background:rgba(255,255,255,.08);color:#fff}
+.demo-btn.on{background:rgba(59,91,219,.3);border-color:var(--accent);color:#7eb8ff;font-weight:600}
+
+/* PAGE (liste) */
+.page-wrap{flex:1;overflow-y:auto;padding:20px 24px;transition:opacity .2s}
+.page-wrap.dimmed{opacity:.3;pointer-events:none;user-select:none}
+.table-card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--sh-sm)}
+.tc-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.tc-title{font-size:14px;font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+thead{background:var(--surface2);border-bottom:1.5px solid var(--border)}
+th{padding:9px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap}
+td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr.hl td{background:rgba(59,91,219,.04)}
+tr:not(.hl):hover td{background:var(--surface2);cursor:pointer}
+.td-match{font-weight:600}
+.td-mono{font-family:'JetBrains Mono',monospace;font-weight:600}
+.td-p{color:var(--green);font-family:'JetBrains Mono',monospace;font-weight:700}
+.td-n{color:var(--red);font-family:'JetBrains Mono',monospace;font-weight:700}
+.td-m{color:var(--muted);font-family:'JetBrains Mono',monospace}
+.st{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:600;font-family:'JetBrains Mono',monospace}
+.st-g{background:var(--green-bg);color:var(--green)}
+.st-p{background:var(--red-bg);color:var(--red)}
+.st-c{background:var(--accent-bg);color:var(--accent)}
+.st-prop{background:var(--amber-bg);color:var(--amber)}
+.st-dot{width:4px;height:4px;border-radius:50%;background:currentColor}
+.st-c .st-dot,.st-prop .st-dot{animation:pulse 2s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.tag{display:inline-flex;padding:1px 6px;border-radius:3px;font-size:9.5px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.t-algo{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-bd)}
+.t-manual{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-bd)}
+.t-combi{background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd)}
+.clv-b{font-size:10.5px;padding:1px 6px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-weight:600}
+.clv-p{background:var(--green-bg);color:var(--green)}
+.clv-n{background:var(--red-bg);color:var(--red)}
+.row-btn{padding:3px 9px;border-radius:5px;border:1px solid var(--border);background:transparent;font-size:11.5px;cursor:pointer;color:var(--muted);font-family:'Plus Jakarta Sans',sans-serif;transition:all .12s}
+.row-btn:hover,.row-btn.on{border-color:var(--accent-bd);color:var(--accent);background:var(--accent-bg)}
+
+/* —— DRAWER —— */
+.drawer{position:absolute;top:0;right:0;width:440px;height:100%;background:var(--white);border-left:1.5px solid var(--border);box-shadow:var(--sh-lg);transform:translateX(100%);transition:transform .26s cubic-bezier(.32,.72,0,1);display:flex;flex-direction:column;z-index:100}
+.drawer.open{transform:translateX(0)}
+
+/* Navigateur tickets */
+.d-nav{height:38px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 14px;flex-shrink:0}
+.d-nav-info{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.d-nav-btns{display:flex;gap:4px}
+.dnb{width:24px;height:24px;border-radius:5px;border:1px solid var(--border);background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:all .12s}
+.dnb:hover{border-color:var(--accent-bd);color:var(--accent)}
+
+/* Header drawer */
+.dh{padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.dh-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.dh-sport{font-size:11px;color:var(--muted);margin-bottom:4px}
+.dh-match{font-size:16px;font-weight:800;letter-spacing:-.03em;line-height:1.25;margin-bottom:6px}
+.dh-badges{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.close-btn{width:26px;height:26px;border-radius:6px;border:none;background:transparent;cursor:pointer;color:var(--muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .12s}
+.close-btn:hover{background:var(--surface2);color:var(--text)}
+
+/* Body */
+.db{flex:1;overflow-y:auto}
+.dbloc{padding:14px 16px;border-bottom:1px solid var(--border)}
+.dbloc:last-child{border-bottom:none}
+.dbloc-title{font-size:10.5px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.09em;margin-bottom:10px;display:flex;align-items:center;gap:5px}
+.dbloc-title svg{width:12px;height:12px;color:var(--accent)}
+
+/* Stats */
+.dg2{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px}
+.dg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.ds{background:var(--surface2);border-radius:8px;padding:9px 11px}
+.ds-val{font-size:15px;font-weight:800;font-family:'JetBrains Mono',monospace;letter-spacing:-.02em}
+.ds-lbl{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* Rows */
+.dr{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)}
+.dr:last-child{border-bottom:none}
+.dr-lbl{font-size:12.5px;color:var(--muted)}
+.dr-val{font-size:12.5px;font-weight:600;font-family:'JetBrains Mono',monospace;color:var(--text2);text-align:right;max-width:220px}
+
+/* Cote chart */
+.cote-wrap{height:68px;width:100%;position:relative;margin-bottom:8px}
+.cote-svg{width:100%;height:100%}
+.cote-pts{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.cote-sig{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:7px;font-size:11.5px;font-weight:500;margin-top:8px}
+.sig-ok{background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd)}
+.sig-bad{background:var(--red-bg);color:var(--red);border:1px solid var(--red-bd)}
+.sig-neu{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.cote-leg{display:flex;gap:12px;margin-top:6px}
+.cl-it{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+.cl-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+
+/* Result box */
+.res-box{border-radius:9px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.rb-won{background:var(--green-bg);border:1.5px solid var(--green-bd)}
+.rb-lost{background:var(--red-bg);border:1.5px solid var(--red-bd)}
+.rb-cours{background:var(--accent-bg);border:1.5px solid var(--accent-bd)}
+.rb-prop{background:var(--amber-bg);border:1.5px solid var(--amber-bd)}
+.rb-lbl{font-size:13px;font-weight:700}
+.rb-val{font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;letter-spacing:-.03em}
+
+/* COMBI sélections */
+.combi-list{display:flex;flex-direction:column;gap:6px}
+.combi-sel{background:var(--surface2);border-radius:8px;padding:10px 12px;border:1.5px solid var(--border)}
+.combi-sel.won{border-color:var(--green-bd);background:rgba(18,183,106,.04)}
+.combi-sel.lost{border-color:var(--red-bd);background:rgba(240,68,56,.04)}
+.combi-sel.pending{border-color:var(--amber-bd)}
+.cs-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.cs-match{font-size:12.5px;font-weight:700}
+.cs-issue{font-size:11.5px;color:var(--text2)}
+.cs-meta{font-size:10.5px;color:var(--muted);display:flex;gap:8px;align-items:center;margin-top:3px}
+.cs-cote{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12.5px}
+.cs-res{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:4px;font-family:'JetBrains Mono',monospace}
+.cs-res-won{background:var(--green-bg);color:var(--green)}
+.cs-res-lost{background:var(--red-bg);color:var(--red)}
+.cs-res-pend{background:var(--amber-bg);color:var(--amber)}
+.combi-total{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--surface2);border-radius:7px;margin-top:4px;border:1px solid var(--border)}
+.ct-lbl{font-size:11.5px;color:var(--muted)}
+.ct-val{font-size:13px;font-weight:800;font-family:'JetBrains Mono',monospace}
+
+/* Note */
+.note-area{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:var(--text);resize:none;min-height:60px;background:var(--surface2);outline:none;transition:all .15s;line-height:1.5}
+.note-area:focus{border-color:var(--accent);background:var(--white);box-shadow:0 0 0 3px var(--accent-bg)}
+.note-area::placeholder{color:var(--muted2)}
+
+/* Actions */
+.dact{padding:12px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:7px;flex-shrink:0;background:var(--white)}
+.da-row{display:flex;gap:7px}
+.btn-p{padding:9px 14px;border-radius:9px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;transition:all .15s;flex:1;justify-content:center}
+.btn-p:hover{background:#2f4ac7}
+.btn-p.green{background:var(--green)}
+.btn-p.green:hover{background:#0da35e}
+.btn-g{padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12.5px;font-weight:500;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .12s;display:inline-flex;align-items:center;gap:6px;flex:1;justify-content:center}
+.btn-g:hover{border-color:var(--border2);background:var(--surface2)}
+.btn-g.red{color:var(--red);border-color:var(--red-bd)}
+.btn-g.red:hover{background:var(--red-bg)}
+.btn-share{padding:8px 12px;border-radius:8px;border:1.5px solid var(--accent-bd);background:var(--accent-bg);color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;transition:all .15s;flex:1;justify-content:center}
+.btn-share:hover{background:var(--accent);color:#fff}
+.btn-camp{padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .12s;display:inline-flex;align-items:center;gap:6px;width:100%;justify-content:center}
+.btn-camp:hover{border-color:var(--accent-bd);color:var(--accent);background:var(--accent-bg)}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <div class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div class="logo-text">Bet<em>Tracker</em></div>
+    </div>
+    <nav class="sb-nav">
+      <span class="sb-label">Analyse</span>
+      <div class="ni"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</div>
+      <div class="ni"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Scan matchs<span class="nbadge">7</span></div>
+      <span class="sb-label">Paris</span>
+      <div class="ni on"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Tickets<span class="nbadge amb">3</span></div>
+      <div class="ni"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Campagnes</div>
+      <div class="ndiv"></div>
+      <div class="ni ai"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>IA Analyste<span class="nbadge" style="background:rgba(126,184,255,.15);color:#7eb8ff">β</span></div>
+    </nav>
+    <div class="sb-bottom">
+      <div class="ni" style="padding:8px 10px"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/></svg>Paramètres</div>
+      <div class="ni" style="padding:8px 10px"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Mon profil</div>
+      <div class="ni out" style="padding:8px 10px"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Déconnexion</div>
+      <div class="ndiv"></div>
+      <div class="uchip"><div class="ucav">MQ</div><div><div class="ucname">Mehdi Q.</div><div class="ucplan">Pro · actif</div></div></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="bc"><span>BetTracker</span><span class="bcs"> › </span><span class="bcc">Tickets · Liste / Historique</span></div>
+    </div>
+
+    <!-- DEMO BAR -->
+    <div class="demo-bar">
+      <span>Cliquer sur Détail :</span>
+      <button class="demo-btn on" onclick="open('simple_won',this)">Simple · Gagné</button>
+      <button class="demo-btn" onclick="open('simple_prop',this)">Simple · Proposé</button>
+      <button class="demo-btn" onclick="open('combi_won',this)">Combi · Gagné</button>
+      <button class="demo-btn" onclick="open('combi_prop',this)">Combi · Proposé</button>
+    </div>
+
+    <!-- LISTE -->
+    <div class="page-wrap dimmed" id="page-wrap">
+      <div class="table-card">
+        <div class="tc-head">
+          <div class="tc-title">Liste / Historique</div>
+          <span style="font-size:12px;color:var(--muted)">48 tickets</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Match / Ticket</th><th>Issue</th><th>Cote</th>
+              <th>Mise</th><th>Statut</th><th>Gain/Perte</th><th>CLV</th><th>Tag</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="hl" onclick="open('simple_won',document.querySelectorAll('.demo-btn')[0])">
+              <td class="td-m">09/03</td>
+              <td class="td-match">Sinner vs Fritz</td>
+              <td>Dom · Sinner</td>
+              <td class="td-mono">1.65</td>
+              <td class="td-mono">30€</td>
+              <td><span class="st st-g"><span class="st-dot"></span>Gagné</span></td>
+              <td class="td-p">+19.50€</td>
+              <td><span class="clv-b clv-p">+3.8%</span></td>
+              <td><span class="tag t-algo">ALGO</span></td>
+              <td><button class="row-btn on">Détail →</button></td>
+            </tr>
+            <tr onclick="open('simple_prop',document.querySelectorAll('.demo-btn')[1])">
+              <td class="td-m">10/03</td>
+              <td class="td-match">Sinner vs Medvedev</td>
+              <td>Dom · Sinner</td>
+              <td class="td-mono">1.72</td>
+              <td class="td-mono">28€</td>
+              <td><span class="st st-prop"><span class="st-dot"></span>Proposé</span></td>
+              <td class="td-m">+19.6€ pot.</td>
+              <td class="td-m">—</td>
+              <td><span class="tag t-algo">ALGO</span></td>
+              <td><button class="row-btn">Détail</button></td>
+            </tr>
+            <tr onclick="open('combi_won',document.querySelectorAll('.demo-btn')[2])">
+              <td class="td-m">08/03</td>
+              <td class="td-match">Combi à 3 sélections</td>
+              <td>Dom ×3</td>
+              <td class="td-mono">4.18</td>
+              <td class="td-mono">20€</td>
+              <td><span class="st st-g"><span class="st-dot"></span>Gagné</span></td>
+              <td class="td-p">+63.60€</td>
+              <td><span class="clv-b clv-p">+2.4%</span></td>
+              <td><div style="display:flex;gap:4px"><span class="tag t-algo">ALGO</span><span class="tag t-combi">COMBI</span></div></td>
+              <td><button class="row-btn">Détail</button></td>
+            </tr>
+            <tr onclick="open('combi_prop',document.querySelectorAll('.demo-btn')[3])">
+              <td class="td-m">10/03</td>
+              <td class="td-match">Combi à 2 sélections</td>
+              <td>Dom ×2</td>
+              <td class="td-mono">2.49</td>
+              <td class="td-mono">20€</td>
+              <td><span class="st st-prop"><span class="st-dot"></span>Proposé</span></td>
+              <td class="td-m">+29.8€ pot.</td>
+              <td class="td-m">—</td>
+              <td><div style="display:flex;gap:4px"><span class="tag t-algo">ALGO</span><span class="tag t-combi">COMBI</span></div></td>
+              <td><button class="row-btn">Détail</button></td>
+            </tr>
+            <tr>
+              <td class="td-m">08/03</td>
+              <td class="td-match">Gauff vs Paolini</td>
+              <td>Dom · Gauff</td>
+              <td class="td-mono">1.55</td>
+              <td class="td-mono">10€</td>
+              <td><span class="st st-g"><span class="st-dot"></span>Gagné</span></td>
+              <td class="td-p">+5.50€</td>
+              <td><span class="clv-b clv-p">+1.9%</span></td>
+              <td><span class="tag t-manual">MANUEL</span></td>
+              <td><button class="row-btn">Détail</button></td>
+            </tr>
+            <tr>
+              <td class="td-m">07/03</td>
+              <td class="td-match">Zverev vs Rune</td>
+              <td>Dom · Zverev</td>
+              <td class="td-mono">1.72</td>
+              <td class="td-mono">26€</td>
+              <td><span class="st st-p"><span class="st-dot"></span>Perdu</span></td>
+              <td class="td-n">−26€</td>
+              <td><span class="clv-b clv-n">−0.8%</span></td>
+              <td><span class="tag t-algo">ALGO</span></td>
+              <td><button class="row-btn">Détail</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- —— DRAWER —— -->
+    <div class="drawer" id="drawer">
+
+      <div class="d-nav">
+        <span class="d-nav-info" id="d-nav-info">Ticket 1 / 48</span>
+        <div class="d-nav-btns">
+          <button class="dnb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+          <button class="dnb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+        </div>
+      </div>
+
+      <!-- Header -->
+      <div class="dh">
+        <div class="dh-top">
+          <div style="flex:1;min-width:0">
+            <div class="dh-sport" id="d-sport"></div>
+            <div class="dh-match" id="d-match"></div>
+            <div class="dh-badges" id="d-badges"></div>
+          </div>
+          <button class="close-btn" onclick="close()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div class="db" id="d-body"></div>
+
+      <!-- Actions -->
+      <div class="dact" id="d-act"></div>
+
+    </div><!-- /drawer -->
+  </div>
+</div>
+
+<script>
+const T = {
+
+  /* —— SIMPLE GAGNÉ —— */
+  simple_won: {
+    nav: 'Ticket 1 / 48',
+    sport: '🎾 ATP · Indian Wells · Quart de finale',
+    match: 'Sinner vs Fritz',
+    badges: `<span class="st st-g"><span class="st-dot"></span>Gagné</span> <span class="tag t-algo">ALGO</span> <span style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace">09/03 · 20:00</span>`,
+    body: `
+      <div class="dbloc">
+        <div class="dbloc-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 11l3 3L22 4"/></svg>Données du pari</div>
+        <div class="dg2">
+          <div class="ds"><div class="ds-val">1.65</div><div class="ds-lbl">Cote au placement</div></div>
+          <div class="ds"><div class="ds-val">30€</div><div class="ds-lbl">Mise</div></div>
+        </div>
+        <div class="dr"><span class="dr-lbl">Issue pariée</span><span class="dr-val">Victoire Dom · Sinner</span></div>
+        <div class="dr"><span class="dr-lbl">Gain potentiel</span><span class="dr-val" style="color:var(--green)">+19.50€</span></div>
+        <div class="dr"><span class="dr-lbl">Edge généré</span><span class="dr-val" style="color:var(--green)">+5.8%</span></div>
+        <div class="dr"><span class="dr-lbl">Confiance algo</span><span class="dr-val">67.2%</span></div>
+        <div class="dr"><span class="dr-lbl">Bookmaker</span><span class="dr-val">Unibet</span></div>
+        <div class="dr"><span class="dr-lbl">Stratégie mise</span><span class="dr-val">½ Kelly</span></div>
+      </div>
+
+      <div class="dbloc">
+        <div class="dbloc-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Mouvement de cote</div>
+        <div class="cote-wrap">
+          <svg class="cote-svg" viewBox="0 0 400 68" preserveAspectRatio="none">
+            <defs><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3b5bdb" stop-opacity=".1"/><stop offset="100%" stop-color="#3b5bdb" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0,14 C60,18 120,26 200,34 C280,42 330,44 400,48 L400,68 L0,68Z" fill="url(#cg1)"/>
+            <path d="M0,14 C60,18 120,26 200,34 C280,42 330,44 400,48" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="0" cy="14" r="4" fill="var(--accent)" stroke="white" stroke-width="2"/>
+            <circle cx="200" cy="34" r="4" fill="var(--green)" stroke="white" stroke-width="2"/>
+            <circle cx="400" cy="48" r="4" fill="var(--purple)" stroke="white" stroke-width="2"/>
+            <line x1="200" y1="0" x2="200" y2="68" stroke="var(--green)" stroke-width="1" stroke-dasharray="3,2" opacity=".35"/>
+          </svg>
+        </div>
+        <div class="cote-pts"><span>Génération · 1.78</span><span style="color:var(--green)">Placement · 1.65</span><span style="color:var(--purple)">Fermeture · 1.58</span></div>
+        <div class="cote-leg">
+          <div class="cl-it"><div class="cl-dot" style="background:var(--accent)"></div>Génération</div>
+          <div class="cl-it"><div class="cl-dot" style="background:var(--green)"></div>Placement</div>
+          <div class="cl-it"><div class="cl-dot" style="background:var(--purple)"></div>Fermeture</div>
+        </div>
+        <div class="cote-sig sig-ok" style="margin-top:8px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Cote en baisse — le marché confirme la valeur. Bonne entrée.
+        </div>
+      </div>
+
+      <div class="dbloc">
+        <div class="dbloc-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Résultat & CLV</div>
+        <div class="res-box rb-won">
+          <div>
+            <div class="rb-lbl" style="color:var(--green)">✓ Gagné</div>
+            <div style="font-size:11px;color:var(--green);margin-top:2px;opacity:.7">Sinner 6-4 7-6 · 1h42</div>
+          </div>
+          <div class="rb-val" style="color:var(--green)">+19.50€</div>
+        </div>
+        <div class="dg3">
+          <div class="ds"><div class="ds-val" style="color:var(--green)">+65%</div><div class="ds-lbl">ROI ticket</div></div>
+          <div class="ds"><div class="ds-val" style="color:var(--green)">+3.8%</div><div class="ds-lbl">CLV</div></div>
+          <div class="ds"><div class="ds-val">+143%</div><div class="ds-lbl">EV réel/att.</div></div>
+        </div>
+        <div class="dr" style="margin-top:8px"><span class="dr-lbl">EV attendu</span><span class="dr-val">+1.74€</span></div>
+        <div class="dr"><span class="dr-lbl">CLV détail</span><span class="dr-val" style="font-size:11.5px">1.65 placé · 1.58 fermeture</span></div>
+      </div>
+
+      <div class="dbloc">
+        <div class="dbloc-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Origine & contexte</div>
+        <div class="dr"><span class="dr-lbl">Campagne</span><span class="dr-val" style="color:var(--accent);cursor:pointer">ATP Masters →</span></div>
+        <div class="dr"><span class="dr-lbl">Bankroll</span><span class="dr-val">Campagne ATP Masters</span></div>
+        <div class="dr"><span class="dr-lbl">Généré le</span><span class="dr-val">09/03 · 07:58</span></div>
+        <div class="dr"><span class="dr-lbl">Placé le</span><span class="dr-val">09/03 · 08:45</span></div>
+        <div class="dr"><span class="dr-lbl">Délai placement</span><span class="dr-val">47 min après génération</span></div>
+        <div style="margin-top:10px">
+          <div style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:5px">Note personnelle</div>
+          <textarea class="note-area" placeholder="Ajouter une note…">Sinner en grande forme sur cette surface. Fritz jamais très à l'aise à Indian Wells.</textarea>
+          <div style="font-size:10px;color:var(--muted2);margin-top:3px">Sauvegardé automatiquement</div>
+        </div>
+      </div>`,
+    act: `<div class="da-row"><button class="btn-share">🤝 Partager ce ticket</button></div>
+          <button class="btn-camp">→ Voir la campagne ATP Masters</button>`
+  },
+
+  /* —— SIMPLE PROPOSÉ —— */
+  simple_prop: {
+    nav: 'Ticket 2 / 48',
+    sport: '🎾 ATP · Indian Wells · Quart de finale',
+    match: 'Sinner vs Medvedev',
+    badges: `<span class="st st-prop"><span class="st-dot"></span>Proposé</span> <span class="tag t-algo">ALGO</span> <span style="font-size:11px;color:var(--red);font-family:'JetBrains Mono',monospace;font-weight:700">⏱ Expire dans 22min</span>`,
+    body: `
+      <div class="dbloc">
+        <div class="dbloc-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 11l3 3L22 4"/></svg>Données du pari</div>
+        <div class="dg2">
+          <div class="ds"><div class="ds-val">1.72</div><div class="ds-lbl">Cote générée</div></div>
+          <div class="ds"><div class="ds-val">28€</div><div class="ds-lbl">Mise calculée</div></div>
+        </div>
+        <div class="dr"><span class="dr-lbl">Issue pariée</span><span class="dr-val">Victoire Dom · Sinner</span></div>
+        <div class="dr"><span class="dr-lbl">Gain potentiel</span><span class="dr-val" style="color:var(--green)">+19.60€</span></div>
+        <div class="dr"><span class="dr-lbl">Edge</span><span class="dr-val" style="color:var(--green)">+6.3%</span></div>
+        <div class="dr"><span class="dr-lbl">Confiance algo</span><span class="dr-val">69.1%</span></div>
+        <div class="dr"><span class="dr-lbl">Bookmaker suggéré</span><span class="dr-val">Unibet</span></div>
+        <div class="dr"><span class="dr-lbl">Mouvement cote</span><span class="dr-val" style="color:var(--green)">▼ −0.05 depuis génération</span></div>
+        <div class="dr"><span class="dr-lbl">Stratégie mise</span><span class="dr-val">½ Kelly</span></div>
+      </div>
+
+      <div class="dbloc">
+        <div class="dbloc-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Mouvement de cote</div>
+        <div class="cote-wrap">
+          <svg class="cote-svg" viewBox="0 0 400 68" preserveAspectRatio="none">
+            <defs><linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3b5bdb" stop-opacity=".1"/><stop offset="100%" stop-color="#3b5bdb" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0,16 C80,20 160,28 280,35 C340,38 370,39 400,40 L400,68 L0,68Z" fill="url(#cg2)"/>
+            <path d="M0,16 C80,20 160,28 280,35 C340,38 370,39 400,40" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="0" cy="16" r="4" fill="var(--accent)" stroke="white" stroke-width="2"/>
+            <circle cx="400" cy="40" r="4" fill="var(--green)" stroke="white" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="cote-pts"><span>Génération · 1.77</span><span style="color:var(--green)">Maintenant · 1.72</span></div>
+        <div class="cote-leg">
+          <div class="cl-it"><div class="cl-dot" style="background:var(--accent)"></div>Génération</div>
+          <div class="cl-it"><div class="cl-dot" style="background:var(--green)"></div>Maintenant</div>
+          <div class="cl-it" style="color:var(--muted2);font-size:10px">Fermeture disponible après le match</div>
+        </div>
+        <div class="cote-sig sig-ok" style="margin-top:8px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Cote en baisse — à valider rapidement.
+        </div>
+      </div>
+
+      <div class="dbloc">
+        <div class="dbloc-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Origine</div>
+        <div class="dr"><span class="dr-lbl">Campagne</span><span class="dr-val" style="color:var(--accent);cursor:pointer">ATP Masters →</span></div>
+        <div class="dr"><span class="dr-lbl">Bankroll</span><span class="dr-val">Campagne ATP Masters</span></div>
+        <div class="dr"><span class="dr-lbl">Généré le</span><span class="dr-val">10/03 · 08:02</span></div>
+        <div style="margin-top:10px">
+          <div style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:5px">Note personnelle</div>
+          <textarea class="note-area" placeholder="Ajouter une note avant de valider…"></textarea>
+        </div>
+      </div>`,
+    act: `
+      <div class="da-row">
+        <button class="btn-p green">✓ Valider — Placer sur Unibet</button>
+      </div>
+      <div class="da-row">
+        <button class="btn-g">✏️ Modifier la mise</button>
+        <button class="btn-g red">✕ Ignorer</button>
+      </div>
+      <button class="btn-camp">→ Voir la campagne ATP Masters</button>`
+  },
+
+  /* —— COMBI GAGNÉ —— */
+  combi_won: {
+    nav: 'Ticket 3 / 48',
+    sport: '🎾 ATP + ⚽ Bundesliga · 3 sélections',
+    match: 'Combi à 3',
+    badges: `<span class="st st-g"><span class="st-dot"></span>Gagné</span> <span class="tag t-algo">ALGO</span> <span class="tag t-combi">COMBI</span> <span style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace">08/03</span>`,
+    body: `
+      <div class="dbloc">
+        <div class="dbloc-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 11l3 3L22 4"/></svg>Données du combi</div>
+        <div class="dg2">
+          <div class="ds"><div class="ds-val">4.18</div><div class="ds-lbl">Cote combinée</div></div>
+          <div class="ds"><div class="ds-val">20€</div><div class="ds-lbl">Mise</div></div>
+        </div>
+        <div class="dr"><span class="dr-lbl">Gain potentiel</span><span class="dr-val" style="color:var(--green)">+63.60€</span></div>
+        <div class="dr"><span class="dr-lbl">EV combi</span><span class="dr-val" style="color:var(--green)">+4.2%</span></div>
+        <div class="dr"><span class="dr-lbl">Bookmaker</span><span class="dr-val">Unibet</span></div>
+        <div class="dr"><span class="dr-lbl">Stratégie mise</span><span class="dr-val">½ Kelly</span></div>
+      </div>
+
+      <div class="dbloc">
+        <div class="dbloc-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>Sélections (3)</div>
+        <div class="combi-list">
+
+          <div class="combi-sel won">
+            <div class="cs-top">
+              <div>
+                <div class="cs-match">Sinner vs Fritz</div>
+                <div class="cs-issue">Victoire Dom · Sinner</div>
+              </div>
+              <span class="cs-res cs-res-won">✓ Gagné</span>
+            </div>
+            <div class="cs-meta">
+              <span>🎾 ATP · Indian Wells R4</span>
+              <span class="cs-cote">@ 1.65</span>
+              <span style="color:var(--green);font-family:'JetBrains Mono',monospace;font-size:10.5px">Edge +5.8%</span>
+            </div>
+          </div>
+
+          <div class="combi-sel won">
+            <div class="cs-top">
+              <div>
+                <div class="cs-match">Bayern vs Dortmund</div>
+                <div class="cs-issue">Victoire Dom · Bayern</div>
+              </div>
+              <span class="cs-res cs-res-won">✓ Gagné</span>
+            </div>
+            <div class="cs-meta">
+              <span>⚽ Bundesliga · J27</span>
+              <span class="cs-cote">@ 1.58</span>
+              <span style="color:var(--green);font-family:'JetBrains Mono',monospace;font-size:10.5px">Edge +4.1%</span>
+            </div>
+          </div>
+
+          <div class="combi-sel won">
+            <div class="cs-top">
+              <div>
+                <div class="cs-match">Zverev vs Rune</div>
+                <div class="cs-issue">Victoire Dom · Zverev</div>
+              </div>
+              <span class="cs-res cs-res-won">✓ Gagné</span>
+            </div>
+            <div class="cs-meta">
+              <span>🎾 ATP · Indian Wells R3</span>
+              <span class="cs-cote">@ 1.60</span>
+              <span style="color:var(--green);font-family:'JetBrains Mono',monospace;font-size:10.5px">Edge +6.2%</span>
+            </div>
+          </div>
+
+          <div class="combi-total">
+            <span class="ct-lbl">Cote totale</span>
+            <span class="ct-val">1.65 × 1.58 × 1.60 = <strong style="color:var(--accent)">4.18</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="dbloc">
+        <div class="dbloc-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Résultat & CLV</div>
+        <div class="res-box rb-won">
+          <div>
+            <div class="rb-lbl" style="color:var(--green)">✓ Combi Gagné — 3/3</div>
+            <div style="font-size:11px;color:var(--green);margin-top:2px;opacity:.7">Toutes les sélections validées</div>
+          </div>
+          <div class="rb-val" style="color:var(--green)">+63.60€</div>
+        </div>
+        <div class="dg3">
+          <div class="ds"><div class="ds-val" style="color:var(--green)">+318%</div><div class="ds-lbl">ROI combi</div></div>
+          <div class="ds"><div class="ds-val" style="color:var(--green)">+2.4%</div><div class="ds-lbl">CLV moyen</div></div>
+          <div class="ds"><div class="ds-val">+200%</div><div class="ds-lbl">EV réel/att.</div></div>
+        </div>
+      </div>
+
+      <div class="dbloc">
+        <div class="dbloc-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Origine</div>
+        <div class="dr"><span class="dr-lbl">Campagne</span><span class="dr-val" style="color:var(--accent);cursor:pointer">ATP Masters →</span></div>
+        <div class="dr"><span class="dr-lbl">Bankroll</span><span class="dr-val">Campagne ATP Masters</span></div>
+        <div class="dr"><span class="dr-lbl">Généré le</span><span class="dr-val">08/03 · 08:04</span></div>
+        <div class="dr"><span class="dr-lbl">Placé le</span><span class="dr-val">08/03 · 08:51</span></div>
+        <div style="margin-top:10px">
+          <div style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:5px">Note personnelle</div>
+          <textarea class="note-area" placeholder="Ajouter une note…">Les 3 favoris bien sélectionnés par l'algo — beau combi.</textarea>
+          <div style="font-size:10px;color:var(--muted2);margin-top:3px">Sauvegardé automatiquement</div>
+        </div>
+      </div>`,
+    act: `<div class="da-row"><button class="btn-share">🤝 Partager ce combi</button></div>
+          <button class="btn-camp">→ Voir la campagne ATP Masters</button>`
+  },
+
+  /* —— COMBI PROPOSÉ —— */
+  combi_prop: {
+    nav: 'Ticket 4 / 48',
+    sport: '⚽ Bundesliga · 2 sélections',
+    match: 'Combi à 2',
+    badges: `<span class="st st-prop"><span class="st-dot"></span>Proposé</span> <span class="tag t-algo">ALGO</span> <span class="tag t-combi">COMBI</span> <span style="font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;font-weight:600">⏱ 1h 48</span>`,
+    body: `
+      <div class="dbloc">
+        <div class="dbloc-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 11l3 3L22 4"/></svg>Données du combi</div>
+        <div class="dg2">
+          <div class="ds"><div class="ds-val">2.49</div><div class="ds-lbl">Cote combinée</div></div>
+          <div class="ds"><div class="ds-val">20€</div><div class="ds-lbl">Mise calculée</div></div>
+        </div>
+        <div class="dr"><span class="dr-lbl">Gain potentiel</span><span class="dr-val" style="color:var(--green)">+29.80€</span></div>
+        <div class="dr"><span class="dr-lbl">EV combi</span><span class="dr-val" style="color:var(--green)">+5.1%</span></div>
+        <div class="dr"><span class="dr-lbl">Bookmaker suggéré</span><span class="dr-val">Pinnacle</span></div>
+        <div class="dr"><span class="dr-lbl">Stratégie mise</span><span class="dr-val">½ Kelly</span></div>
+      </div>
+
+      <div class="dbloc">
+        <div class="dbloc-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>Sélections (2)</div>
+        <div class="combi-list">
+
+          <div class="combi-sel pending">
+            <div class="cs-top">
+              <div>
+                <div class="cs-match">Bayern vs Dortmund</div>
+                <div class="cs-issue">Victoire Dom · Bayern</div>
+              </div>
+              <span class="cs-res cs-res-pend">En attente</span>
+            </div>
+            <div class="cs-meta">
+              <span>⚽ Bundesliga · J27 · 18:30</span>
+              <span class="cs-cote">@ 1.58</span>
+              <span style="color:var(--green);font-family:'JetBrains Mono',monospace;font-size:10.5px">Edge +4.8%</span>
+            </div>
+          </div>
+
+          <div class="combi-sel pending">
+            <div class="cs-top">
+              <div>
+                <div class="cs-match">Leverkusen vs Stuttgart</div>
+                <div class="cs-issue">Victoire Dom · Leverkusen</div>
+              </div>
+              <span class="cs-res cs-res-pend">En attente</span>
+            </div>
+            <div class="cs-meta">
+              <span>⚽ Bundesliga · J27 · 20:30</span>
+              <span class="cs-cote">@ 1.57</span>
+              <span style="color:var(--green);font-family:'JetBrains Mono',monospace;font-size:10.5px">Edge +5.4%</span>
+            </div>
+          </div>
+
+          <div class="combi-total">
+            <span class="ct-lbl">Cote totale</span>
+            <span class="ct-val">1.58 × 1.57 = <strong style="color:var(--accent)">2.49</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="dbloc">
+        <div class="dbloc-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Origine</div>
+        <div class="dr"><span class="dr-lbl">Campagne</span><span class="dr-val" style="color:var(--accent);cursor:pointer">Bundesliga Dom. →</span></div>
+        <div class="dr"><span class="dr-lbl">Bankroll</span><span class="dr-val">Campagne Bundesliga Dom.</span></div>
+        <div class="dr"><span class="dr-lbl">Généré le</span><span class="dr-val">10/03 · 08:05</span></div>
+        <div style="margin-top:10px">
+          <div style="font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:5px">Note personnelle</div>
+          <textarea class="note-area" placeholder="Ajouter une note avant de valider…"></textarea>
+        </div>
+      </div>`,
+    act: `
+      <div class="da-row">
+        <button class="btn-p green">✓ Valider — Placer sur Pinnacle</button>
+      </div>
+      <div class="da-row">
+        <button class="btn-g">✏️ Modifier la mise</button>
+        <button class="btn-g red">✕ Ignorer</button>
+      </div>
+      <button class="btn-camp">→ Voir la campagne Bundesliga Dom.</button>`
+  }
+};
+
+let current = 'simple_won';
+
+function open(key, btn) {
+  current = key;
+  const t = T[key];
+  document.getElementById('d-nav-info').textContent = t.nav;
+  document.getElementById('d-sport').textContent = t.sport;
+  document.getElementById('d-match').textContent = t.match;
+  document.getElementById('d-badges').innerHTML = t.badges;
+  document.getElementById('d-body').innerHTML = t.body;
+  document.getElementById('d-act').innerHTML = t.act;
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('page-wrap').classList.add('dimmed');
+  document.querySelectorAll('.demo-btn').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('.row-btn').forEach(b => { b.classList.remove('on'); b.textContent = 'Détail'; });
+  if (btn) btn.classList.add('on');
+  // highlight row
+  const rows = document.querySelectorAll('tbody tr');
+  const idx = ['simple_won','simple_prop','combi_won','combi_prop'].indexOf(key);
+  rows.forEach((r,i) => { r.classList.toggle('hl', i === idx); });
+  if (idx >= 0 && rows[idx]) rows[idx].querySelector('.row-btn').textContent = 'Détail →';
+}
+
+function close() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('page-wrap').classList.remove('dimmed');
+  document.querySelectorAll('.demo-btn').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('tbody tr').forEach(r => r.classList.remove('hl'));
+  document.querySelectorAll('.row-btn').forEach(b => { b.classList.remove('on'); b.textContent = 'Détail'; });
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+// default
+open('simple_won', document.querySelectorAll('.demo-btn')[0]);
+</script>
+</body>
+</html>

@@ -8,6 +8,8 @@ interface User {
   is_active: boolean;
   trial_ends_at: string | null;
   created_at: string;
+  onboarding_completed: boolean;
+  visited_modules: string[];
 }
 
 interface AuthState {

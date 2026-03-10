@@ -22,7 +22,7 @@ FOOTBALL_LEAGUES = {
 
 FOOTBALL_SEASONS = ["2021", "2122", "2223", "2324", "2425"]
 
-FOOTBALL_DATA_BASE_URL = "https://www.football-data.co.uk/mmz4281"
+FOOTBALL_DATA_BASE_URL = "https://www.football-data.co.uk/mmz4281"  # canonical: also in config.py
 
 # Column mapping: CSV column name -> DB column name
 FOOTBALL_COLUMN_MAP = {

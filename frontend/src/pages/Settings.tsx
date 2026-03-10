@@ -19,6 +19,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { changePassword, getUserStats, deleteAccount as apiDeleteAccount } from "@/services/api";
 import { Toggle } from "@/components/ui";
 import type { UserStats } from "@/types";
+import { useTour } from "@/hooks/useTour";
+import SpotlightTour from "@/components/SpotlightTour";
+import { settingsTour } from "@/tours/index";
 
 /* ── Design tokens ── */
 const C = {
@@ -106,6 +109,7 @@ export default function Settings() {
   const { user, updateProfile, logout } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("compte");
+  const { showTour, completeTour } = useTour("settings");
 
   // Profile
   const [displayName, setDisplayName] = useState(user?.display_name || "");
@@ -225,7 +229,7 @@ export default function Settings() {
 
       <div className="grid gap-4" style={{ gridTemplateColumns: "252px 1fr" }}>
         {/* ── LEFT: Avatar Card ── */}
-        <div className="bg-white border border-[#e3e6eb] rounded-xl shadow-sm overflow-hidden animate-fade-up">
+        <div data-tour="profile-card" className="bg-white border border-[#e3e6eb] rounded-xl shadow-sm overflow-hidden animate-fade-up">
           <div className="p-5 flex flex-col items-center text-center">
             {/* Avatar */}
             <div className="relative w-20 h-20 mb-3.5">
@@ -279,19 +283,28 @@ export default function Settings() {
         <div className="bg-white border border-[#e3e6eb] rounded-xl shadow-sm overflow-hidden animate-fade-up" style={{ animationDelay: "0.05s" }}>
           {/* Tab bar */}
           <div className="flex border-b border-[#e3e6eb] px-1.5">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`px-4 py-3.5 text-[13px] font-medium cursor-pointer border-b-2 -mb-px transition-all whitespace-nowrap bg-transparent border-x-0 border-t-0 ${
-                  tab === t.id
-                    ? "text-[#3b5bdb] border-b-[#3b5bdb] font-semibold"
-                    : "text-[#8a919e] border-b-transparent hover:text-[#3c4149]"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
+            {TABS.map((t) => {
+              const tourMap: Record<string, string> = {
+                compte: "tab-account",
+                securite: "tab-security",
+                plan: "tab-plan",
+                danger: "tab-privacy",
+              };
+              return (
+                <button
+                  key={t.id}
+                  data-tour={tourMap[t.id]}
+                  onClick={() => setTab(t.id)}
+                  className={`px-4 py-3.5 text-[13px] font-medium cursor-pointer border-b-2 -mb-px transition-all whitespace-nowrap bg-transparent border-x-0 border-t-0 ${
+                    tab === t.id
+                      ? "text-[#3b5bdb] border-b-[#3b5bdb] font-semibold"
+                      : "text-[#8a919e] border-b-transparent hover:text-[#3c4149]"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* ── Tab: Compte ── */}
@@ -681,6 +694,7 @@ export default function Settings() {
           )}
         </div>
       </div>
+      {showTour && <SpotlightTour steps={settingsTour} onComplete={completeTour} />}
     </div>
   );
 }

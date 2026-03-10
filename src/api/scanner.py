@@ -1,17 +1,21 @@
 """Scanner API endpoints for value bet detection."""
 
+import logging
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+logger = logging.getLogger(__name__)
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from src.api.deps import require_tier
 from src.api.schemas import (
     AIResearchResponse,
     AIScanMatch,
     AIScanResponse,
 )
 
-router = APIRouter(tags=["scanner"])
+router = APIRouter(tags=["scanner"], dependencies=[Depends(require_tier("pro"))])
 
 # --- V6 model lazy loader ---
 _V6_MODEL = None
@@ -575,9 +579,10 @@ async def ai_research(
     )
 
     if "_error" in result:
+        logger.error("Claude research error: %s", result["_error"])
         raise HTTPException(
             status_code=502,
-            detail=f"Claude research failed: {result['_error']}",
+            detail="Service de recherche temporairement indisponible",
         )
 
     duration = result.get("_duration_seconds", 0.0)

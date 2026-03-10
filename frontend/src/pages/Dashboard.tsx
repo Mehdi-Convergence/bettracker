@@ -13,6 +13,9 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTour } from "@/hooks/useTour";
+import SpotlightTour from "@/components/SpotlightTour";
+import { dashboardTour } from "@/tours/index";
 import {
   getPortfolioStats,
   getPortfolioHistory,
@@ -88,6 +91,7 @@ function groupBets(bets: Bet[]): BetGroup[] {
    ══════════════════════════════════════════════ */
 export default function Dashboard() {
   const { user } = useAuth();
+  const { showTour, completeTour } = useTour("dashboard");
   const firstName = user?.display_name?.split(" ")[0] || "Bettor";
 
   const [period, setPeriod] = useState<string>("30d");
@@ -148,7 +152,7 @@ export default function Dashboard() {
           <h1 className="text-[20px] font-extrabold tracking-tight text-[#111318]">Bonjour, {firstName}</h1>
           <p className="text-[12.5px] text-[#8a919e] mt-0.5">Voici un aperçu de vos performances · Semaine {getWeekNumber()}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" data-tour="period-selector">
           <div className="flex gap-1 bg-[#f4f5f7] border border-[#e3e6eb] rounded-[9px] p-[3px]">
             {PERIODS.filter((p) => p.key !== "custom").map((p) => (
               <button key={p.key} onClick={() => { setPeriod(p.key); setShowCustom(false); }}
@@ -174,7 +178,7 @@ export default function Dashboard() {
 
       {/* ── BANNER ── */}
       {campaignSummaries.filter((c) => c.total_bets > 0).length > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 rounded-[10px]" style={{ background: "linear-gradient(90deg, rgba(59,91,219,0.06), rgba(59,91,219,0.02))", border: "1px solid rgba(59,91,219,0.18)" }}>
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-[10px]" data-tour="campaign-banner" style={{ background: "linear-gradient(90deg, rgba(59,91,219,0.06), rgba(59,91,219,0.02))", border: "1px solid rgba(59,91,219,0.18)" }}>
           <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(59,91,219,0.07)" }}><Flag size={14} className="text-[#3b5bdb]" /></div>
           <div className="flex-1 text-[12.5px]">
             {campaignSummaries.filter((c) => c.total_bets > 0).map((c, i) => (
@@ -194,10 +198,10 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="grid grid-cols-4 gap-3">
-          <KPICard label="ROI global" value={`${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`} valueColor={roi >= 0 ? "#12b76a" : "#f04438"} icon={<TrendingUp size={14} />} iconBg={roi >= 0 ? "rgba(18,183,106,0.08)" : "rgba(240,68,56,0.07)"} iconColor={roi >= 0 ? "#12b76a" : "#f04438"} delta={roiDelta != null ? `${roiDelta >= 0 ? "+" : ""}${roiDelta.toFixed(1)}% vs mois dernier` : undefined} deltaUp={roiDelta != null ? roiDelta >= 0 : undefined} />
-          <KPICard label="Mise totale" value={`${totalStaked.toLocaleString("fr-FR")}€`} icon={<DollarSign size={14} />} iconBg="rgba(59,91,219,0.07)" iconColor="#3b5bdb" delta={stakedDelta != null ? `${stakedDelta >= 0 ? "+" : ""}${Math.round(stakedDelta)}€ vs mois dernier` : undefined} deltaUp={stakedDelta != null ? stakedDelta >= 0 : undefined} />
-          <KPICard label="Tickets ce mois" value={`${totalBets}`} icon={<CheckSquare size={14} />} iconBg="rgba(247,144,9,0.08)" iconColor="#f79009" delta={pendingBets > 0 ? `dont ${pendingBets} en attente` : undefined} />
-          <KPICard label="Taux de réussite" value={`${winRate.toFixed(1)}%`} valueColor={winRate >= 50 ? "#12b76a" : "#f04438"} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>} iconBg="rgba(18,183,106,0.08)" iconColor="#12b76a" delta={winRateDelta != null ? `${winRateDelta >= 0 ? "+" : ""}${winRateDelta.toFixed(1)}% vs mois dernier` : undefined} deltaUp={winRateDelta != null ? winRateDelta >= 0 : undefined} />
+          <KPICard dataTour="kpi-roi" label="ROI global" value={`${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`} valueColor={roi >= 0 ? "#12b76a" : "#f04438"} icon={<TrendingUp size={14} />} iconBg={roi >= 0 ? "rgba(18,183,106,0.08)" : "rgba(240,68,56,0.07)"} iconColor={roi >= 0 ? "#12b76a" : "#f04438"} delta={roiDelta != null ? `${roiDelta >= 0 ? "+" : ""}${roiDelta.toFixed(1)}% vs mois dernier` : undefined} deltaUp={roiDelta != null ? roiDelta >= 0 : undefined} />
+          <KPICard dataTour="kpi-staked" label="Mise totale" value={`${totalStaked.toLocaleString("fr-FR")}€`} icon={<DollarSign size={14} />} iconBg="rgba(59,91,219,0.07)" iconColor="#3b5bdb" delta={stakedDelta != null ? `${stakedDelta >= 0 ? "+" : ""}${Math.round(stakedDelta)}€ vs mois dernier` : undefined} deltaUp={stakedDelta != null ? stakedDelta >= 0 : undefined} />
+          <KPICard dataTour="kpi-tickets" label="Tickets ce mois" value={`${totalBets}`} icon={<CheckSquare size={14} />} iconBg="rgba(247,144,9,0.08)" iconColor="#f79009" delta={pendingBets > 0 ? `dont ${pendingBets} en attente` : undefined} />
+          <KPICard dataTour="kpi-winrate" label="Taux de réussite" value={`${winRate.toFixed(1)}%`} valueColor={winRate >= 50 ? "#12b76a" : "#f04438"} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>} iconBg="rgba(18,183,106,0.08)" iconColor="#12b76a" delta={winRateDelta != null ? `${winRateDelta >= 0 ? "+" : ""}${winRateDelta.toFixed(1)}% vs mois dernier` : undefined} deltaUp={winRateDelta != null ? winRateDelta >= 0 : undefined} />
         </div>
       )}
 
@@ -208,7 +212,7 @@ export default function Dashboard() {
           {/* ROW 1: ROI chart + P&L résumé side by side */}
           <div className="grid grid-cols-2 gap-3 flex-1">
             {/* ROI Chart */}
-            <div className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col">
+            <div data-tour="roi-chart" className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col">
               <div className="flex items-center px-4 py-2.5 border-b border-[#e3e6eb]">
                 <div className="flex items-center gap-2 text-[13px] font-bold text-[#111318]">
                   <TrendingUp size={13} className="text-[#3b5bdb]" /> Évolution ROI
@@ -220,7 +224,7 @@ export default function Dashboard() {
             </div>
 
             {/* P&L Résumé */}
-            <div className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col">
+            <div data-tour="pnl-card" className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col">
               <div className="flex items-center px-4 py-2.5 border-b border-[#e3e6eb]">
                 <div className="flex items-center gap-2 text-[13px] font-bold text-[#111318]">
                   <DollarSign size={13} className="text-[#3b5bdb]" /> P&L Cumulé
@@ -245,7 +249,7 @@ export default function Dashboard() {
           {/* ROW 2: 2 cards side by side, pushed to bottom */}
           <div className="grid grid-cols-2 gap-3">
             {/* Sport + Donut merged */}
-            <div className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col">
+            <div data-tour="sport-breakdown" className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col">
               <div className="px-4 py-2.5 border-b border-[#e3e6eb] shrink-0">
                 <div className="flex items-center gap-2 text-[13px] font-bold text-[#111318]">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>
@@ -280,7 +284,7 @@ export default function Dashboard() {
         </div>
 
         {/* RIGHT column: Tickets récents */}
-        <div className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col min-h-0">
+        <div data-tour="recent-bets" className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col min-h-0">
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#e3e6eb] shrink-0">
             <div className="flex items-center gap-2 text-[13px] font-bold text-[#111318]">
               <CheckSquare size={13} className="text-[#3b5bdb]" /> Tickets récents
@@ -296,6 +300,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {showTour && <SpotlightTour steps={dashboardTour} onComplete={completeTour} />}
     </div>
   );
 }
@@ -304,11 +310,11 @@ export default function Dashboard() {
    SUB-COMPONENTS
    ══════════════════════════════════════════════ */
 
-function KPICard({ label, value, valueColor, icon, iconBg, iconColor, delta, deltaUp }: {
-  label: string; value: string; valueColor?: string; icon: React.ReactNode; iconBg: string; iconColor: string; delta?: string; deltaUp?: boolean;
+function KPICard({ label, value, valueColor, icon, iconBg, iconColor, delta, deltaUp, dataTour }: {
+  label: string; value: string; valueColor?: string; icon: React.ReactNode; iconBg: string; iconColor: string; delta?: string; deltaUp?: boolean; dataTour?: string;
 }) {
   return (
-    <div className="bg-white border border-[#e3e6eb] rounded-xl p-[14px_16px] shadow-[0_1px_3px_rgba(16,24,40,0.06)] hover:shadow-[0_4px_16px_rgba(16,24,40,0.08)] transition-shadow flex flex-col items-center text-center gap-1">
+    <div data-tour={dataTour} className="bg-white border border-[#e3e6eb] rounded-xl p-[14px_16px] shadow-[0_1px_3px_rgba(16,24,40,0.06)] hover:shadow-[0_4px_16px_rgba(16,24,40,0.08)] transition-shadow flex flex-col items-center text-center gap-1">
       <div className="w-[28px] h-[28px] rounded-lg flex items-center justify-center" style={{ background: iconBg, color: iconColor }}>{icon}</div>
       <span className="text-[10px] font-medium text-[#8a919e] uppercase tracking-wide">{label}</span>
       <div className="text-[26px] font-extrabold tracking-tight leading-none" style={{ color: valueColor || "#111318" }}>{value}</div>

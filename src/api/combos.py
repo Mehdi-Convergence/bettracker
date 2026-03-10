@@ -1,7 +1,8 @@
 """Combo bet generation and simulation endpoints."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from src.api.deps import require_tier
 from src.api.schemas import (
     ComboGenerateRequest,
     ComboResponse,
@@ -11,7 +12,7 @@ from src.api.schemas import (
 )
 from src.ml.combo_engine import ComboEngine, ComboLeg
 
-router = APIRouter(tags=["combos"])
+router = APIRouter(tags=["combos"], dependencies=[Depends(require_tier("premium"))])
 
 
 @router.post("/combos/generate", response_model=list[ComboResponse])

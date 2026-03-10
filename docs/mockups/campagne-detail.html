@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BetTracker — Détail Campagne</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f5f7;--white:#fff;--surface2:#f4f5f7;--surface3:#eef0f3;
+  --border:#e3e6eb;--border2:#cdd1d9;
+  --text:#111318;--text2:#3c4149;--muted:#8a919e;--muted2:#b0b7c3;
+  --sb:#1e2535;--sb-border:rgba(255,255,255,.07);
+  --sb-text:rgba(255,255,255,.48);--sb-text2:rgba(255,255,255,.82);
+  --sb-hover:rgba(255,255,255,.05);--sb-active:rgba(255,255,255,.09);
+  --accent:#3b5bdb;--accent-bg:rgba(59,91,219,.07);--accent-bd:rgba(59,91,219,.18);
+  --green:#12b76a;--green-bg:rgba(18,183,106,.08);--green-bd:rgba(18,183,106,.2);
+  --red:#f04438;--red-bg:rgba(240,68,56,.07);--red-bd:rgba(240,68,56,.2);
+  --amber:#f79009;--amber-bg:rgba(247,144,9,.08);--amber-bd:rgba(247,144,9,.2);
+  --purple:#7c3aed;--purple-bg:rgba(124,58,237,.07);--purple-bd:rgba(124,58,237,.2);
+  --radius:12px;
+  --sh-sm:0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04);
+  --sh:0 4px 16px rgba(16,24,40,.08);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+.app{display:flex;height:100vh}
+
+/* SIDEBAR */
+.sidebar{width:228px;min-width:228px;background:var(--sb);display:flex;flex-direction:column;z-index:10}
+.sb-logo{height:56px;padding:0 18px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--sb-border)}
+.logo-mark{width:28px;height:28px;background:#4f8cff;border-radius:7px;display:flex;align-items:center;justify-content:center}
+.logo-text{font-weight:800;font-size:15px;letter-spacing:-.03em;color:#fff}
+.logo-text em{color:#7eb8ff;font-style:normal}
+.sb-nav{flex:1;padding:10px 8px;display:flex;flex-direction:column;gap:1px}
+.sb-label{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.2);padding:10px 10px 5px}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13.5px;font-weight:400;color:var(--sb-text);transition:all .12s}
+.ni:hover{background:var(--sb-hover);color:var(--sb-text2)}
+.ni.on{background:var(--sb-active);color:#fff;font-weight:600}
+.nic{width:16px;height:16px;flex-shrink:0;opacity:.45}
+.ni:hover .nic,.ni.on .nic{opacity:1}
+.nbadge{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 6px;border-radius:20px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.7)}
+.nbadge.amb{background:rgba(247,144,9,.2);color:#fbb040}
+.ndiv{height:1px;background:var(--sb-border);margin:6px 8px}
+.ni.ai{background:rgba(79,140,255,.12);color:#7eb8ff;font-weight:600;border:1px solid rgba(79,140,255,.18)}
+.ni.out{color:rgba(240,68,56,.65)!important}
+.ni.out:hover{background:rgba(240,68,56,.08);color:#f04438!important}
+.sb-bottom{border-top:1px solid var(--sb-border);padding:8px}
+.uchip{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;cursor:pointer}
+.ucav{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#4f8cff,#a78bfa);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.ucname{font-size:13px;font-weight:600;color:rgba(255,255,255,.82)}
+.ucplan{font-size:10.5px;color:#7eb8ff;font-family:'JetBrains Mono',monospace;text-transform:uppercase}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:56px;min-height:56px;border-bottom:1px solid var(--border);background:var(--white);display:flex;align-items:center;padding:0 24px;gap:10px}
+.bc{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.bcs{color:var(--muted2)}
+.bc-link{color:var(--accent);cursor:pointer;font-weight:500}
+.bc-link:hover{text-decoration:underline}
+.bcc{color:var(--text);font-weight:600}
+.tbr{margin-left:auto;display:flex;gap:8px}
+
+/* CONTENT */
+.content{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
+@keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* BUTTONS */
+.btn-p{padding:8px 15px;border-radius:9px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;display:inline-flex;align-items:center;gap:6px;transition:all .15s}
+.btn-p:hover{background:#2f4ac7}
+.btn-g{padding:7px 13px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--text2);font-size:12.5px;font-weight:500;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .12s;display:inline-flex;align-items:center;gap:6px}
+.btn-g:hover{border-color:var(--border2);background:var(--surface2)}
+.btn-amber{padding:7px 13px;border-radius:8px;border:1px solid var(--amber-bd);background:var(--amber-bg);color:var(--amber);font-size:12.5px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .12s;display:inline-flex;align-items:center;gap:6px}
+
+/* CAMPAIGN HEADER */
+.camp-header{background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--sh-sm);animation:fu .3s ease both}
+.ch-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.ch-left{display:flex;align-items:center;gap:12px}
+.ch-icon{width:44px;height:44px;border-radius:11px;background:#e3f2fd;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.ch-name{font-size:19px;font-weight:800;letter-spacing:-.03em;margin-bottom:4px}
+.ch-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ch-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+
+/* Status badge */
+.cbadge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:600;font-family:'JetBrains Mono',monospace}
+.cb-on{background:var(--green-bg);color:var(--green)}
+.cb-pause{background:var(--amber-bg);color:var(--amber)}
+.cb-stop{background:var(--red-bg);color:var(--red)}
+.cb-off{background:rgba(138,145,158,.1);color:var(--muted)}
+.cbadge-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.cb-on .cbadge-dot{animation:pulse 2s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.mode-badge{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:4px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-bd)}
+
+/* Progress */
+.ch-prog{display:flex;align-items:center;gap:12px}
+.prog-track{flex:1;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;border:1px solid var(--border)}
+.prog-fill{height:100%;border-radius:3px;background:var(--accent)}
+.prog-meta{font-size:11.5px;color:var(--muted);font-family:'JetBrains Mono',monospace;white-space:nowrap}
+
+/* menu dropdown */
+.rel{position:relative}
+.dropdown{position:absolute;top:calc(100%+4px);right:0;background:var(--white);border:1px solid var(--border);border-radius:10px;box-shadow:var(--sh);padding:6px;z-index:100;min-width:160px;display:none}
+.dropdown.open{display:block}
+.ddi{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;font-size:13px;cursor:pointer;color:var(--text2);transition:background .1s}
+.ddi:hover{background:var(--surface2)}
+.ddi.danger{color:var(--red)}
+.ddi.danger:hover{background:var(--red-bg)}
+.ddi svg{width:14px;height:14px;color:var(--muted)}
+.ddi.danger svg{color:var(--red)}
+.ddsep{height:1px;background:var(--border);margin:4px 0}
+
+/* KPI STRIP */
+.kpi-strip{display:grid;grid-template-columns:repeat(8,1fr);gap:10px;animation:fu .3s ease both;animation-delay:.04s}
+.kpi{background:var(--white);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;box-shadow:var(--sh-sm)}
+.kpi-label{font-size:10px;color:var(--muted);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-val{font-size:16px;font-weight:800;letter-spacing:-.02em;font-family:'JetBrains Mono',monospace}
+.kpi-sub{font-size:10px;color:var(--muted2);margin-top:2px}
+
+/* BODY SPLIT */
+.body-split{display:grid;grid-template-columns:1fr 1.4fr;gap:14px;animation:fu .3s ease both;animation-delay:.08s}
+
+/* PERFORMANCE PANEL */
+.perf-panel{display:flex;flex-direction:column;gap:12px}
+.card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--sh-sm);overflow:hidden}
+.card-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px;color:var(--text)}
+.card-title svg{width:14px;height:14px;color:var(--accent)}
+.card-body{padding:14px 16px}
+
+/* Courbe */
+.chart-wrap{position:relative;height:90px;width:100%}
+.chart-svg{width:100%;height:100%}
+.period-tabs{display:flex;gap:3px;background:var(--surface2);border-radius:6px;padding:3px}
+.pt{padding:3px 9px;border-radius:5px;font-size:11px;font-weight:500;cursor:pointer;color:var(--muted);transition:all .12s}
+.pt.on{background:var(--white);color:var(--text);font-weight:600;box-shadow:var(--sh-sm)}
+
+/* Algo vs Manuel */
+.avs-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.avs-block{padding:10px 12px;border-radius:9px;border:1.5px solid var(--border)}
+.avs-block.algo{border-color:var(--accent-bd);background:var(--accent-bg)}
+.avs-block.manual{border-color:var(--purple-bd);background:var(--purple-bg)}
+.avs-tag{font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;margin-bottom:8px;display:inline-block}
+.avs-tag.algo{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-bd)}
+.avs-tag.manual{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-bd)}
+.avs-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid rgba(0,0,0,.05)}
+.avs-row:last-child{border-bottom:none}
+.avs-label{color:var(--muted)}
+.avs-val{font-weight:700;font-family:'JetBrains Mono',monospace;font-size:11.5px}
+
+/* Repartition donut */
+.dist-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)}
+.dist-row:last-child{border-bottom:none}
+.dist-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dist-label{font-size:12.5px;flex:1;color:var(--text2)}
+.dist-count{font-size:12px;font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--text2)}
+.dist-bar-wrap{width:80px;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.dist-bar{height:100%;border-radius:3px}
+
+/* Regles arret */
+.rule-row{padding:10px 0;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:5px}
+.rule-row:last-child{border-bottom:none}
+.rule-top{display:flex;align-items:center;justify-content:space-between}
+.rule-name{font-size:12.5px;font-weight:500;color:var(--text2)}
+.rule-state{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:4px;font-family:'JetBrains Mono',monospace}
+.rs-ok{background:var(--green-bg);color:var(--green)}
+.rs-warn{background:var(--amber-bg);color:var(--amber)}
+.rs-hit{background:var(--red-bg);color:var(--red)}
+.rule-vals{display:flex;gap:10px;font-size:11.5px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.rule-val-cur{color:var(--text2);font-weight:600}
+.rule-prog{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-top:2px}
+.rule-prog-fill{height:100%;border-radius:2px;transition:width .4s}
+
+/* TICKETS PANEL */
+.tickets-panel{display:flex;flex-direction:column;gap:0}
+.tp-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--white)}
+.tp-tabs{display:flex;gap:3px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:3px}
+.tpt{padding:5px 12px;border-radius:6px;font-size:12.5px;font-weight:500;cursor:pointer;color:var(--muted);transition:all .12s;display:flex;align-items:center;gap:5px}
+.tpt.on{background:var(--white);color:var(--text);font-weight:600;box-shadow:var(--sh-sm)}
+.tpt svg{width:12px;height:12px}
+.tp-filters{padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.filter-pills{display:flex;gap:3px;background:var(--white);border:1px solid var(--border);border-radius:7px;padding:3px}
+.fp{padding:3px 9px;border-radius:5px;font-size:11.5px;font-weight:500;color:var(--muted);cursor:pointer;transition:all .12s}
+.fp.on{background:var(--accent);color:#fff;font-weight:600}
+.fsel{padding:6px 10px;border:1px solid var(--border);border-radius:7px;background:var(--white);font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:var(--text2);outline:none}
+
+/* Kanban tickets */
+.tp-kanban{padding:12px 14px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;min-height:200px}
+.kb-col{background:var(--surface2);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--border)}
+.kb-col-head{display:flex;align-items:center;justify-content:space-between;padding:4px 4px 8px;border-bottom:1px solid var(--border);margin-bottom:2px}
+.kb-col-title{font-size:11px;font-weight:700;color:var(--text2);display:flex;align-items:center;gap:5px}
+.kb-cnt{font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;font-family:'JetBrains Mono',monospace}
+.kbc{background:var(--white);border:1.5px solid var(--border);border-radius:8px;padding:9px 10px;cursor:pointer;transition:all .12s}
+.kbc:hover{border-color:var(--border2);box-shadow:var(--sh-sm)}
+.kbc.won{border-color:var(--green-bd)}
+.kbc.lost{border-color:var(--red-bd)}
+.kbc.prop{border-color:var(--amber-bd)}
+.kbc.ign{opacity:.5;border-style:dashed}
+.kbc-tag{display:inline-flex;align-items:center;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;font-family:'JetBrains Mono',monospace;margin-bottom:4px}
+.t-algo{background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-bd)}
+.t-manual{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-bd)}
+.t-combi{background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd)}
+.kbc-teams{font-size:12px;font-weight:700;line-height:1.3;margin-bottom:2px}
+.kbc-meta{font-size:10px;color:var(--muted);margin-bottom:5px}
+.kbc-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.kbc-issue{font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:3px;background:var(--accent-bg);color:var(--accent)}
+.kbc-cote{font-size:13px;font-weight:800;font-family:'JetBrains Mono',monospace}
+.kbc-edge{font-size:10px;font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--green)}
+.kbc-gain{font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:700;margin-top:4px}
+.kbc-gain.p{color:var(--green)}
+.kbc-gain.n{color:var(--red)}
+.kbc-clv{font-size:10px;padding:1px 5px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-weight:600}
+.clv-p{background:var(--green-bg);color:var(--green)}
+.clv-n{background:var(--red-bg);color:var(--red)}
+.kbc-actions{display:flex;gap:4px;margin-top:7px}
+.ka-v{flex:2;padding:5px;border-radius:5px;border:none;background:var(--green);color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
+.ka-e{flex:1;padding:5px;border-radius:5px;border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:11px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
+.ka-i{flex:1;padding:5px;border-radius:5px;border:1px solid var(--red-bd);background:var(--red-bg);color:var(--red);font-size:11px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif}
+.kb-add-manual{width:100%;padding:7px;border-radius:6px;border:1.5px dashed var(--border2);background:transparent;color:var(--muted);font-size:11px;font-weight:500;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:5px;margin-top:2px}
+.kb-add-manual:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+
+/* List view */
+.tp-list{display:none}
+.tp-list.show{display:block}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead{background:var(--surface2);border-bottom:1.5px solid var(--border)}
+th{padding:8px 12px;text-align:left;font-size:10.5px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;cursor:pointer}
+th:hover{color:var(--text2)}
+td{padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface2)}
+.td-match{font-weight:600}
+.td-mono{font-family:'JetBrains Mono',monospace;font-weight:600}
+.td-gp{font-family:'JetBrains Mono',monospace;font-weight:700}
+.td-gp.p{color:var(--green)}
+.td-gp.n{color:var(--red)}
+.td-muted{color:var(--muted);font-family:'JetBrains Mono',monospace}
+.st{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:10.5px;font-weight:600;font-family:'JetBrains Mono',monospace}
+.st-g{background:var(--green-bg);color:var(--green)}
+.st-p{background:var(--red-bg);color:var(--red)}
+.st-c{background:var(--accent-bg);color:var(--accent)}
+.st-i{background:rgba(138,145,158,.1);color:var(--muted)}
+.st-dot{width:4px;height:4px;border-radius:50%;background:currentColor}
+.st-c .st-dot{animation:pulse 2s ease infinite}
+.row-btn{padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;font-size:11px;cursor:pointer;color:var(--muted);font-family:'Plus Jakarta Sans',sans-serif;transition:all .12s}
+.row-btn:hover{border-color:var(--accent-bd);color:var(--accent);background:var(--accent-bg)}
+
+/* Recap parametres */
+.recap-section{background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--sh-sm);animation:fu .3s ease both;animation-delay:.12s}
+.recap-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.recap-head:hover{background:var(--surface2)}
+.recap-head-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+.recap-head-title svg{width:14px;height:14px;color:var(--muted)}
+.recap-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:16px 18px}
+.rbloc{background:var(--surface2);border-radius:8px;padding:10px 12px}
+.rbloc-title{font-size:10.5px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.rrow{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)}
+.rrow:last-child{border-bottom:none}
+.rlabel{color:var(--muted)}
+.rval{font-weight:600;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--text2)}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <div class="logo-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div class="logo-text">Bet<em>Tracker</em></div>
+    </div>
+    <nav class="sb-nav">
+      <span class="sb-label">Analyse</span>
+      <div class="ni"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</div>
+      <div class="ni"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Scan matchs<span class="nbadge">7</span></div>
+      <span class="sb-label">Paris</span>
+      <div class="ni"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Tickets<span class="nbadge amb">3</span></div>
+      <div class="ni on"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Campagnes</div>
+      <div class="ndiv"></div>
+      <div class="ni ai"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>IA Analyste<span class="nbadge" style="background:rgba(126,184,255,.15);color:#7eb8ff">β</span></div>
+    </nav>
+    <div class="sb-bottom">
+      <div class="ni" style="padding:8px 10px"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 105.63 19.07"/></svg>Paramètres</div>
+      <div class="ni" style="padding:8px 10px"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Mon profil</div>
+      <div class="ni out" style="padding:8px 10px"><svg class="nic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Déconnexion</div>
+      <div class="ndiv"></div>
+      <div class="uchip"><div class="ucav">MQ</div><div><div class="ucname">Mehdi Q.</div><div class="ucplan">Pro · actif</div></div></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="bc">
+        <span class="bc-link">Campagnes</span>
+        <span class="bcs">›</span>
+        <span class="bcc">ATP Masters — Value bets</span>
+      </div>
+      <div class="tbr">
+        <button class="btn-g"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Modifier</button>
+        <button class="btn-amber"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Pause</button>
+        <div class="rel">
+          <button class="btn-g" onclick="toggleMenu()" id="menu-btn" style="padding:7px 10px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
+          </button>
+          <div class="dropdown" id="main-menu">
+            <div class="ddi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Dupliquer</div>
+            <div class="ddi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5" rx="1"/></svg>Archiver</div>
+            <div class="ddsep"></div>
+            <div class="ddi danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>Supprimer</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- HEADER CAMPAGNE -->
+      <div class="camp-header">
+        <div class="ch-top">
+          <div class="ch-left">
+            <div class="ch-icon">🎾</div>
+            <div>
+              <div class="ch-name">ATP Masters — Value bets</div>
+              <div class="ch-badges">
+                <div class="cbadge cb-on"><div class="cbadge-dot"></div>Active</div>
+                <div class="mode-badge">ALGO</div>
+                <span style="font-size:11.5px;color:var(--muted);font-family:'JetBrains Mono',monospace">Tennis ATP · Edge ≥5% · ½ Kelly</span>
+              </div>
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Prochaine génération</div>
+            <div style="font-size:13px;font-weight:700;color:var(--text)">Demain 08:00</div>
+          </div>
+        </div>
+        <div class="ch-prog">
+          <span class="prog-meta">Début 20 Fév</span>
+          <div class="prog-track"><div class="prog-fill" style="width:60%"></div></div>
+          <span class="prog-meta">18 / 30 jours</span>
+          <span class="prog-meta" style="color:var(--accent);font-weight:600">Fin 21 Mars</span>
+        </div>
+      </div>
+
+      <!-- KPI STRIP -->
+      <div class="kpi-strip">
+        <div class="kpi"><div class="kpi-label">ROI</div><div class="kpi-val" style="color:var(--green)">+22.4%</div><div class="kpi-sub">depuis démarrage</div></div>
+        <div class="kpi"><div class="kpi-label">CLV moyen</div><div class="kpi-val" style="color:var(--green)">+3.6%</div><div class="kpi-sub">qualité modèle</div></div>
+        <div class="kpi"><div class="kpi-label">Taux réussite</div><div class="kpi-val">64.3%</div><div class="kpi-sub">9/14 gagnés</div></div>
+        <div class="kpi"><div class="kpi-label">Mise totale</div><div class="kpi-val">640€</div><div class="kpi-sub">14 tickets</div></div>
+        <div class="kpi"><div class="kpi-label">Gain net</div><div class="kpi-val" style="color:var(--green)">+143€</div><div class="kpi-sub">réel</div></div>
+        <div class="kpi"><div class="kpi-label">BK courante</div><div class="kpi-val">543€</div><div class="kpi-sub">sur 500€ init.</div></div>
+        <div class="kpi"><div class="kpi-label">Drawdown max</div><div class="kpi-val" style="color:var(--amber)">−8.2%</div><div class="kpi-sub">−41€</div></div>
+        <div class="kpi"><div class="kpi-label">EV attendu</div><div class="kpi-val">+118€</div><div class="kpi-sub">réel +143€ ✓</div></div>
+      </div>
+
+      <!-- BODY SPLIT -->
+      <div class="body-split">
+
+        <!-- PERFORMANCE -->
+        <div class="perf-panel">
+
+          <!-- Courbe -->
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Courbe bankroll
+              </div>
+              <div class="period-tabs">
+                <div class="pt" onclick="setPeriod(this)">7j</div>
+                <div class="pt on" onclick="setPeriod(this)">14j</div>
+                <div class="pt" onclick="setPeriod(this)">Tout</div>
+              </div>
+            </div>
+            <div class="card-body" style="padding:12px 14px">
+              <div class="chart-wrap">
+                <svg class="chart-svg" viewBox="0 0 400 90" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3b5bdb" stop-opacity=".15"/><stop offset="100%" stop-color="#3b5bdb" stop-opacity="0"/></linearGradient>
+                    <linearGradient id="gm" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7c3aed" stop-opacity=".1"/><stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/></linearGradient>
+                  </defs>
+                  <!-- Algo curve -->
+                  <path d="M0,72 C30,68 50,70 80,62 C110,54 130,58 160,46 C190,34 210,40 240,32 C270,24 290,28 320,18 C350,10 380,14 400,8 L400,90 L0,90Z" fill="url(#ga)"/>
+                  <path d="M0,72 C30,68 50,70 80,62 C110,54 130,58 160,46 C190,34 210,40 240,32 C270,24 290,28 320,18 C350,10 380,14 400,8" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+                  <!-- Manuel curve -->
+                  <path d="M0,78 C40,76 70,74 110,68 C150,62 170,65 210,60 C250,55 280,58 320,52 C355,46 380,48 400,44 L400,90 L0,90Z" fill="url(#gm)"/>
+                  <path d="M0,78 C40,76 70,74 110,68 C150,62 170,65 210,60 C250,55 280,58 320,52 C355,46 380,48 400,44" fill="none" stroke="var(--purple)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="5,3"/>
+                </svg>
+              </div>
+              <div style="display:flex;gap:14px;margin-top:6px">
+                <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)"><div style="width:16px;height:2px;background:var(--accent);border-radius:1px"></div>Algo</div>
+                <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)"><div style="width:16px;height:2px;background:var(--purple);border-radius:1px;border-top:1.5px dashed var(--purple)"></div>Manuel</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Algo vs Manuel -->
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                Algo vs Manuel
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="avs-grid">
+                <div class="avs-block algo">
+                  <span class="avs-tag algo">ALGO</span>
+                  <div class="avs-row"><span class="avs-label">ROI</span><span class="avs-val" style="color:var(--green)">+24.1%</span></div>
+                  <div class="avs-row"><span class="avs-label">Tickets</span><span class="avs-val">12</span></div>
+                  <div class="avs-row"><span class="avs-label">Réussite</span><span class="avs-val">66.7%</span></div>
+                  <div class="avs-row"><span class="avs-label">CLV moy.</span><span class="avs-val" style="color:var(--green)">+3.8%</span></div>
+                  <div class="avs-row"><span class="avs-label">Mise tot.</span><span class="avs-val">560€</span></div>
+                </div>
+                <div class="avs-block manual">
+                  <span class="avs-tag manual">MANUEL</span>
+                  <div class="avs-row"><span class="avs-label">ROI</span><span class="avs-val" style="color:var(--amber)">+12.0%</span></div>
+                  <div class="avs-row"><span class="avs-label">Tickets</span><span class="avs-val">2</span></div>
+                  <div class="avs-row"><span class="avs-label">Réussite</span><span class="avs-val">50%</span></div>
+                  <div class="avs-row"><span class="avs-label">CLV moy.</span><span class="avs-val" style="color:var(--muted)">—</span></div>
+                  <div class="avs-row"><span class="avs-label">Mise tot.</span><span class="avs-val">80€</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Repartition -->
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Répartition tickets
+              </div>
+              <span style="font-size:11.5px;color:var(--muted);font-family:'JetBrains Mono',monospace">14 total</span>
+            </div>
+            <div class="card-body">
+              <div class="dist-row"><div class="dist-dot" style="background:var(--green)"></div><span class="dist-label">Gagnés</span><span class="dist-count">9</span><div class="dist-bar-wrap"><div class="dist-bar" style="width:64%;background:var(--green)"></div></div></div>
+              <div class="dist-row"><div class="dist-dot" style="background:var(--red)"></div><span class="dist-label">Perdus</span><span class="dist-count">3</span><div class="dist-bar-wrap"><div class="dist-bar" style="width:21%;background:var(--red)"></div></div></div>
+              <div class="dist-row"><div class="dist-dot" style="background:var(--accent)"></div><span class="dist-label">En cours</span><span class="dist-count">1</span><div class="dist-bar-wrap"><div class="dist-bar" style="width:7%;background:var(--accent)"></div></div></div>
+              <div class="dist-row"><div class="dist-dot" style="background:var(--muted2)"></div><span class="dist-label">Ignorés</span><span class="dist-count">1</span><div class="dist-bar-wrap"><div class="dist-bar" style="width:7%;background:var(--muted2)"></div></div></div>
+              <div class="dist-row"><div class="dist-dot" style="background:var(--border2)"></div><span class="dist-label">Expirés</span><span class="dist-count">0</span><div class="dist-bar-wrap"><div class="dist-bar" style="width:0%;background:var(--border2)"></div></div></div>
+            </div>
+          </div>
+
+          <!-- Regles arret -->
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                Règles d'arrêt
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="rule-row">
+                <div class="rule-top">
+                  <div class="rule-name">Stop-loss journalier</div>
+                  <span class="rule-state rs-ok">✓ OK</span>
+                </div>
+                <div class="rule-vals"><span class="rule-val-cur">−8€ aujourd'hui</span><span>/ −75€ max</span></div>
+                <div class="rule-prog"><div class="rule-prog-fill" style="width:11%;background:var(--green)"></div></div>
+              </div>
+              <div class="rule-row">
+                <div class="rule-top">
+                  <div class="rule-name">Stop-loss total</div>
+                  <span class="rule-state rs-ok">✓ OK</span>
+                </div>
+                <div class="rule-vals"><span class="rule-val-cur">−41€ total</span><span>/ −200€ max</span></div>
+                <div class="rule-prog"><div class="rule-prog-fill" style="width:20%;background:var(--green)"></div></div>
+              </div>
+              <div class="rule-row">
+                <div class="rule-top">
+                  <div class="rule-name">Réussite glissante</div>
+                  <span class="rule-state rs-ok">✓ OK</span>
+                </div>
+                <div class="rule-vals"><span class="rule-val-cur">64.3%</span><span>seuil &lt; 45% / 20 derniers</span></div>
+                <div class="rule-prog"><div class="rule-prog-fill" style="width:64%;background:var(--green)"></div></div>
+              </div>
+              <div class="rule-row">
+                <div class="rule-top">
+                  <div class="rule-name">CLV moyen glissant</div>
+                  <span class="rule-state rs-ok">✓ OK</span>
+                </div>
+                <div class="rule-vals"><span class="rule-val-cur">+3.6%</span><span>seuil &lt; 0% / 50 derniers</span></div>
+                <div class="rule-prog"><div class="rule-prog-fill" style="width:75%;background:var(--green)"></div></div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /perf-panel -->
+
+        <!-- TICKETS -->
+        <div class="card" style="display:flex;flex-direction:column;overflow:hidden">
+          <div class="tp-head">
+            <div class="tp-tabs">
+              <div class="tpt on" id="tpt-kb" onclick="setTicketView('kanban')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="14" rx="1"/><rect x="17" y="3" width="5" height="10" rx="1"/></svg>
+                Kanban
+              </div>
+              <div class="tpt" id="tpt-li" onclick="setTicketView('list')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/></svg>
+                Liste
+              </div>
+            </div>
+            <button class="btn-g" style="font-size:12px;padding:6px 11px">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Ticket manuel
+            </button>
+          </div>
+
+          <div class="tp-filters">
+            <div class="filter-pills">
+              <div class="fp on" onclick="setF(this)">Tous</div>
+              <div class="fp" onclick="setF(this)">Proposés</div>
+              <div class="fp" onclick="setF(this)">En cours</div>
+              <div class="fp" onclick="setF(this)">Gagnés</div>
+              <div class="fp" onclick="setF(this)">Perdus</div>
+              <div class="fp" onclick="setF(this)">Ignorés</div>
+            </div>
+            <select class="fsel"><option>Algo + Manuel</option><option>Algo only</option><option>Manuel only</option></select>
+            <span style="font-size:11.5px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-left:auto">14 tickets</span>
+          </div>
+
+          <!-- KANBAN -->
+          <div id="view-kanban" style="overflow-y:auto;flex:1">
+            <div class="tp-kanban">
+
+              <!-- Proposés -->
+              <div class="kb-col">
+                <div class="kb-col-head">
+                  <div class="kb-col-title" style="color:var(--amber)">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/></svg>
+                    Proposés
+                  </div>
+                  <span class="kb-cnt" style="background:var(--amber-bg);color:var(--amber)">1</span>
+                </div>
+
+                <div class="kbc prop">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                    <span class="kbc-tag t-algo">ALGO</span>
+                    <span style="font-size:9.5px;color:var(--red);font-family:'JetBrains Mono',monospace;font-weight:700">⏱ 22min</span>
+                  </div>
+                  <div class="kbc-teams">Sinner vs Medvedev</div>
+                  <div class="kbc-meta">🎾 QF · Indian Wells · 20:00</div>
+                  <div class="kbc-row">
+                    <span class="kbc-issue">Dom</span>
+                    <span class="kbc-cote">1.72</span>
+                    <span class="kbc-edge">+6.3%</span>
+                  </div>
+                  <div style="font-size:10.5px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:3px">Mise : 28€ · Unibet</div>
+                  <div class="kbc-actions">
+                    <button class="ka-v">✓ Valider</button>
+                    <button class="ka-e">✏️</button>
+                    <button class="ka-i">✕</button>
+                  </div>
+                </div>
+
+                <button class="kb-add-manual">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  + Ticket manuel
+                </button>
+              </div>
+
+              <!-- En cours -->
+              <div class="kb-col">
+                <div class="kb-col-head">
+                  <div class="kb-col-title" style="color:var(--accent)">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    En cours
+                  </div>
+                  <span class="kb-cnt" style="background:var(--accent-bg);color:var(--accent)">1</span>
+                </div>
+                <div class="kbc">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                    <span class="kbc-tag t-algo">ALGO</span>
+                    <span style="font-size:9.5px;color:var(--green);font-family:'JetBrains Mono',monospace">Placé ✓</span>
+                  </div>
+                  <div class="kbc-teams">Zverev vs Alcaraz</div>
+                  <div class="kbc-meta">🎾 SF · Indian Wells · 22:00</div>
+                  <div class="kbc-row">
+                    <span class="kbc-issue">Dom</span>
+                    <span class="kbc-cote">1.85</span>
+                    <span class="kbc-edge">+7.2%</span>
+                  </div>
+                  <div style="font-size:10.5px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:3px">Mise : 32€ · Gain pot. +27.2€</div>
+                </div>
+              </div>
+
+              <!-- Résolus -->
+              <div class="kb-col" style="overflow-y:auto;max-height:380px">
+                <div class="kb-col-head">
+                  <div class="kb-col-title" style="color:var(--green)">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Résolus
+                  </div>
+                  <span class="kb-cnt" style="background:var(--green-bg);color:var(--green)">9 / 3</span>
+                </div>
+
+                <div class="kbc won">
+                  <span class="kbc-tag t-algo">ALGO</span>
+                  <div class="kbc-teams">Sinner vs Fritz</div>
+                  <div class="kbc-meta">🎾 R4 · 09/03</div>
+                  <div class="kbc-row"><span class="kbc-issue">Dom</span><span class="kbc-cote">1.65</span></div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+                    <span class="kbc-gain p">+19.50€</span>
+                    <span class="kbc-clv clv-p">CLV +3.8%</span>
+                  </div>
+                </div>
+
+                <div class="kbc won">
+                  <span class="kbc-tag t-manual">MANUEL</span>
+                  <div class="kbc-teams">Gauff vs Paolini</div>
+                  <div class="kbc-meta">🎾 R4 · 08/03</div>
+                  <div class="kbc-row"><span class="kbc-issue">Dom</span><span class="kbc-cote">1.55</span></div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+                    <span class="kbc-gain p">+5.50€</span>
+                    <span class="kbc-clv clv-p">CLV +1.9%</span>
+                  </div>
+                </div>
+
+                <div class="kbc lost">
+                  <span class="kbc-tag t-algo">ALGO</span>
+                  <div class="kbc-teams">Zverev vs Rune</div>
+                  <div class="kbc-meta">🎾 R3 · 06/03</div>
+                  <div class="kbc-row"><span class="kbc-issue">Dom</span><span class="kbc-cote">1.72</span></div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+                    <span class="kbc-gain n">−26€</span>
+                    <span class="kbc-clv clv-n">CLV −0.8%</span>
+                  </div>
+                </div>
+
+                <div style="text-align:center;padding:8px;font-size:11.5px;color:var(--accent);cursor:pointer;font-weight:500">Voir 9 autres →</div>
+              </div>
+
+              <!-- Ignorés / Expirés -->
+              <div class="kb-col">
+                <div class="kb-col-head">
+                  <div class="kb-col-title" style="color:var(--muted)">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                    Ignorés / Expirés
+                  </div>
+                  <span class="kb-cnt" style="background:var(--surface2);color:var(--muted)">1</span>
+                </div>
+                <div class="kbc ign">
+                  <span class="kbc-tag t-algo">ALGO</span>
+                  <div class="kbc-teams">Djokovic vs Alcaraz</div>
+                  <div class="kbc-meta">🎾 QF · 07/03</div>
+                  <div class="kbc-row"><span class="kbc-issue">Dom</span><span class="kbc-cote">1.45</span></div>
+                  <div style="font-size:10px;color:var(--muted);font-style:italic;margin-top:4px">"Genou à surveiller"</div>
+                  <div style="font-size:10px;color:var(--muted2);font-family:'JetBrains Mono',monospace;margin-top:3px">Aurait rapporté +12.60€</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- LIST -->
+          <div id="view-list" class="tp-list">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th><th>Match</th><th>Issue</th><th>Cote</th><th>Mise</th>
+                  <th>Résultat</th><th>Gain/Perte</th><th>Edge</th><th>CLV</th><th>Tag</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="td-muted">09/03</td><td class="td-match">Sinner vs Fritz</td><td>Dom</td>
+                  <td class="td-mono">1.65</td><td class="td-mono">30€</td>
+                  <td><span class="st st-g"><span class="st-dot"></span>Gagné</span></td>
+                  <td class="td-gp p">+19.50€</td><td class="td-mono" style="color:var(--green)">+5.8%</td>
+                  <td><span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--green-bg);color:var(--green);font-family:'JetBrains Mono',monospace;font-weight:600">+3.8%</span></td>
+                  <td><span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--accent-bg);color:var(--accent);font-family:'JetBrains Mono',monospace;border:1px solid var(--accent-bd)">ALGO</span></td>
+                  <td><button class="row-btn">Détail</button></td>
+                </tr>
+                <tr>
+                  <td class="td-muted">08/03</td><td class="td-match">Gauff vs Paolini</td><td>Dom</td>
+                  <td class="td-mono">1.55</td><td class="td-mono">10€</td>
+                  <td><span class="st st-g"><span class="st-dot"></span>Gagné</span></td>
+                  <td class="td-gp p">+5.50€</td><td class="td-muted">—</td>
+                  <td><span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--green-bg);color:var(--green);font-family:'JetBrains Mono',monospace;font-weight:600">+1.9%</span></td>
+                  <td><span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--purple-bg);color:var(--purple);font-family:'JetBrains Mono',monospace;border:1px solid var(--purple-bd)">MANUEL</span></td>
+                  <td><button class="row-btn">Détail</button></td>
+                </tr>
+                <tr>
+                  <td class="td-muted">07/03</td><td class="td-match">Djokovic vs Alcaraz</td><td>Dom</td>
+                  <td class="td-mono">1.45</td><td class="td-muted">—</td>
+                  <td><span class="st st-i">Ignoré</span></td>
+                  <td class="td-muted" style="font-style:italic;font-size:11px">+12.60€ (aurait)</td>
+                  <td class="td-mono" style="color:var(--green)">+3.2%</td><td class="td-muted">—</td>
+                  <td><span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--accent-bg);color:var(--accent);font-family:'JetBrains Mono',monospace;border:1px solid var(--accent-bd)">ALGO</span></td>
+                  <td><button class="row-btn">Détail</button></td>
+                </tr>
+                <tr>
+                  <td class="td-muted">06/03</td><td class="td-match">Zverev vs Rune</td><td>Dom</td>
+                  <td class="td-mono">1.72</td><td class="td-mono">26€</td>
+                  <td><span class="st st-p"><span class="st-dot"></span>Perdu</span></td>
+                  <td class="td-gp n">−26€</td><td class="td-mono" style="color:var(--green)">+6.1%</td>
+                  <td><span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--red-bg);color:var(--red);font-family:'JetBrains Mono',monospace;font-weight:600">−0.8%</span></td>
+                  <td><span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--accent-bg);color:var(--accent);font-family:'JetBrains Mono',monospace;border:1px solid var(--accent-bd)">ALGO</span></td>
+                  <td><button class="row-btn">Détail</button></td>
+                </tr>
+              </tbody>
+            </table>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)">
+              <span>14 tickets · page 1/2</span>
+              <div style="display:flex;gap:4px">
+                <button style="width:26px;height:26px;border-radius:5px;border:1px solid var(--border);background:var(--accent);color:#fff;cursor:pointer;font-size:12px">1</button>
+                <button style="width:26px;height:26px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-size:12px">2</button>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /tickets card -->
+      </div><!-- /body-split -->
+
+      <!-- RECAP PARAMETRES -->
+      <div class="recap-section">
+        <div class="recap-head" onclick="toggleRecap()">
+          <div class="recap-head-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 105.63 19.07"/></svg>
+            Paramètres de la campagne
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn-g" style="font-size:12px;padding:5px 11px" onclick="event.stopPropagation()">Modifier les paramètres</button>
+            <svg id="recap-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+        <div id="recap-body" style="display:none">
+          <div class="recap-grid">
+            <div class="rbloc">
+              <div class="rbloc-title">Identité</div>
+              <div class="rrow"><span class="rlabel">Sport</span><span class="rval">🎾 Tennis ATP</span></div>
+              <div class="rrow"><span class="rlabel">Compétitions</span><span class="rval">Toutes ATP</span></div>
+              <div class="rrow"><span class="rlabel">Durée</span><span class="rval">30 jours</span></div>
+              <div class="rrow"><span class="rlabel">Fréquence</span><span class="rval">Quotidien 08h00</span></div>
+              <div class="rrow"><span class="rlabel">Expiration</span><span class="rval">2h</span></div>
+            </div>
+            <div class="rbloc">
+              <div class="rbloc-title">Bankroll & Mise</div>
+              <div class="rrow"><span class="rlabel">Bankroll</span><span class="rval">500€</span></div>
+              <div class="rrow"><span class="rlabel">Stratégie</span><span class="rval">½ Kelly</span></div>
+              <div class="rrow"><span class="rlabel">Mise max</span><span class="rval">50€</span></div>
+              <div class="rrow"><span class="rlabel">Stop-loss /j</span><span class="rval">15%</span></div>
+              <div class="rrow"><span class="rlabel">Stop-loss tot.</span><span class="rval">40%</span></div>
+            </div>
+            <div class="rbloc">
+              <div class="rbloc-title">Filtres</div>
+              <div class="rrow"><span class="rlabel">Confiance min</span><span class="rval">60%</span></div>
+              <div class="rrow"><span class="rlabel">Edge min</span><span class="rval">+5%</span></div>
+              <div class="rrow"><span class="rlabel">Cotes</span><span class="rval">1.40 — 3.00</span></div>
+              <div class="rrow"><span class="rlabel">Fiabilité min</span><span class="rval">10/20</span></div>
+              <div class="rrow"><span class="rlabel">Fenêtre</span><span class="rval">24h</span></div>
+            </div>
+            <div class="rbloc">
+              <div class="rbloc-title">Combis</div>
+              <div class="rrow"><span class="rlabel">Activé</span><span class="rval">Non</span></div>
+            </div>
+            <div class="rbloc">
+              <div class="rbloc-title">Règles d'arrêt</div>
+              <div class="rrow"><span class="rlabel">Réussite min</span><span class="rval">&lt; 45% / 20</span></div>
+              <div class="rrow"><span class="rlabel">CLV min</span><span class="rval">&lt; 0% / 50</span></div>
+              <div class="rrow"><span class="rlabel">Variation ±</span><span class="rval">5%</span></div>
+            </div>
+            <div class="rbloc">
+              <div class="rbloc-title">Alertes</div>
+              <div class="rrow"><span class="rlabel">Nouveau ticket</span><span class="rval">Push</span></div>
+              <div class="rrow"><span class="rlabel">Cote modifiée</span><span class="rval">Push</span></div>
+              <div class="rrow"><span class="rlabel">Stop-loss</span><span class="rval">Push + Email</span></div>
+              <div class="rrow"><span class="rlabel">Résumé /j</span><span class="rval">Email</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div>
+</div>
+
+<script>
+function toggleMenu() {
+  document.getElementById('main-menu').classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#menu-btn')) document.getElementById('main-menu').classList.remove('open');
+});
+function setPeriod(el) {
+  el.closest('.period-tabs').querySelectorAll('.pt').forEach(p => p.classList.remove('on'));
+  el.classList.add('on');
+}
+function setF(el) {
+  el.closest('.filter-pills').querySelectorAll('.fp').forEach(f => f.classList.remove('on'));
+  el.classList.add('on');
+}
+function setTicketView(v) {
+  const kb = document.getElementById('view-kanban');
+  const li = document.getElementById('view-list');
+  const tptKb = document.getElementById('tpt-kb');
+  const tptLi = document.getElementById('tpt-li');
+  if (v === 'kanban') {
+    kb.style.display = 'block';
+    li.classList.remove('show');
+    tptKb.classList.add('on');
+    tptLi.classList.remove('on');
+  } else {
+    kb.style.display = 'none';
+    li.classList.add('show');
+    tptLi.classList.add('on');
+    tptKb.classList.remove('on');
+  }
+}
+function toggleRecap() {
+  const body = document.getElementById('recap-body');
+  const chev = document.getElementById('recap-chevron');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  chev.style.transform = open ? '' : 'rotate(180deg)';
+}
+</script>
+</body>
+</html>

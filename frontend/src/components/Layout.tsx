@@ -1,23 +1,25 @@
 import { useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, Link } from "react-router-dom";
 import {
   LayoutDashboard,
   ScanSearch,
-  Ticket,
   Flag,
   Layers,
-  History,
   FlaskConical,
   MessageCircle,
   Settings,
   User,
   LogOut,
-  Bell,
   Search,
   ChevronsLeft,
   ChevronsRight,
+  HelpCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { BreadcrumbProvider, useBreadcrumb } from "@/contexts/BreadcrumbContext";
+import NotificationBell from "@/components/NotificationBell";
+import OnboardingModal from "@/components/OnboardingModal";
+import { TourProvider, useTourContext } from "@/contexts/TourContext";
 
 /* ── Sidebar colors ── */
 const SB = {
@@ -41,7 +43,6 @@ const NAV_SECTIONS = [
   {
     label: "Paris",
     items: [
-      { to: "/scanner?tab=tickets", label: "Tickets", icon: Ticket },
       { to: "/campaign", label: "Campagnes", icon: Flag },
       { to: "/portfolio", label: "Portfolio", icon: Layers },
     ],
@@ -68,6 +69,8 @@ const PAGE_NAMES: Record<string, string> = {
   "/campaign": "Campagnes",
   "/portfolio": "Portfolio",
   "/settings": "Mon profil",
+  "/parametres": "Paramètres",
+  "/ai-analyst": "IA Analyste",
 };
 
 function getInitials(name: string): string {
@@ -79,10 +82,51 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
+function Breadcrumb() {
+  const location = useLocation();
+  const { label } = useBreadcrumb();
+
+  // Dynamic breadcrumb for /campaign/:id
+  const campaignDetailMatch = location.pathname.match(/^\/campaign\/(\d+)$/);
+  if (campaignDetailMatch) {
+    return (
+      <div className="flex items-center gap-1.5 text-[13px] text-[#8a919e]">
+        <span>BetTracker</span>
+        <span className="text-[11px] text-[#b0b7c3]">&rsaquo;</span>
+        <Link to="/campaign" className="hover:text-[#111318] transition-colors no-underline text-[#8a919e]">Campagnes</Link>
+        <span className="text-[11px] text-[#b0b7c3]">&rsaquo;</span>
+        <span className="text-[#111318] font-semibold">{label || "..."}</span>
+      </div>
+    );
+  }
+
+  const currentPage = PAGE_NAMES[location.pathname] || "BetTracker";
+  return (
+    <div className="flex items-center gap-1.5 text-[13px] text-[#8a919e]">
+      <span>BetTracker</span>
+      <span className="text-[11px] text-[#b0b7c3]">&rsaquo;</span>
+      <span className="text-[#111318] font-semibold">{currentPage}</span>
+    </div>
+  );
+}
+
+function HelpButton() {
+  const { requestTour } = useTourContext();
+  if (!requestTour) return null;
+  return (
+    <button
+      onClick={requestTour}
+      title="Visite guidée"
+      className="w-8 h-8 rounded-lg bg-transparent border border-[#e3e6eb] flex items-center justify-center cursor-pointer text-[#8a919e] hover:bg-[#f4f5f7] hover:border-[#cdd1d9] hover:text-[#4f8cff] transition-all"
+    >
+      <HelpCircle size={15} />
+    </button>
+  );
+}
+
 export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const currentPage = PAGE_NAMES[location.pathname] || "BetTracker";
   const [collapsed, setCollapsed] = useState(false);
 
   const w = collapsed ? "w-[60px] min-w-[60px]" : "w-[228px] min-w-[228px]";
@@ -161,7 +205,7 @@ export default function Layout() {
 
           {/* IA Analyste */}
           <NavLink
-            to="/scanner?mode=ai"
+            to="/ai-analyst"
             title={collapsed ? "IA Analyste" : undefined}
             className={`flex items-center ${collapsed ? "justify-center" : "gap-[9px]"} ${collapsed ? "px-0 py-2" : "px-2.5 py-2"} rounded-lg text-[13.5px] font-semibold no-underline`}
             style={{
@@ -206,12 +250,12 @@ export default function Layout() {
           </button>
 
           <NavLink
-            to="/settings"
+            to="/parametres"
             title={collapsed ? "Paramètres" : undefined}
             className={`flex items-center ${collapsed ? "justify-center" : "gap-[9px]"} ${collapsed ? "px-0" : "px-2.5"} py-2 rounded-lg text-[13.5px] no-underline transition-all`}
             style={({ isActive }) => ({
               color: isActive ? "#fff" : SB.text,
-              background: isActive && location.pathname === "/settings" ? SB.active : "transparent",
+              background: isActive && location.pathname === "/parametres" ? SB.active : "transparent",
             })}
           >
             <Settings size={16} className="shrink-0" style={{ opacity: 0.45 }} />
@@ -278,30 +322,31 @@ export default function Layout() {
       </aside>
 
       {/* ── MAIN ── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Topbar */}
-        <div className="h-14 min-h-14 border-b border-[#e3e6eb] bg-white flex items-center px-7 gap-3">
-          <div className="flex items-center gap-1.5 text-[13px] text-[#8a919e]">
-            <span>BetTracker</span>
-            <span className="text-[11px] text-[#b0b7c3]">›</span>
-            <span className="text-[#111318] font-semibold">{currentPage}</span>
+      <TourProvider>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Topbar */}
+          <div className="h-14 min-h-14 border-b border-[#e3e6eb] bg-white flex items-center px-7 gap-3">
+            <Breadcrumb />
+            <div className="ml-auto flex items-center gap-2">
+              <HelpButton />
+              <NotificationBell />
+              <button className="w-8 h-8 rounded-lg bg-transparent border border-[#e3e6eb] flex items-center justify-center cursor-pointer text-[#8a919e] hover:bg-[#f4f5f7] hover:border-[#cdd1d9] hover:text-[#111318] transition-all">
+                <Search size={14} />
+              </button>
+            </div>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <button className="w-8 h-8 rounded-lg bg-transparent border border-[#e3e6eb] flex items-center justify-center cursor-pointer text-[#8a919e] hover:bg-[#f4f5f7] hover:border-[#cdd1d9] hover:text-[#111318] transition-all relative">
-              <Bell size={14} />
-              <span className="absolute top-[5px] right-[5px] w-[5px] h-[5px] bg-[#3b5bdb] rounded-full border-[1.5px] border-white" />
-            </button>
-            <button className="w-8 h-8 rounded-lg bg-transparent border border-[#e3e6eb] flex items-center justify-center cursor-pointer text-[#8a919e] hover:bg-[#f4f5f7] hover:border-[#cdd1d9] hover:text-[#111318] transition-all">
-              <Search size={14} />
-            </button>
-          </div>
-        </div>
 
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto px-6 py-5">
-          <Outlet />
-        </main>
-      </div>
+          {/* Content */}
+          <main className="flex-1 overflow-y-auto px-6 py-5">
+            <BreadcrumbProvider>
+              <Outlet />
+            </BreadcrumbProvider>
+          </main>
+        </div>
+      </TourProvider>
+
+      {/* Onboarding modal */}
+      {user && !user.onboarding_completed && <OnboardingModal />}
     </div>
   );
 }
