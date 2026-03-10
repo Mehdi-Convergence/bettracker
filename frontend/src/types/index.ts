@@ -375,7 +375,7 @@ export interface CampaignRecommendationsResponse {
   total_scanned: number;
 }
 
-// --- AI Research types (Claude Code powered) ---
+// --- AI Research types ---
 
 export interface AIScanMatch {
   // Football

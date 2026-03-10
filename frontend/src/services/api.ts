@@ -231,7 +231,7 @@ export function deletePortfolioBet(betId: number) {
   return request<void>(`/portfolio/bets/${betId}`, { method: "DELETE" });
 }
 
-// AI Research (Claude Code powered)
+// AI Research
 export function aiScan(params: { sport: string; leagues?: string; timeframe?: string; force?: boolean; cacheOnly?: boolean }) {
   const qs = new URLSearchParams();
   qs.set("sport", params.sport);

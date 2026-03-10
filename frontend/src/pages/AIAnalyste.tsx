@@ -275,7 +275,7 @@ export default function AIAnalyste() {
           <h1 className="text-[22px] font-extrabold tracking-tight text-[#111318]">IA Analyste</h1>
           <div className="flex items-center gap-[5px] px-2.5 py-1 rounded-full text-[11px] font-semibold font-mono text-[#7c3aed]" style={{ background: "rgba(124,58,237,.07)", border: "1px solid rgba(124,58,237,.18)" }}>
             <span className="w-1.5 h-1.5 rounded-full bg-[#7c3aed] animate-pulse" />
-            En ligne · Claude
+            En ligne · IA
           </div>
         </div>
         <div className="flex items-center gap-2">
