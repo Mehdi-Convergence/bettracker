@@ -290,6 +290,17 @@ export default function AIAnalyste() {
         </div>
       </div>
 
+      {/* ══ DEV BANNER ══ */}
+      <div className="shrink-0 flex items-center gap-2.5 px-5 py-2.5 bg-amber-50 border-b border-amber-200">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold uppercase tracking-wide">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          En cours de dev
+        </span>
+        <span className="text-[13px] text-amber-700">
+          Cette fonctionnalité est en cours de développement. Les réponses affichées sont simulées et ne reflètent pas de vraies analyses.
+        </span>
+      </div>
+
       {/* ══ BODY: CHAT + CONTEXT ══ */}
       <div className="flex-1 flex overflow-hidden">
 

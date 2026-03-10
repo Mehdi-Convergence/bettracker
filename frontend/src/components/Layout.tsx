@@ -220,9 +220,9 @@ export default function Layout() {
                 IA Analyste
                 <span
                   className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded-full"
-                  style={{ background: "rgba(126,184,255,0.15)", color: "#7eb8ff" }}
+                  style={{ background: "rgba(245,158,11,0.15)", color: "#f59e0b" }}
                 >
-                  β
+                  Soon
                 </span>
               </>
             )}
