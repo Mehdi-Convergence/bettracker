@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LogIn, Mail, Lock, Eye, EyeOff, UserPlus, Check } from "lucide-react";
+import { LogIn, Mail, Lock, Eye, EyeOff, UserPlus, Check, ScanSearch, BarChart2, Bot, MessageCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 type Mode = "login" | "signup";
@@ -59,9 +59,9 @@ export default function Login() {
   const labelCls = "text-[11.5px] font-semibold text-[#3c4149] tracking-wide";
 
   return (
-    <div className="grid min-h-screen" style={{ gridTemplateColumns: "1fr 1fr" }}>
+    <div className="grid min-h-screen" style={{ gridTemplateColumns: "48fr 52fr" }}>
       {/* ── LEFT PANEL: BRANDING ── */}
-      <div className="relative overflow-hidden flex flex-col justify-between p-10 px-12" style={{ background: "#1e2535" }}>
+      <div className="relative overflow-hidden flex flex-col justify-between p-10 pl-14 pr-10" style={{ background: "#1e2535" }}>
         {/* Grid decoration */}
         <div
           className="absolute inset-0 pointer-events-none"
@@ -87,32 +87,32 @@ export default function Login() {
         </div>
 
         {/* Center content */}
-        <div className="relative z-10 flex-1 flex flex-col justify-center py-12">
+        <div className="relative z-10 flex-1 flex flex-col justify-center py-12 pl-10">
           <div className="text-[11px] font-semibold tracking-[0.12em] uppercase text-[#7eb8ff] mb-4">
             Value Bet Detection
           </div>
-          <h1 className="text-[38px] font-extrabold tracking-tight leading-[1.1] text-white mb-4">
+          <h1 className="text-[40px] font-extrabold tracking-tight leading-[1.1] text-white mb-5">
             Pariez plus{" "}
             <span className="bg-gradient-to-r from-[#7eb8ff] to-[#12b76a] bg-clip-text text-transparent">
               intelligemment
             </span>
           </h1>
-          <p className="text-[15px] leading-relaxed max-w-[360px] mb-9" style={{ color: "rgba(255,255,255,0.48)" }}>
-            Détection automatique des value bets, suivi de vos performances et campagnes intelligentes. Tout ce qu'il faut pour des paris basés sur les données.
+          <p className="text-[14.5px] leading-relaxed max-w-[340px] mb-8" style={{ color: "rgba(255,255,255,0.45)" }}>
+            Détectez les value bets, suivez vos performances et pilotez vos campagnes. Tout basé sur les données.
           </p>
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2.5">
             {[
-              { emoji: "🔍", text: "Scan automatique des matchs à fort edge", bg: "rgba(79,140,255,0.15)" },
-              { emoji: "📊", text: "Suivi ROI en temps réel · Historique complet", bg: "rgba(18,183,106,0.15)" },
-              { emoji: "🤖", text: "Campagnes auto-pilotées par l'algorithme", bg: "rgba(247,144,9,0.15)" },
-              { emoji: "💬", text: "IA Analyste disponible 24h/24", bg: "rgba(139,92,246,0.15)" },
-            ].map((f) => (
-              <div key={f.text} className="flex items-center gap-3 text-[13.5px]" style={{ color: "rgba(255,255,255,0.65)" }}>
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[13px]" style={{ background: f.bg }}>
-                  {f.emoji}
+              { Icon: ScanSearch, text: "Scan automatique des matchs à fort edge", color: "#7eb8ff", bg: "rgba(79,140,255,0.12)" },
+              { Icon: BarChart2, text: "Suivi ROI en temps réel · Historique complet", color: "#12b76a", bg: "rgba(18,183,106,0.12)" },
+              { Icon: Bot, text: "Campagnes auto-pilotées par l'algorithme", color: "#f79009", bg: "rgba(247,144,9,0.12)" },
+              { Icon: MessageCircle, text: "IA Analyste disponible 24h/24", color: "#a78bfa", bg: "rgba(139,92,246,0.12)" },
+            ].map(({ Icon, text, color, bg }) => (
+              <div key={text} className="flex items-center gap-3 text-[13px]" style={{ color: "rgba(255,255,255,0.6)" }}>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: bg }}>
+                  <Icon size={13} style={{ color }} />
                 </div>
-                {f.text}
+                {text}
               </div>
             ))}
           </div>
@@ -141,8 +141,8 @@ export default function Login() {
       </div>
 
       {/* ── RIGHT PANEL: FORM ── */}
-      <div className="bg-[#f4f5f7] flex items-center justify-center px-8 py-10">
-        <div className="w-full max-w-[400px] animate-fade-up">
+      <div className="bg-[#f4f5f7] flex items-center justify-center px-10 py-10">
+        <div className="w-full max-w-[420px] animate-fade-up">
           {/* Header */}
           <div className="mb-7">
             <h2 className="text-[22px] font-extrabold tracking-tight text-[#111318]">
@@ -287,7 +287,7 @@ export default function Login() {
                       type="text"
                       value={signupName}
                       onChange={(e) => setSignupName(e.target.value)}
-                      placeholder="MehdiQ_bets"
+                      placeholder="ex: ValueBettor_99"
                       className={inputCls}
                       required
                     />

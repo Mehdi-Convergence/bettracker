@@ -2,7 +2,8 @@
 import os, sys, warnings, json
 os.environ["PYTHONIOENCODING"] = "utf-8"
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "C:/Users/MehdiBouziane/bettracker")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
 
 import numpy as np
 import pandas as pd
@@ -13,7 +14,7 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 from src.ml.football_model import MODEL_FEATURES, LABEL_MAP
 
-df = pd.read_parquet("C:/Users/MehdiBouziane/bettracker/data/processed/football_features.parquet")
+df = pd.read_parquet(os.path.join(ROOT, "data/processed/football_features.parquet"))
 all_seasons = sorted(df["season"].unique())
 print(f"Seasons: {all_seasons}")
 
@@ -76,7 +77,7 @@ out = {
     "best_params": best,
     "n_trials": len(study.trials),
 }
-with open("C:/Users/MehdiBouziane/bettracker/data/xgb_best_params.json", "w") as f:
+with open(os.path.join(ROOT, "data/xgb_best_params.json"), "w") as f:
     json.dump(out, f, indent=2)
 print("\nSaved to data/xgb_best_params.json")
 

@@ -3,7 +3,8 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, "C:/Users/MehdiBouziane/bettracker")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
 
 import pandas as pd
 from rich.console import Console
@@ -58,28 +59,28 @@ def main():
 
     strategies = [
         # --- Paris simples : confiance modele ---
-        ("SIMPLE, prob>=60%, flat 5%", {"min_edge": 0.0, "min_model_prob": 0.60, "flat_stake": 0.05, "initial_bankroll": 200.0}),
-        ("SIMPLE, prob>=55%, edge>3%", {"min_edge": 0.03, "min_model_prob": 0.55, "flat_stake": 0.05, "initial_bankroll": 200.0}),
+        ("SIMPLE, prob>=60%, flat 5%", {"min_edge": 0.0, "min_model_prob": 0.60, "staking_strategy": "flat", "flat_stake_amount": 10.0, "initial_bankroll": 200.0}),
+        ("SIMPLE, prob>=55%, edge>3%", {"min_edge": 0.03, "min_model_prob": 0.55, "staking_strategy": "flat", "flat_stake_amount": 10.0, "initial_bankroll": 200.0}),
         # --- Reference nuls ---
-        ("NULS, edge>5% (reference)", {"allowed_outcomes": ["D"], "min_edge": 0.05, "flat_stake": 0.05, "initial_bankroll": 200.0}),
+        ("NULS, edge>5% (reference)", {"allowed_outcomes": ["D"], "min_edge": 0.05, "staking_strategy": "flat", "flat_stake_amount": 10.0, "initial_bankroll": 200.0}),
         # --- COMBIS 2 legs ---
         ("COMBO 2 legs, odds 1.8-3.0, prob>=55%", {
             "combo_mode": True, "combo_max_legs": 2, "combo_min_odds": 1.8, "combo_max_odds": 3.0,
-            "min_edge": 0.02, "min_model_prob": 0.55, "flat_stake": 0.05, "initial_bankroll": 200.0, "combo_top_n": 2,
+            "min_edge": 0.02, "min_model_prob": 0.55, "staking_strategy": "flat", "flat_stake_amount": 10.0, "initial_bankroll": 200.0, "combo_top_n": 2,
         }),
         ("COMBO 2 legs, odds 1.8-3.0, prob>=60%", {
             "combo_mode": True, "combo_max_legs": 2, "combo_min_odds": 1.8, "combo_max_odds": 3.0,
-            "min_edge": 0.02, "min_model_prob": 0.60, "flat_stake": 0.05, "initial_bankroll": 200.0, "combo_top_n": 2,
+            "min_edge": 0.02, "min_model_prob": 0.60, "staking_strategy": "flat", "flat_stake_amount": 10.0, "initial_bankroll": 200.0, "combo_top_n": 2,
         }),
         # --- COMBIS 2-3 legs ---
         ("COMBO 2-3 legs, odds 1.8-3.0, prob>=55%", {
             "combo_mode": True, "combo_max_legs": 3, "combo_min_odds": 1.8, "combo_max_odds": 3.0,
-            "min_edge": 0.02, "min_model_prob": 0.55, "flat_stake": 0.05, "initial_bankroll": 200.0, "combo_top_n": 3,
+            "min_edge": 0.02, "min_model_prob": 0.55, "staking_strategy": "flat", "flat_stake_amount": 10.0, "initial_bankroll": 200.0, "combo_top_n": 3,
         }),
         # --- COMBIS 2-4 legs ---
         ("COMBO 2-4 legs, odds 1.8-3.0, prob>=55%", {
             "combo_mode": True, "combo_max_legs": 4, "combo_min_odds": 1.8, "combo_max_odds": 3.0,
-            "min_edge": 0.02, "min_model_prob": 0.55, "flat_stake": 0.05, "initial_bankroll": 200.0, "combo_top_n": 3,
+            "min_edge": 0.02, "min_model_prob": 0.55, "staking_strategy": "flat", "flat_stake_amount": 10.0, "initial_bankroll": 200.0, "combo_top_n": 3,
         }),
     ]
 

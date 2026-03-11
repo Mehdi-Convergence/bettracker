@@ -172,10 +172,9 @@ export function updateCampaign(id: number, body: unknown) {
   });
 }
 
-export function getCampaignRecommendations(id: number, demo?: boolean) {
-  const qs = demo ? "?demo=true" : "";
+export function getCampaignRecommendations(id: number) {
   return request<import("../types").CampaignRecommendationsResponse>(
-    `/campaigns/${id}/recommendations${qs}`
+    `/campaigns/${id}/recommendations`
   );
 }
 
@@ -325,5 +324,12 @@ export function markTourVisited(module: string) {
   return request<{ message: string }>("/auth/tour-visited", {
     method: "POST",
     body: JSON.stringify({ module }),
+  });
+}
+
+export function sendFeedback(message: string) {
+  return request<{ ok: boolean; sent: boolean }>("/feedback", {
+    method: "POST",
+    body: JSON.stringify({ message }),
   });
 }

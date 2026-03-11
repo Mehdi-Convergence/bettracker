@@ -2,13 +2,14 @@
 import os, sys, math, warnings
 os.environ["PYTHONIOENCODING"] = "utf-8"
 warnings.filterwarnings("ignore")
-sys.path.insert(0, "C:/Users/MehdiBouziane/bettracker")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
 
 import pandas as pd
 from src.backtest.engine import BacktestEngine
 from src.backtest.metrics import BacktestMetrics
 
-df = pd.read_parquet("C:/Users/MehdiBouziane/bettracker/data/processed/football_features.parquet")
+df = pd.read_parquet(os.path.join(ROOT, "data/processed/football_features.parquet"))
 all_seasons = sorted(df["season"].unique())
 test_seasons = [s for i, s in enumerate(all_seasons) if i >= 2]
 print(f"Test seasons: {test_seasons}")
@@ -66,7 +67,7 @@ for i, cfg in enumerate(configs):
 
 print(f"\nDone. Valid: {len(results)}\n")
 dr = pd.DataFrame(results)
-dr.to_csv("C:/Users/MehdiBouziane/bettracker/data/backtest_grid_v6.csv", index=False)
+dr.to_csv(os.path.join(ROOT, "data/backtest_grid_v6.csv"), index=False)
 
 def ptable(title, rows):
     print(f"\n{'='*85}\n  {title}\n{'='*85}")

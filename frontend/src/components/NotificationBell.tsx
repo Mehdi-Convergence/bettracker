@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Bell, Check, AlertTriangle, TrendingDown, Flag, Zap, Target } from "lucide-react";
+import { Bell, AlertTriangle, TrendingDown, Flag, Zap, Target } from "lucide-react";
 import { getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead } from "@/services/api";
 import type { AppNotification } from "@/types";
 
@@ -91,9 +91,9 @@ export default function NotificationBell() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="w-8 h-8 rounded-lg bg-transparent border border-[#e3e6eb] flex items-center justify-center cursor-pointer text-[#8a919e] hover:bg-[#f4f5f7] hover:border-[#cdd1d9] hover:text-[#111318] transition-all relative"
+        className="w-8 h-8 rounded-lg bg-[#f4f5f7] flex items-center justify-center cursor-pointer text-[#5a6272] hover:bg-[#e8eaed] hover:text-[#111318] transition-all relative border-none"
       >
-        <Bell size={14} />
+        <Bell size={15} />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 min-w-[16px] h-4 flex items-center justify-center text-[10px] font-bold text-white bg-[#f04438] rounded-full px-1">
             {unreadCount > 99 ? "99+" : unreadCount}

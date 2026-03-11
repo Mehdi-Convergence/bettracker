@@ -2,12 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, develop]
   pull_request:
-    branches: [main, master]
+    branches: [main, develop]
+  workflow_call:
 
 jobs:
   backend:
+    name: Backend (lint + tests)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +34,7 @@ jobs:
           TESTING: "1"
 
   frontend:
+    name: Frontend (type-check + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -48,18 +51,11 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Lint
+        run: npm run lint
+
       - name: Type check
         run: npx tsc --noEmit
 
       - name: Build
         run: npm run build
-
-  docker:
-    runs-on: ubuntu-latest
-    needs: [backend, frontend]
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build Docker images
-        run: docker compose build

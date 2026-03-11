@@ -61,12 +61,6 @@ const STAKING_OPTIONS: { key: StakingStrategy; name: string; desc: string }[] = 
   { key: "pct_bankroll", name: "% BK", desc: "% bankroll" },
 ];
 
-const PERIOD_OPTIONS = [
-  { value: ["2425"], label: "1 saison (2024-2025)" },
-  { value: ["2324", "2425"], label: "2 saisons (2023-2025)" },
-  { value: ["2223", "2324", "2425"], label: "3 saisons (2022-2025)" },
-];
-
 // ── Helpers ──
 
 function formatEur(v: number) {
@@ -79,15 +73,15 @@ function getAlerts(m: BacktestResponse["metrics"], totalDays: number) {
   const alerts: { type: "ok" | "warn" | "err"; msg: string }[] = [];
   const betsPerMonth = totalDays > 0 ? (m.total_bets / totalDays) * 30 : 0;
   if (m.roi_pct > 10 && m.max_drawdown_pct < 15)
-    alerts.push({ type: "ok", msg: `<strong>Stratégie solide</strong> — ROI positif, drawdown maîtrisé sous 15%.` });
+    alerts.push({ type: "ok", msg: `<strong>Stratégie solide</strong> : ROI positif, drawdown maîtrisé sous 15%.` });
   if (betsPerMonth < 5)
-    alerts.push({ type: "warn", msg: `<strong>Sur-filtrage détecté</strong> — Moins de 5 paris / 30 jours. Élargissez les filtres.` });
+    alerts.push({ type: "warn", msg: `<strong>Sur-filtrage détecté</strong> : Moins de 5 paris / 30 jours. Élargissez les filtres.` });
   if (betsPerMonth > 200)
-    alerts.push({ type: "warn", msg: `<strong>Sous-filtrage</strong> — Plus de 200 paris / 30 jours, variance élevée.` });
+    alerts.push({ type: "warn", msg: `<strong>Sous-filtrage</strong> : Plus de 200 paris / 30 jours, variance élevée.` });
   if (m.roi_pct < -10)
-    alerts.push({ type: "err", msg: `<strong>Stratégie non rentable</strong> — ROI simulé < -10%. Ajustez vos paramètres.` });
+    alerts.push({ type: "err", msg: `<strong>Stratégie non rentable</strong> : ROI simulé < -10%. Ajustez vos paramètres.` });
   if (m.max_drawdown_pct > 30)
-    alerts.push({ type: "err", msg: `<strong>Drawdown élevé</strong> (${m.max_drawdown_pct.toFixed(1)}%) — risque de ruine bankroll.` });
+    alerts.push({ type: "err", msg: `<strong>Drawdown élevé</strong> (${m.max_drawdown_pct.toFixed(1)}%) : risque de ruine bankroll.` });
   return alerts;
 }
 
@@ -99,6 +93,51 @@ const alertCls = (t: string) =>
     : t === "warn"
       ? "bg-[#f79009]/8 text-[#b45309] border border-[#f79009]/20"
       : "bg-[#f04438]/7 text-[#c0392b] border border-[#f04438]/20";
+
+// ── Multi-sport merge helper ──
+function mergeBacktestResults(res1: BacktestResponse, res2: BacktestResponse, initialBankroll: number): BacktestResponse {
+  const merged = [...res1.bets, ...res2.bets].sort((a, b) => a.date.localeCompare(b.date));
+  let bankroll = initialBankroll;
+  const curve: number[] = [bankroll];
+  let peak = bankroll, maxDd = 0;
+  let curWin = 0, curLose = 0, maxWinStreak = 0, maxLoseStreak = 0;
+  for (const bet of merged) {
+    bankroll += bet.pnl;
+    curve.push(bankroll);
+    if (bankroll > peak) peak = bankroll;
+    const dd = peak > 0 ? (peak - bankroll) / peak * 100 : 0;
+    if (dd > maxDd) maxDd = dd;
+    if (bet.won) { curWin++; curLose = 0; if (curWin > maxWinStreak) maxWinStreak = curWin; }
+    else { curLose++; curWin = 0; if (curLose > maxLoseStreak) maxLoseStreak = curLose; }
+  }
+  const wins = merged.filter(b => b.won).length;
+  const totalStaked = merged.reduce((sum, b) => sum + b.stake, 0);
+  const totalPnl = merged.reduce((sum, b) => sum + b.pnl, 0);
+  const clvBets = merged.filter(b => b.clv != null);
+  return {
+    bets: merged,
+    bankroll_curve: curve,
+    config: res1.config,
+    metrics: {
+      total_bets: merged.length,
+      wins,
+      losses: merged.length - wins,
+      win_rate: merged.length > 0 ? wins / merged.length : 0,
+      total_staked: totalStaked,
+      total_pnl: totalPnl,
+      roi_pct: totalStaked > 0 ? (totalPnl / totalStaked) * 100 : 0,
+      final_bankroll: bankroll,
+      bankroll_growth_pct: initialBankroll > 0 ? ((bankroll - initialBankroll) / initialBankroll) * 100 : 0,
+      max_drawdown_pct: maxDd,
+      longest_losing_streak: maxLoseStreak,
+      longest_winning_streak: maxWinStreak,
+      avg_edge: merged.length > 0 ? merged.reduce((s, b) => s + b.edge, 0) / merged.length : 0,
+      avg_odds: merged.length > 0 ? merged.reduce((s, b) => s + b.odds, 0) / merged.length : 0,
+      avg_clv: clvBets.length > 0 ? clvBets.reduce((s, b) => s + (b.clv ?? 0), 0) / clvBets.length : null,
+      avg_ev_per_bet: merged.length > 0 ? totalPnl / merged.length : 0,
+    },
+  };
+}
 
 // ── Shared styles ──
 const cardCls = "bg-white border-[1.5px] border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,.06),0_1px_2px_rgba(16,24,40,.04)]";
@@ -122,6 +161,9 @@ export default function Backtest() {
 
   // Mode
   const [mode, setMode] = useState<"quick" | "adv">("quick");
+
+  // Sport multi-select
+  const [sports, setSports] = useState<Set<"football" | "tennis">>(new Set(["football"]));
 
   // Params (strategy 1 — editable)
   const [params, setParams] = useState<BacktestParams>({ ...DEFAULT_PARAMS });
@@ -155,11 +197,26 @@ export default function Backtest() {
     setLoading(true);
     setError("");
     try {
-      const data = await runBacktest(params);
+      const sportList = [...sports] as ("football" | "tennis")[];
+      let data: BacktestResponse;
+      let sportLabel: string;
+      let sportKey: string;
+      if (sportList.length === 1) {
+        data = await runBacktest({ ...params, sport: sportList[0] });
+        sportLabel = sportList[0] === "football" ? "⚽" : "🎾";
+        sportKey = sportList[0];
+      } else {
+        const [res1, res2] = await Promise.all(
+          sportList.map(s => runBacktest({ ...params, sport: s }))
+        );
+        data = mergeBacktestResults(res1, res2, params.initial_bankroll);
+        sportLabel = "⚽+🎾";
+        sportKey = "football+tennis";
+      }
       const newResult: StratResult = {
         id: results.length + 1,
-        label: `Strat. ${results.length + 1}`,
-        params: { ...params },
+        label: `Strat. ${results.length + 1} ${sportLabel}`,
+        params: { ...params, sport: sportKey },
         response: data,
       };
       if (results.length === 0) {
@@ -174,7 +231,7 @@ export default function Backtest() {
       setError((e as Error).message);
     }
     setLoading(false);
-  }, [params, results]);
+  }, [params, results, sports]);
 
   // ── Save ──
   const handleSave = useCallback(async () => {
@@ -279,6 +336,14 @@ export default function Backtest() {
   const p = params;
   const set = (patch: Partial<BacktestParams>) => setParams((prev) => ({ ...prev, ...patch }));
   const toggleSection = (key: string) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggleSportBt = (s: "football" | "tennis") => {
+    setSports(prev => {
+      const next = new Set(prev);
+      if (next.has(s)) { if (next.size > 1) next.delete(s); }
+      else { next.add(s); }
+      return next;
+    });
+  };
 
   const handleCreateCampaign = () => {
     navigate("/campaign", { state: { prefillBacktest: results[activeStrat]?.params } });
@@ -358,18 +423,22 @@ export default function Backtest() {
               <div className="grid grid-cols-3 gap-3.5 mb-4">
                 <div>
                   <label className={labelCls}>Sport</label>
-                  <select className={selectCls} value={p.sport} onChange={(e) => set({ sport: e.target.value })}>
-                    <option value="football">⚽ Football</option>
-                  </select>
+                  <div className="flex gap-1.5">
+                    {(["football", "tennis"] as const).map(s => (
+                      <button key={s} onClick={() => toggleSportBt(s)}
+                        className={`flex-1 py-2 px-1 rounded-lg border-2 text-[13px] font-semibold text-center transition-all cursor-pointer ${
+                          sports.has(s) ? "border-[#3b5bdb] bg-[#3b5bdb]/7 text-[#3b5bdb]" : "border-[#e3e6eb] text-[#3c4149] hover:border-[#3b5bdb]/30"
+                        }`}>
+                        {s === "football" ? "⚽ Football" : "🎾 Tennis"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <label className={labelCls}>Période historique</label>
-                  <select className={selectCls} value={JSON.stringify(p.test_seasons)}
-                    onChange={(e) => set({ test_seasons: JSON.parse(e.target.value) })}>
-                    {PERIOD_OPTIONS.map((o) => (
-                      <option key={o.label} value={JSON.stringify(o.value)}>{o.label}</option>
-                    ))}
-                  </select>
+                  <div className={`${inputCls} bg-[#f4f5f7] text-[#8a919e] cursor-not-allowed`}>
+                    {sports.has("football") && sports.has("tennis") ? "2023–2025 (multi)" : sports.has("tennis") ? "2024–2025 (fixe)" : "2023–2025 (fixe)"}
+                  </div>
                 </div>
                 <div>
                   <label className={labelCls}>Bankroll de départ (€)</label>
@@ -476,18 +545,22 @@ export default function Backtest() {
                     </div>
                     <div>
                       <label className={labelCls}>Sport</label>
-                      <select className={selectCls} value={p.sport} onChange={(e) => set({ sport: e.target.value })}>
-                        <option value="football">⚽ Football</option>
-                      </select>
+                      <div className="flex gap-1.5">
+                        {(["football", "tennis"] as const).map(s => (
+                          <button key={s} onClick={() => toggleSportBt(s)}
+                            className={`flex-1 py-2 px-1 rounded-lg border-2 text-[13px] font-semibold text-center transition-all cursor-pointer ${
+                              sports.has(s) ? "border-[#3b5bdb] bg-[#3b5bdb]/7 text-[#3b5bdb]" : "border-[#e3e6eb] text-[#3c4149] hover:border-[#3b5bdb]/30"
+                            }`}>
+                            {s === "football" ? "⚽ Football" : "🎾 Tennis"}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div>
                       <label className={labelCls}>Période</label>
-                      <select className={selectCls} value={JSON.stringify(p.test_seasons)}
-                        onChange={(e) => set({ test_seasons: JSON.parse(e.target.value) })}>
-                        {PERIOD_OPTIONS.map((o) => (
-                          <option key={o.label} value={JSON.stringify(o.value)}>{o.label}</option>
-                        ))}
-                      </select>
+                      <div className={`${inputCls} bg-[#f4f5f7] text-[#8a919e] cursor-not-allowed`}>
+                        {sports.has("football") && sports.has("tennis") ? "2023–2025 (multi)" : sports.has("tennis") ? "2024–2025 (fixe)" : "2023–2025 (fixe)"}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -598,7 +671,13 @@ export default function Backtest() {
           {/* ── Launch bar ── */}
           <div className="flex items-center justify-between pt-4 border-t border-[#e3e6eb] mt-4">
             <div className="text-xs text-[#8a919e]">
-              Simulation sur <strong className="text-[#3c4149]">{p.test_seasons.length} saison{p.test_seasons.length > 1 ? "s" : ""}</strong> · <strong className="text-[#3c4149]">{p.sport === "football" ? "Football" : p.sport}</strong>
+              {sports.has("football") && sports.has("tennis") ? (
+                <>Simulation sur <strong className="text-[#3c4149]">2023–2025</strong> · <strong className="text-[#3c4149]">⚽ Football + 🎾 Tennis</strong></>
+              ) : sports.has("tennis") ? (
+                <>Simulation sur <strong className="text-[#3c4149]">2024–2025</strong> · <strong className="text-[#3c4149]">🎾 Tennis ATP</strong></>
+              ) : (
+                <>Simulation sur <strong className="text-[#3c4149]">{p.test_seasons.length} saison{p.test_seasons.length > 1 ? "s" : ""}</strong> · <strong className="text-[#3c4149]">⚽ Football</strong></>
+              )}
             </div>
             <div className="flex gap-2">
               <button onClick={() => { setParams({ ...DEFAULT_PARAMS }); setResults([]); }}
@@ -660,7 +739,7 @@ export default function Backtest() {
                   <YAxis stroke="#8a919e" tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${v.toFixed(0)}€`} />
                   <Tooltip
                     contentStyle={{ background: "#fff", border: "1px solid #e3e6eb", borderRadius: 8, boxShadow: "0 4px 16px rgba(16,24,40,.08)", fontSize: 12 }}
-                    formatter={(v: number, name: string) => [`${v.toFixed(2)}€`, results[Number(name.replace("s", ""))]?.label || name]}
+                    formatter={(v: number | undefined, name: string | undefined) => [`${(v ?? 0).toFixed(2)}€`, results[Number((name ?? "").replace("s", ""))]?.label || name || ""]}
                   />
                   {results.map((_, i) => (
                     <Line key={i} type="monotone" dataKey={`s${i}`} stroke={STRAT_COLORS[i]}
@@ -679,7 +758,7 @@ export default function Backtest() {
               {results.map((r, i) => (
                 <span key={i} className="flex items-center gap-1.5">
                   <span className="w-4 h-[2.5px] rounded-sm" style={{ background: STRAT_COLORS[i] }} />
-                  {r.label} — {stakingLabel(r.params.staking_strategy)} · Edge {(r.params.min_edge * 100).toFixed(0)}%
+                  {r.label} : {stakingLabel(r.params.staking_strategy)} · Edge {(r.params.min_edge * 100).toFixed(0)}%
                 </span>
               ))}
               {ddIdx >= 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#f04438]" /> Drawdown max</span>}
@@ -697,7 +776,7 @@ export default function Backtest() {
                     <th className="px-3.5 py-2.5 text-left text-[10.5px] font-bold text-[#b0b7c3] uppercase tracking-wider">Métrique</th>
                     {results.map((r, i) => (
                       <th key={i} className="px-3.5 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wider" style={{ color: STRAT_COLORS[i] }}>
-                        {r.label} — {stakingLabel(r.params.staking_strategy)} · Edge {(r.params.min_edge * 100).toFixed(0)}%
+                        {r.label} : {stakingLabel(r.params.staking_strategy)} · Edge {(r.params.min_edge * 100).toFixed(0)}%
                       </th>
                     ))}
                   </tr>
@@ -731,7 +810,7 @@ export default function Backtest() {
           <div className={`${cardCls} overflow-hidden`}>
             <div className="px-4 py-3 border-b border-[#e3e6eb] flex items-center justify-between">
               <div className="text-[13px] font-bold">
-                Paris simulés — {results[activeStrat]?.label}{" "}
+                Paris simulés : {results[activeStrat]?.label}{" "}
                 <span className="text-[12px] text-[#8a919e] font-normal">({activeResult.metrics.total_bets} total)</span>
               </div>
               <div className="flex gap-2 items-center">
@@ -807,7 +886,7 @@ export default function Backtest() {
           <div className={`${cardCls} px-5 py-4 flex items-center justify-between`} style={{ borderColor: `${ACCENT}30` }}>
             <div>
               <div className="text-[13.5px] font-bold">Vous aimez ces résultats ?</div>
-              <div className="text-xs text-[#8a919e] mt-0.5">Créez une campagne avec exactement ces paramètres — pré-remplie automatiquement.</div>
+              <div className="text-xs text-[#8a919e] mt-0.5">Créez une campagne avec exactement ces paramètres, pré-remplie automatiquement.</div>
             </div>
             <div className="flex gap-2">
               <button onClick={() => setShowSaveModal(true)}
@@ -834,7 +913,7 @@ export default function Backtest() {
           <div className="space-y-1.5">
             {savedList.map((s) => (
               <div key={s.id} className={`${cardCls} flex items-center gap-3 px-4 py-3 hover:border-[#3b5bdb]/30 hover:bg-[#3b5bdb]/3 transition-all cursor-pointer`}>
-                <span className="text-base">{s.sport === "football" ? "⚽" : "🎾"}</span>
+                <span className="text-base">{s.sport === "football" ? "⚽" : s.sport === "tennis" ? "🎾" : "⚽+🎾"}</span>
                 <span className="text-[13px] font-semibold flex-1">{s.name}</span>
                 <span className="text-[11px] text-[#8a919e] font-mono flex items-center gap-1">
                   <Clock size={11} /> {new Date(s.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}

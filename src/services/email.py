@@ -56,6 +56,30 @@ def send_welcome_email(email: str, display_name: str) -> bool:
     return _send(email, "Bienvenue sur BetTracker", html)
 
 
+def send_feedback_email(from_email: str, from_name: str, message: str) -> bool:
+    """Send a user feedback/support message to the admin."""
+    admin_email = settings.ADMIN_EMAIL
+    html = f"""
+    <div style="font-family: -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;
+                border: 1px solid #e3e6eb; border-radius: 12px;">
+      <h2 style="color: #111318; margin-bottom: 4px;">💬 Nouveau message utilisateur</h2>
+      <p style="color: #8a919e; font-size: 13px; margin-top: 0;">BetTracker — Feedback &amp; Support</p>
+      <hr style="border: none; border-top: 1px solid #e3e6eb; margin: 16px 0;" />
+      <p style="color: #3c4149; font-size: 13px; margin-bottom: 4px;">
+        <strong>De :</strong> {from_name} &lt;{from_email}&gt;
+      </p>
+      <div style="background: #f4f5f7; border-radius: 8px; padding: 16px; margin-top: 12px;
+                  color: #111318; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">
+        {message}
+      </div>
+      <p style="color: #b0b7c3; font-size: 11px; margin-top: 20px;">
+        Répondre directement à cet email pour contacter l'utilisateur.
+      </p>
+    </div>
+    """
+    return _send(admin_email, f"[BetTracker] Message de {from_name}", html)
+
+
 def send_reset_password_email(email: str, display_name: str, reset_url: str) -> bool:
     """Send password reset link."""
     name = display_name or email.split("@")[0]

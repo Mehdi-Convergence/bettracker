@@ -14,12 +14,15 @@ import {
   ChevronsLeft,
   ChevronsRight,
   HelpCircle,
+  Send,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { BreadcrumbProvider, useBreadcrumb } from "@/contexts/BreadcrumbContext";
 import NotificationBell from "@/components/NotificationBell";
 import OnboardingModal from "@/components/OnboardingModal";
 import { TourProvider, useTourContext } from "@/contexts/TourContext";
+import { sendFeedback } from "@/services/api";
 
 /* ── Sidebar colors ── */
 const SB = {
@@ -110,17 +113,110 @@ function Breadcrumb() {
   );
 }
 
-function HelpButton() {
+function HelpAndFeedback() {
   const { requestTour } = useTourContext();
-  if (!requestTour) return null;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
+
+  async function handleSend() {
+    if (!message.trim()) return;
+    setStatus("sending");
+    try {
+      await sendFeedback(message.trim());
+      setStatus("done");
+      setTimeout(() => { setFeedbackOpen(false); setMessage(""); setStatus("idle"); }, 2000);
+    } catch {
+      setStatus("error");
+    }
+  }
+
+  function openFeedback() { setMenuOpen(false); setFeedbackOpen(true); }
+  function startTour() { setMenuOpen(false); requestTour?.(); }
+
   return (
-    <button
-      onClick={requestTour}
-      title="Visite guidée"
-      className="w-8 h-8 rounded-lg bg-transparent border border-[#e3e6eb] flex items-center justify-center cursor-pointer text-[#8a919e] hover:bg-[#f4f5f7] hover:border-[#cdd1d9] hover:text-[#4f8cff] transition-all"
-    >
-      <HelpCircle size={15} />
-    </button>
+    <>
+      {/* Single ? button */}
+      <div className="relative">
+        <button
+          onClick={() => setMenuOpen((v) => !v)}
+          className={`w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-all text-[13px] font-bold border-none ${
+            menuOpen
+              ? "bg-[#e8eaed] text-[#111318]"
+              : "bg-[#f4f5f7] text-[#5a6272] hover:bg-[#e8eaed] hover:text-[#111318]"
+          }`}
+        >
+          ?
+        </button>
+
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+            <div className="absolute right-0 top-10 z-50 bg-white border border-[#e3e6eb] rounded-xl shadow-lg py-1 w-48 overflow-hidden">
+              {requestTour && (
+                <button onClick={startTour}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-[#3c4149] hover:bg-[#f4f5f7] transition-colors text-left bg-transparent border-none cursor-pointer">
+                  <HelpCircle size={14} className="text-[#3b5bdb]" />
+                  Visite guidée
+                </button>
+              )}
+              <button onClick={openFeedback}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-[#3c4149] hover:bg-[#f4f5f7] transition-colors text-left bg-transparent border-none cursor-pointer">
+                <MessageCircle size={14} className="text-[#7c3aed]" />
+                Envoyer un message
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Feedback modal */}
+      {feedbackOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.35)" }} onClick={() => setFeedbackOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[440px] mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[16px] font-extrabold text-[#111318]">Envoyer un message</h3>
+              <button onClick={() => setFeedbackOpen(false)} className="text-[#b0b7c3] hover:text-[#111318] bg-transparent border-none cursor-pointer p-1 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {status === "done" ? (
+              <div className="text-center py-6">
+                <div className="text-3xl mb-2">✅</div>
+                <p className="text-[14px] font-semibold text-[#12b76a]">Message envoyé, merci !</p>
+              </div>
+            ) : (
+              <>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Retour, bug, suggestion..."
+                  rows={5}
+                  className="w-full border border-[#e3e6eb] rounded-xl px-3.5 py-3 text-[13px] text-[#111318] outline-none resize-none focus:border-[#7c3aed] focus:shadow-[0_0_0_3px_rgba(124,58,237,0.07)] transition-all placeholder:text-[#b0b7c3]"
+                />
+                {status === "error" && (
+                  <p className="text-[12px] text-[#f04438] mt-1.5">Erreur d'envoi, réessaie.</p>
+                )}
+                <button
+                  onClick={handleSend}
+                  disabled={!message.trim() || status === "sending"}
+                  className="w-full mt-3 py-[11px] rounded-xl bg-[#7c3aed] text-white text-[13px] font-bold flex items-center justify-center gap-2 cursor-pointer border-none hover:bg-[#6d28d9] transition-all disabled:opacity-50"
+                >
+                  {status === "sending" ? (
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                  ) : (
+                    <Send size={14} />
+                  )}
+                  Envoyer
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -215,17 +311,7 @@ export default function Layout() {
             }}
           >
             <MessageCircle size={collapsed ? 18 : 16} className="shrink-0" />
-            {!collapsed && (
-              <>
-                IA Analyste
-                <span
-                  className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded-full"
-                  style={{ background: "rgba(245,158,11,0.15)", color: "#f59e0b" }}
-                >
-                  Soon
-                </span>
-              </>
-            )}
+            {!collapsed && "IA Analyste"}
           </NavLink>
         </nav>
 
@@ -328,11 +414,8 @@ export default function Layout() {
           <div className="h-14 min-h-14 border-b border-[#e3e6eb] bg-white flex items-center px-7 gap-3">
             <Breadcrumb />
             <div className="ml-auto flex items-center gap-2">
-              <HelpButton />
               <NotificationBell />
-              <button className="w-8 h-8 rounded-lg bg-transparent border border-[#e3e6eb] flex items-center justify-center cursor-pointer text-[#8a919e] hover:bg-[#f4f5f7] hover:border-[#cdd1d9] hover:text-[#111318] transition-all">
-                <Search size={14} />
-              </button>
+              <HelpAndFeedback />
             </div>
           </div>
 

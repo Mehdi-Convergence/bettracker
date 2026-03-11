@@ -12,11 +12,12 @@ import pandas as pd
 import numpy as np
 
 # Add project root to path
-sys.path.insert(0, "C:/Users/MehdiBouziane/bettracker")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
 
 from src.backtest.engine import BacktestEngine
 
-DATA_PATH = "C:/Users/MehdiBouziane/bettracker/data/processed/football_features.parquet"
+DATA_PATH = os.path.join(ROOT, "data/processed/football_features.parquet")
 
 # Available seasons: 2021, 2122, 2223, 2324, 2425
 # Walk-forward: need at least 2 seasons to train. Test on 2324 and 2425.

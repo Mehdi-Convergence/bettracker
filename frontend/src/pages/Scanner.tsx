@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import {
   Search, AlertTriangle, Filter, Calendar, Clock, HelpCircle,
-  GripVertical, X, Eye, Star, ChevronDown, Trophy, RefreshCw,
+  X, Eye, Star, ChevronDown, Trophy, RefreshCw,
   ScanSearch, TrendingUp, Shield, CheckCircle2,
 } from "lucide-react";
 import { aiScan } from "@/services/api";
@@ -86,16 +86,6 @@ const TENNIS_CIRCUITS: TennisCircuit[] = [
     knownTournaments: [],
   },
 ];
-const ALL_CIRCUIT_CODES = TENNIS_CIRCUITS.map((c) => c.code);
-
-function matchCircuit(league: string): string | null {
-  const lower = (league || "").toLowerCase();
-  for (const c of TENNIS_CIRCUITS) {
-    if (c.patterns.some((p) => lower.includes(p))) return c.code;
-  }
-  return null;
-}
-
 const LEAGUE_INFO_BY_NAME: Record<string, import("@/types").LeagueInfo> = Object.fromEntries(
   Object.values(LEAGUE_INFO).map((v) => [v.name, v])
 );
@@ -146,20 +136,6 @@ function extractBkOdds(val: unknown): Record<string, number> {
   return n > 0 ? { "IA": n } : {};
 }
 
-/** Day label for grouping matches */
-function dayLabel(dateStr: string): string {
-  const d = new Date(dateStr);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const matchDay = new Date(d);
-  matchDay.setHours(0, 0, 0, 0);
-
-  if (matchDay.getTime() === today.getTime()) return "Aujourd'hui";
-  if (matchDay.getTime() === tomorrow.getTime()) return "Demain";
-  return d.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "2-digit" });
-}
 
 /* ═══════════════════════════════════════════════════════════════════
    Component
@@ -174,7 +150,19 @@ export default function Scanner() {
   const [hasScanned, setHasScanned] = useState(false);
   const [isCached, setIsCached] = useState(false);
   const [cachedAt, setCachedAt] = useState<string | null>(null);
-  const [sport, setSport] = useState<"football" | "tennis">("football");
+  const [sports, setSports] = useState<Set<"football" | "tennis">>(new Set(["football"]));
+
+  function toggleSport(s: "football" | "tennis") {
+    setSports(prev => {
+      const next = new Set(prev);
+      if (next.has(s)) {
+        if (next.size > 1) next.delete(s); // toujours au moins 1 sport actif
+      } else {
+        next.add(s);
+      }
+      return next;
+    });
+  }
   const [aiMatches, setAiMatches] = useState<AIScanMatch[]>([]);
   const [aiDuration, setAiDuration] = useState(0);
 
@@ -220,19 +208,23 @@ export default function Scanner() {
     if (!silent) { setLoading(true); setError(""); }
     try {
       const timeframeMap: Record<string, string> = { today: "24h", "48h": "48h", "72h": "72h", week: "1w", month: "1m" };
-      const data = await aiScan({
-        sport,
-        leagues: sport === "tennis" ? "ATP,WTA" : "",
-        timeframe: timeframeMap[datePreset] || "48h",
-        force: forceRefresh || undefined,
-        cacheOnly: silent || undefined,
-      });
-      const matches = data.matches ?? [];
+      const sportList = [...sports];
+      const results = await Promise.all(
+        sportList.map(s => aiScan({
+          sport: s,
+          leagues: s === "tennis" ? "ATP,WTA" : "",
+          timeframe: timeframeMap[datePreset] || "48h",
+          force: forceRefresh || undefined,
+          cacheOnly: silent || undefined,
+        }))
+      );
+      const matches = results.flatMap(d => d.matches ?? []);
+      const first = results[0];
       if (matches.length > 0 || !silent) {
         setAiMatches(matches);
-        setAiDuration(data.research_duration_seconds);
-        setIsCached(data.cached);
-        setCachedAt(data.cached_at);
+        setAiDuration(first.research_duration_seconds);
+        setIsCached(first.cached);
+        setCachedAt(first.cached_at);
         setHasScanned(matches.length > 0);
       }
     } catch (e) {
@@ -248,7 +240,7 @@ export default function Scanner() {
     ));
 
     // League display filter (football only)
-    if (sport === "football" && activeLeagues.size < ALL_LEAGUE_CODES.length) {
+    if (sports.has("football") && activeLeagues.size < ALL_LEAGUE_CODES.length) {
       const activeNames = new Set(
         ALL_LEAGUE_CODES.filter((c) => activeLeagues.has(c)).map((c) => LEAGUE_INFO[c]?.name).filter(Boolean)
       );
@@ -256,7 +248,7 @@ export default function Scanner() {
     }
 
     // Circuit/tournament filter (tennis only)
-    if (sport === "tennis" && excludedTournaments.size > 0) {
+    if (sports.has("tennis") && excludedTournaments.size > 0) {
       result = result.filter((am) => {
         if (am.sport !== "tennis") return true;
         return !excludedTournaments.has(am.league || "");
@@ -379,7 +371,7 @@ export default function Scanner() {
     });
 
     return result;
-  }, [aiMatches, searchTeam, activeLeagues, excludedTournaments, sport, dateFrom, dateTo, timeFrom, timeTo, sortBy, hiddenMatches, minEdge, minOdds, maxOdds, valueOnlyFilter, minDataScore, hideInTicket, tickets]);
+  }, [aiMatches, searchTeam, activeLeagues, excludedTournaments, sports, dateFrom, dateTo, timeFrom, timeTo, sortBy, hiddenMatches, minEdge, minOdds, maxOdds, valueOnlyFilter, minDataScore, hideInTicket, tickets]);
 
   /* ── League management ── */
   function toggleLeague(code: string) {
@@ -665,21 +657,6 @@ export default function Scanner() {
   };
 
   /* ── Group matches by day ── */
-  const matchesByDay = useMemo(() => {
-    const groups: { day: string; matches: AIScanMatch[] }[] = [];
-    let currentDay = "";
-    for (const am of filteredAiMatches) {
-      const d = am.date ? parseBetDate(am.date).dateStr : "";
-      const label = d ? dayLabel(d) : "Sans date";
-      if (label !== currentDay) {
-        currentDay = label;
-        groups.push({ day: label, matches: [] });
-      }
-      groups[groups.length - 1].matches.push(am);
-    }
-    return groups;
-  }, [filteredAiMatches]);
-
   /* ═══════════════════════════════════════════════════════════════════
      RENDER
      ═══════════════════════════════════════════════════════════════════ */
@@ -727,13 +704,13 @@ export default function Scanner() {
               <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Sport</label>
               <div className="flex gap-1">
                 {(["football", "tennis"] as const).map((s) => (
-                  <button key={s} onClick={() => setSport(s)}
+                  <button key={s} onClick={() => toggleSport(s)}
                     className={`px-3 py-[5px] rounded-full text-[11.5px] font-semibold transition-all ${
-                      sport === s
+                      sports.has(s)
                         ? "bg-[#3b5bdb] text-white shadow-sm"
                         : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
                     }`}>
-                    {s === "football" ? "Football" : "Tennis"}
+                    {s === "football" ? "⚽ Football" : "🎾 Tennis"}
                   </button>
                 ))}
               </div>
@@ -742,12 +719,12 @@ export default function Scanner() {
             {/* Search */}
             <div className="flex-1 min-w-[180px]">
               <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">
-                {sport === "tennis" ? "Joueur" : "Equipe"}
+                {sports.has("tennis") && !sports.has("football") ? "Joueur" : sports.has("football") && !sports.has("tennis") ? "Equipe" : "Equipe / Joueur"}
               </label>
               <div className="relative">
                 <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#b0b7c3]" />
                 <input type="text"
-                  placeholder={sport === "tennis" ? "Djokovic, Alcaraz..." : "Arsenal, PSG..."}
+                  placeholder={sports.has("tennis") && !sports.has("football") ? "Djokovic, Alcaraz..." : sports.has("football") && !sports.has("tennis") ? "Arsenal, PSG..." : "Arsenal, Djokovic..."}
                   value={searchTeam} onChange={(e) => setSearchTeam(e.target.value)}
                   className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg pl-8 pr-3 py-[5px] text-[12px] text-[#111318] w-full focus:ring-2 focus:ring-[#3b5bdb]/30 focus:border-[#3b5bdb] outline-none" />
               </div>
@@ -829,58 +806,9 @@ export default function Scanner() {
 
         {/* Row 2: Leagues + toggle filters */}
         <div data-tour="filters" className="px-5 py-2.5">
-          <div className="flex items-center gap-3 flex-wrap">
-            {sport === "tennis" ? (
-            <>
-              <button
-                onClick={() => setShowCircuits(!showCircuits)}
-                className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
-              >
-                <Trophy size={12} className="text-[#f79009]" />
-                <span className="font-semibold">Circuits</span>
-                <span className="text-[10px] text-[#f79009] bg-[#f79009]/10 px-1.5 py-0.5 rounded-full font-bold">
-                  {activeTennisCount}/{allTennisNames.length}
-                </span>
-                <ChevronDown size={12} className={`text-[#8a919e] transition-transform ${showCircuits ? "rotate-180" : ""}`} />
-              </button>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={toggleAllTournaments}
-                  className="text-[10px] text-[#f79009] hover:text-[#d97706] font-semibold px-2 py-1 rounded-md hover:bg-[#f79009]/8 transition-colors"
-                >
-                  {excludedTournaments.size === 0 ? "Aucun" : "Tous"}
-                </button>
-                {tennisByCircuit.map((g) => {
-                  const allActive = g.tournaments.every((t) => !excludedTournaments.has(t));
-                  return (
-                    <button
-                      key={g.code}
-                      onClick={() => toggleCircuitGroup(g.tournaments)}
-                      className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${
-                        allActive
-                          ? "text-[#f79009] hover:bg-[#f79009]/8"
-                          : "text-[#b0b7c3] hover:text-[#f79009] hover:bg-[#f79009]/8"
-                      }`}
-                    >
-                      {allActive ? `- ${g.name}` : `+ ${g.name}`}
-                    </button>
-                  );
-                })}
-              </div>
-              {!showCircuits && excludedTournaments.size > 0 && excludedTournaments.size < allTennisNames.length && (
-                <div className="flex flex-wrap gap-1 flex-1 min-w-0">
-                  {allTennisNames.filter((t) => !excludedTournaments.has(t)).slice(0, 6).map((name) => (
-                    <span key={name} className="text-[10px] text-[#111318] bg-[#f4f5f7] px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-[#e3e6eb]">
-                      {name}
-                      <X size={8} className="text-[#8a919e] hover:text-[#f04438] cursor-pointer" onClick={() => toggleTournament(name)} />
-                    </span>
-                  ))}
-                  {activeTennisCount > 6 && <span className="text-[10px] text-[#8a919e]">+{activeTennisCount - 6}</span>}
-                </div>
-              )}
-            </>
-            ) : (
-            <>
+          {/* Football filter bar */}
+          {sports.has("football") && (
+            <div className="flex items-center gap-3 flex-wrap mb-1">
               <button
                 onClick={() => setShowLeagues(!showLeagues)}
                 className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
@@ -923,42 +851,78 @@ export default function Scanner() {
                   {activeLeagues.size > 6 && <span className="text-[10px] text-[#8a919e]">+{activeLeagues.size - 6}</span>}
                 </div>
               )}
-            </>
-            )}
-
-            <div className="h-5 w-px bg-[#e3e6eb]" />
-
-            {/* Toggle filters */}
-            <button
-              data-tour="value-toggle"
-              onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
-              className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${
-                valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
-              }`}
-            >
-              <TrendingUp size={10} />
-              Value bets
-            </button>
-            <button
-              onClick={() => setHideInTicket(!hideInTicket)}
-              className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${
-                hideInTicket ? "bg-[#3b5bdb] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
-              }`}
-            >
-              <Shield size={10} />
-              Masquer en ticket
-            </button>
-            <div>
-              <input type="number" min="0" max="20" step="1" placeholder="Data min" value={minDataScore}
-                onChange={(e) => setMinDataScore(e.target.value)}
-                className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-2.5 py-[5px] text-[11px] text-[#111318] w-20 outline-none focus:ring-2 focus:ring-[#3b5bdb]/30"
-                title="Score de qualite de donnees minimum (sur 20)" />
+              {!sports.has("tennis") && (
+                <>
+                  <div className="h-5 w-px bg-[#e3e6eb]" />
+                  <button data-tour="value-toggle" onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
+                    className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+                    <TrendingUp size={10} /> Value bets
+                  </button>
+                  <button onClick={() => setHideInTicket(!hideInTicket)}
+                    className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${hideInTicket ? "bg-[#3b5bdb] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+                    <Shield size={10} /> Masquer en ticket
+                  </button>
+                </>
+              )}
             </div>
-          </div>
+          )}
+
+          {/* Tennis filter bar */}
+          {sports.has("tennis") && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={() => setShowCircuits(!showCircuits)}
+                className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
+              >
+                <Trophy size={12} className="text-[#f79009]" />
+                <span className="font-semibold">Circuits</span>
+                <span className="text-[10px] text-[#f79009] bg-[#f79009]/10 px-1.5 py-0.5 rounded-full font-bold">
+                  {activeTennisCount}/{allTennisNames.length}
+                </span>
+                <ChevronDown size={12} className={`text-[#8a919e] transition-transform ${showCircuits ? "rotate-180" : ""}`} />
+              </button>
+              <div className="flex items-center gap-1">
+                <button onClick={toggleAllTournaments}
+                  className="text-[10px] text-[#f79009] hover:text-[#d97706] font-semibold px-2 py-1 rounded-md hover:bg-[#f79009]/8 transition-colors">
+                  {excludedTournaments.size === 0 ? "Aucun" : "Tous"}
+                </button>
+                {tennisByCircuit.map((g) => {
+                  const allActive = g.tournaments.every((t) => !excludedTournaments.has(t));
+                  return (
+                    <button key={g.code} onClick={() => toggleCircuitGroup(g.tournaments)}
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${allActive ? "text-[#f79009] hover:bg-[#f79009]/8" : "text-[#b0b7c3] hover:text-[#f79009] hover:bg-[#f79009]/8"}`}>
+                      {allActive ? `- ${g.name}` : `+ ${g.name}`}
+                    </button>
+                  );
+                })}
+              </div>
+              {!showCircuits && excludedTournaments.size > 0 && excludedTournaments.size < allTennisNames.length && (
+                <div className="flex flex-wrap gap-1 flex-1 min-w-0">
+                  {allTennisNames.filter((t) => !excludedTournaments.has(t)).slice(0, 6).map((name) => (
+                    <span key={name} className="text-[10px] text-[#111318] bg-[#f4f5f7] px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-[#e3e6eb]">
+                      {name}
+                      <X size={8} className="text-[#8a919e] hover:text-[#f04438] cursor-pointer" onClick={() => toggleTournament(name)} />
+                    </span>
+                  ))}
+                  {activeTennisCount > 6 && <span className="text-[10px] text-[#8a919e]">+{activeTennisCount - 6}</span>}
+                </div>
+              )}
+              <div className="h-5 w-px bg-[#e3e6eb]" />
+              <button data-tour="value-toggle" onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
+                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+                <TrendingUp size={10} /> Value bets
+              </button>
+              <button onClick={() => setHideInTicket(!hideInTicket)}
+                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${hideInTicket ? "bg-[#3b5bdb] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+                <Shield size={10} /> Masquer en ticket
+              </button>
+            </div>
+          )}
+
 
           {/* Leagues dropdown panel */}
           {/* Leagues dropdown panel (football) */}
-          {showLeagues && sport === "football" && (
+          {showLeagues && sports.has("football") && (
             <div className="mt-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-xl p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {LEAGUES_BY_COUNTRY.map(({ country, flag, leagues }) => {
                 const countryCodes = leagues.map((l) => l.code);
@@ -1009,10 +973,10 @@ export default function Scanner() {
           )}
 
           {/* Circuits dropdown panel (tennis) — circuit → tournaments */}
-          {showCircuits && sport === "tennis" && (
+          {showCircuits && sports.has("tennis") && (
             <div className="mt-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-xl p-4">
               {tennisByCircuit.length === 0 ? (
-                <span className="text-[11px] text-[#8a919e]">Aucun tournoi — lancez un scan tennis pour voir les tournois actifs</span>
+                <span className="text-[11px] text-[#8a919e]">Aucun tournoi. Lancez un scan tennis pour voir les tournois actifs</span>
               ) : (
                 <div className="flex gap-6">
                   {tennisByCircuit.map((g) => {

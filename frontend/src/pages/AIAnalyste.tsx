@@ -1,9 +1,8 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import DOMPurify from "dompurify";
 import {
   MessageCircle,
   Send,
-  Plus,
   RotateCcw,
   Settings2,
   Image,
@@ -20,12 +19,6 @@ import {
    MOCK DATA — Phase 1 only (will be replaced by API)
    ═══════════════════════════════════════════════════════ */
 
-interface MockSession {
-  id: number;
-  name: string;
-  active: boolean;
-}
-
 interface MockEmbed {
   type: "match" | "ticket" | "chart";
 }
@@ -39,17 +32,12 @@ interface MockMessage {
   chips?: string[];
 }
 
-const MOCK_SESSIONS: MockSession[] = [
-  { id: 1, name: "Analyse du jour", active: true },
-  { id: 2, name: "Ticket Indian Wells", active: false },
-  { id: 3, name: "Review Mars 2026", active: false },
-];
 
 const MOCK_MESSAGES: MockMessage[] = [
   {
     id: 1,
     role: "assistant",
-    content: `Bonjour Mehdi 👋 J'ai analysé ton scan du jour. <strong>7 value bets détectés</strong>, edge moyen <span class="hl-green">+6.2%</span>.<br><br>Ton meilleur signal aujourd'hui : <span class="hl-blue">Almeria vs Cultural</span> avec un edge de <span class="hl-green">+7.5%</span> sur la victoire Almeria. Le modèle Poisson donne <span class="hl-green">71.7%</span> de chances, le marché ne valorise que <span class="hl-amber">64.1%</span>.<br><br>Ton ticket actuel (2 sélections) a un EV combiné de <span class="hl-green">+18.3%</span>. C'est solide.`,
+    content: `Bonjour 👋 J'ai analysé ton scan du jour. <strong>7 value bets détectés</strong>, edge moyen <span class="hl-green">+6.2%</span>.<br><br>Ton meilleur signal aujourd'hui : <span class="hl-blue">Almeria vs Cultural</span> avec un edge de <span class="hl-green">+7.5%</span> sur la victoire Almeria. Le modèle Poisson donne <span class="hl-green">71.7%</span> de chances, le marché ne valorise que <span class="hl-amber">64.1%</span>.<br><br>Ton ticket actuel (2 sélections) a un EV combiné de <span class="hl-green">+18.3%</span>. C'est solide.`,
     time: "09:14",
     embeds: [{ type: "match" }],
     chips: [
@@ -68,7 +56,7 @@ const MOCK_MESSAGES: MockMessage[] = [
   {
     id: 3,
     role: "assistant",
-    content: `Voici ton <strong>Ticket 1</strong> analysé :<br><br>✅ <strong>Almeria Dom @ 1.56</strong> — Excellent. Edge +7.5%, modèle confiant à 71.7%. Cote en baisse (−0.04 en 2h), le marché confirme.<br><br>✅ <strong>Trabzonspor Ext @ 2.05</strong> — Très bon. Edge +10.8%, le plus fort du scan. Trabzonspor est 3e au classement, Kayserispor 17e. λ favorable.<br><br>⚠️ <strong>Point d'attention</strong> : les deux matchs sont <span class="hl-amber">le même jour (09/03)</span>. En combi, si l'un tombe, tout tombe. Avec 20€ et une cote combinée de <span class="hl-blue">×3.20</span>, ton gain potentiel est <span class="hl-green">+44€</span> pour un EV combiné de <span class="hl-green">+18.3%</span>. C'est une bonne combinaison selon mon modèle.`,
+    content: `Voici ton <strong>Ticket 1</strong> analysé :<br><br>✅ <strong>Almeria Dom @ 1.56</strong> : Excellent. Edge +7.5%, modèle confiant à 71.7%. Cote en baisse (−0.04 en 2h), le marché confirme.<br><br>✅ <strong>Trabzonspor Ext @ 2.05</strong> : Très bon. Edge +10.8%, le plus fort du scan. Trabzonspor est 3e au classement, Kayserispor 17e. λ favorable.<br><br>⚠️ <strong>Point d'attention</strong> : les deux matchs sont <span class="hl-amber">le même jour (09/03)</span>. En combi, si l'un tombe, tout tombe. Avec 20€ et une cote combinée de <span class="hl-blue">×3.20</span>, ton gain potentiel est <span class="hl-green">+44€</span> pour un EV combiné de <span class="hl-green">+18.3%</span>. C'est une bonne combinaison selon mon modèle.`,
     time: "09:15",
     embeds: [{ type: "ticket" }],
     chips: [
@@ -87,7 +75,7 @@ const MOCK_MESSAGES: MockMessage[] = [
   {
     id: 5,
     role: "assistant",
-    content: `Sur les <strong>30 derniers jours</strong> : ROI global <span class="hl-green">+18.4%</span>, taux de réussite <span class="hl-blue">61.8%</span> sur 34 tickets.<br><br>Points forts : <strong>Tennis ATP</strong> est ta meilleure surface (<span class="hl-green">+22.4%</span>), Bundesliga aussi (<span class="hl-green">+11.1%</span>).<br><br>⚠️ Points à améliorer :<br>• <strong>Basketball NBA</strong> : <span class="hl-red">−8.1%</span> — à éviter jusqu'à nouvelle analyse<br>• <strong>WTA combi</strong> : trop volatile, 3 tickets tués ce mois. Limite à 10€ max<br>• <strong>Cotes > 3.0</strong> : taux de réussite chute à 34% — rester sur 1.4–2.8`,
+    content: `Sur les <strong>30 derniers jours</strong> : ROI global <span class="hl-green">+18.4%</span>, taux de réussite <span class="hl-blue">61.8%</span> sur 34 tickets.<br><br>Points forts : <strong>Tennis ATP</strong> est ta meilleure surface (<span class="hl-green">+22.4%</span>), Bundesliga aussi (<span class="hl-green">+11.1%</span>).<br><br>⚠️ Points à améliorer :<br>• <strong>Basketball NBA</strong> : <span class="hl-red">−8.1%</span>, à éviter jusqu'à nouvelle analyse<br>• <strong>WTA combi</strong> : trop volatile, 3 tickets tués ce mois. Limite à 10€ max<br>• <strong>Cotes > 3.0</strong> : taux de réussite chute à 34%, rester sur 1.4–2.8`,
     time: "09:18",
     embeds: [{ type: "chart" }],
     chips: [
@@ -204,8 +192,6 @@ function EmbedChartCard() {
    ═══════════════════════════════════════════════════════ */
 
 export default function AIAnalyste() {
-  const [sessions] = useState(MOCK_SESSIONS);
-  const [activeSessionId, setActiveSessionId] = useState(1);
   const [messages, setMessages] = useState(MOCK_MESSAGES);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -224,10 +210,6 @@ export default function AIAnalyste() {
       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + "px";
     }
   }, [input]);
-
-  const now = useMemo(() => {
-    return new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-  }, []);
 
   function handleSend(text?: string) {
     const msg = text || input.trim();
@@ -273,10 +255,6 @@ export default function AIAnalyste() {
       <div className="shrink-0 px-5 py-3 bg-white border-b border-[#e3e6eb] flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <h1 className="text-[22px] font-extrabold tracking-tight text-[#111318]">IA Analyste</h1>
-          <div className="flex items-center gap-[5px] px-2.5 py-1 rounded-full text-[11px] font-semibold font-mono text-[#7c3aed]" style={{ background: "rgba(124,58,237,.07)", border: "1px solid rgba(124,58,237,.18)" }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#7c3aed] animate-pulse" />
-            En ligne · IA
-          </div>
         </div>
         <div className="flex items-center gap-2">
           <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-white text-[#8a919e] text-[12px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] transition-colors font-[inherit]">
@@ -290,42 +268,11 @@ export default function AIAnalyste() {
         </div>
       </div>
 
-      {/* ══ DEV BANNER ══ */}
-      <div className="shrink-0 flex items-center gap-2.5 px-5 py-2.5 bg-amber-50 border-b border-amber-200">
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold uppercase tracking-wide">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-          En cours de dev
-        </span>
-        <span className="text-[13px] text-amber-700">
-          Cette fonctionnalité est en cours de développement. Les réponses affichées sont simulées et ne reflètent pas de vraies analyses.
-        </span>
-      </div>
-
       {/* ══ BODY: CHAT + CONTEXT ══ */}
       <div className="flex-1 flex overflow-hidden">
 
         {/* ── CHAT ZONE ── */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-
-          {/* Sessions bar */}
-          <div className="shrink-0 flex items-center gap-2 px-4 py-2 bg-[#f7f8fa] border-b border-[#e3e6eb] overflow-x-auto">
-            {sessions.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setActiveSessionId(s.id)}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium whitespace-nowrap cursor-pointer transition-all border font-[inherit] ${
-                  s.id === activeSessionId
-                    ? "bg-[rgba(124,58,237,.07)] text-[#7c3aed] border-[rgba(124,58,237,.18)] font-semibold"
-                    : "bg-white text-[#8a919e] border-[#e3e6eb] hover:border-[#cdd1d9] hover:text-[#3c4149]"
-                }`}
-              >
-                {s.name}
-              </button>
-            ))}
-            <button className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer text-[#8a919e] hover:border-[#7c3aed] hover:text-[#7c3aed] transition-colors" style={{ border: "1px dashed #cdd1d9", background: "none" }}>
-              <Plus size={13} />
-            </button>
-          </div>
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">

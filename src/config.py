@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     # API Keys (optional, for live scanner)
     ODDS_API_KEY: str = ""
     API_FOOTBALL_KEY: str = ""
+    OPENWEATHER_API_KEY: str = ""
 
     # ML Config
     KELLY_FRACTION: float = 0.125  # 1/8 Kelly (conservative)
@@ -42,7 +43,8 @@ class Settings(BaseSettings):
 
     # Email (Resend — optional, graceful skip if empty)
     RESEND_API_KEY: str = ""
-    RESEND_FROM_EMAIL: str = "BetTracker <noreply@bettracker.com>"
+    RESEND_FROM_EMAIL: str = "BetTracker <noreply@bettracker.fr>"
+    ADMIN_EMAIL: str = "contact@bettracker.fr"
     FRONTEND_URL: str = "http://localhost:5173"
 
     # Auth / JWT (no default — MUST be set via env or .env)
