@@ -29,17 +29,13 @@ beforeEach(() => {
 describe('Login page — branding panel', () => {
   it('affiche le titre principal', () => {
     renderWithRouter(<Login />)
-    expect(screen.getByText('Pariez plus')).toBeInTheDocument()
-    expect(screen.getByText('intelligemment')).toBeInTheDocument()
+    expect(screen.getByText(/Pas l/)).toBeInTheDocument()
+    expect(screen.getByText(/Value Bet Detection/)).toBeInTheDocument()
   })
 
-  it('affiche les stats clés', () => {
+  it('affiche la description', () => {
     renderWithRouter(<Login />)
-    expect(screen.getAllByText('+14.2%').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('63%')).toBeInTheDocument()
-    expect(screen.getByText('38k+')).toBeInTheDocument()
-    expect(screen.getByText('ROI moyen')).toBeInTheDocument()
-    expect(screen.getByText('Taux de réussite')).toBeInTheDocument()
+    expect(screen.getByText(/BetTracker analyse chaque match/)).toBeInTheDocument()
   })
 
   it('affiche les 4 features', () => {
@@ -52,7 +48,8 @@ describe('Login page — branding panel', () => {
 
   it('affiche la preuve sociale', () => {
     renderWithRouter(<Login />)
-    expect(screen.getByText(/1 240 bettors/)).toBeInTheDocument()
+    expect(screen.getByText(/Rejoignez nos parieurs/)).toBeInTheDocument()
+    expect(screen.getByText('+18%')).toBeInTheDocument()
   })
 })
 

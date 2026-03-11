@@ -59,20 +59,23 @@ export default function Login() {
   const labelCls = "text-[11.5px] font-semibold text-[#3c4149] tracking-wide";
 
   return (
-    <div className="grid min-h-screen" style={{ gridTemplateColumns: "48fr 52fr" }}>
+    <div className="grid min-h-screen" style={{ gridTemplateColumns: "1fr 480px" }}>
       {/* ── LEFT PANEL: BRANDING ── */}
-      <div className="relative overflow-hidden flex flex-col justify-between p-10 pl-14 pr-10" style={{ background: "#1e2535" }}>
+      <div
+        className="relative overflow-hidden flex flex-col justify-between py-10"
+        style={{ background: "#0f1623", padding: "40px 32px 40px 80px" }}
+      >
         {/* Grid decoration */}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            backgroundImage: "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+            backgroundImage: "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)",
             backgroundSize: "48px 48px",
           }}
         />
         {/* Glow circles */}
-        <div className="absolute -top-30 -right-30 w-[480px] h-[480px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(79,140,255,0.15) 0%, transparent 70%)" }} />
-        <div className="absolute -bottom-20 -left-20 w-[360px] h-[360px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(18,183,106,0.1) 0%, transparent 70%)" }} />
+        <div className="absolute -top-30 -right-30 w-[600px] h-[600px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(79,140,255,0.12) 0%, transparent 65%)" }} />
+        <div className="absolute -bottom-20 -left-20 w-[400px] h-[400px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(18,183,106,0.08) 0%, transparent 65%)" }} />
 
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-2.5">
@@ -87,46 +90,45 @@ export default function Login() {
         </div>
 
         {/* Center content */}
-        <div className="relative z-10 flex-1 flex flex-col justify-center gap-8">
+        <div className="relative z-10 flex-1 flex flex-col justify-center" style={{ gap: "36px" }}>
           <div>
-            <div className="text-[11px] font-semibold tracking-[0.12em] uppercase text-[#7eb8ff] mb-4">
-              Value Bet Detection
+            <div
+              className="font-semibold uppercase mb-5"
+              style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "12px", letterSpacing: "0.18em", color: "rgba(79,140,255,0.8)" }}
+            >
+              Value Bet Detection · Algorithme IA
             </div>
-            <h1 className="text-[46px] font-extrabold tracking-tight leading-[1.08] text-white mb-5">
-              Pariez plus{" "}
-              <span className="bg-gradient-to-r from-[#7eb8ff] to-[#12b76a] bg-clip-text text-transparent">
-                intelligemment
-              </span>
+            <h1
+              className="tracking-tight leading-[1.05] text-white mb-6"
+              style={{ fontSize: "62px", fontWeight: 900 }}
+            >
+              Pariez avec l&apos;<span className="bg-gradient-to-r from-[#7eb8ff] to-[#4f8cff] bg-clip-text text-transparent">edge</span>
+              <br />
+              et la <span className="bg-gradient-to-r from-[#12b76a] to-[#3ee09c] bg-clip-text text-transparent">probabilité</span>.
+              <br />
+              <span style={{ color: "rgba(255,255,255,0.35)" }}>Pas l&apos;instinct.</span>
             </h1>
-            <p className="text-[15px] leading-relaxed max-w-[420px]" style={{ color: "rgba(255,255,255,0.5)" }}>
-              Détectez les value bets, suivez vos performances et pilotez vos campagnes avec un algorithme entraîné sur 7 saisons de données.
+            <p
+              className="leading-[1.75] max-w-[540px]"
+              style={{ fontSize: "20px", color: "rgba(255,255,255,0.42)", textAlign: "justify" }}
+            >
+              BetTracker analyse chaque match en temps réel, calibre les probabilités et détecte automatiquement les value bets — là où les bookmakers sous-estiment vos chances.
             </p>
           </div>
 
-          {/* Stats strip */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="flex flex-col" style={{ gap: "18px" }}>
             {[
-              { value: "+14.2%", label: "ROI moyen", color: "#12b76a" },
-              { value: "63%", label: "Taux de réussite", color: "#7eb8ff" },
-              { value: "38k+", label: "Matchs analysés", color: "#f79009" },
-            ].map(({ value, label, color }) => (
-              <div key={label} className="rounded-xl px-4 py-3.5" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                <div className="text-[22px] font-extrabold tracking-tight" style={{ color }}>{value}</div>
-                <div className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex flex-col gap-3">
-            {[
-              { Icon: ScanSearch, text: "Scan automatique des matchs à fort edge", color: "#7eb8ff", bg: "rgba(79,140,255,0.12)" },
-              { Icon: BarChart2, text: "Suivi ROI en temps réel · Historique complet", color: "#12b76a", bg: "rgba(18,183,106,0.12)" },
-              { Icon: Bot, text: "Campagnes auto-pilotées par l'algorithme", color: "#f79009", bg: "rgba(247,144,9,0.12)" },
-              { Icon: MessageCircle, text: "IA Analyste disponible 24h/24", color: "#a78bfa", bg: "rgba(139,92,246,0.12)" },
+              { Icon: ScanSearch, text: "Scan automatique des matchs à fort edge", color: "#7eb8ff", bg: "rgba(79,140,255,0.15)" },
+              { Icon: BarChart2, text: "Suivi ROI en temps réel · Historique complet", color: "#12b76a", bg: "rgba(18,183,106,0.15)" },
+              { Icon: Bot, text: "Campagnes auto-pilotées par l'algorithme", color: "#f79009", bg: "rgba(247,144,9,0.15)" },
+              { Icon: MessageCircle, text: "IA Analyste disponible 24h/24", color: "#a78bfa", bg: "rgba(139,92,246,0.15)" },
             ].map(({ Icon, text, color, bg }) => (
-              <div key={text} className="flex items-center gap-3 text-[13.5px]" style={{ color: "rgba(255,255,255,0.65)" }}>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: bg }}>
-                  <Icon size={14} style={{ color }} />
+              <div key={text} className="flex items-center gap-4" style={{ fontSize: "15.5px", color: "rgba(255,255,255,0.72)" }}>
+                <div
+                  className="rounded-xl flex items-center justify-center shrink-0"
+                  style={{ width: "38px", height: "38px", background: bg }}
+                >
+                  <Icon size={17} style={{ color }} />
                 </div>
                 {text}
               </div>
@@ -135,29 +137,26 @@ export default function Login() {
         </div>
 
         {/* Social proof */}
-        <div
-          className="relative z-10 flex items-center gap-3 px-4 py-3.5 rounded-xl"
-          style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
-        >
+        <div className="relative z-10 flex items-center gap-3">
           <div className="flex">
             {["#4f8cff", "#12b76a", "#f79009", "#7c3aed", "#f04438"].map((c, i) => (
               <div
                 key={i}
                 className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2"
-                style={{ background: c, borderColor: "#1e2535", marginLeft: i > 0 ? "-8px" : 0 }}
+                style={{ background: c, borderColor: "#0f1623", marginLeft: i > 0 ? "-8px" : 0 }}
               >
                 {["A", "T", "R", "M", "K"][i]}
               </div>
             ))}
           </div>
-          <div className="text-[12px]" style={{ color: "rgba(255,255,255,0.55)" }}>
-            <strong style={{ color: "rgba(255,255,255,0.85)" }}>+1 240 bettors</strong> font confiance à BetTracker · ROI moyen <strong className="text-[#12b76a]">+14.2%</strong>
+          <div className="text-[12.5px]" style={{ color: "rgba(255,255,255,0.45)" }}>
+            Rejoignez nos parieurs · ROI moyen <strong style={{ color: "#12b76a" }}>+18%</strong>
           </div>
         </div>
       </div>
 
       {/* ── RIGHT PANEL: FORM ── */}
-      <div className="bg-[#f4f5f7] flex items-center justify-center px-10 py-10">
+      <div className="bg-[#f4f5f7] flex items-center justify-center px-8 py-10">
         <div className="w-full max-w-[420px] animate-fade-up">
           {/* Header */}
           <div className="mb-7">
