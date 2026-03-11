@@ -87,30 +87,46 @@ export default function Login() {
         </div>
 
         {/* Center content */}
-        <div className="relative z-10 flex-1 flex flex-col justify-center py-12 pl-10">
-          <div className="text-[11px] font-semibold tracking-[0.12em] uppercase text-[#7eb8ff] mb-4">
-            Value Bet Detection
+        <div className="relative z-10 flex-1 flex flex-col justify-center gap-8">
+          <div>
+            <div className="text-[11px] font-semibold tracking-[0.12em] uppercase text-[#7eb8ff] mb-4">
+              Value Bet Detection
+            </div>
+            <h1 className="text-[46px] font-extrabold tracking-tight leading-[1.08] text-white mb-5">
+              Pariez plus{" "}
+              <span className="bg-gradient-to-r from-[#7eb8ff] to-[#12b76a] bg-clip-text text-transparent">
+                intelligemment
+              </span>
+            </h1>
+            <p className="text-[15px] leading-relaxed max-w-[420px]" style={{ color: "rgba(255,255,255,0.5)" }}>
+              Détectez les value bets, suivez vos performances et pilotez vos campagnes avec un algorithme entraîné sur 7 saisons de données.
+            </p>
           </div>
-          <h1 className="text-[40px] font-extrabold tracking-tight leading-[1.1] text-white mb-5">
-            Pariez plus{" "}
-            <span className="bg-gradient-to-r from-[#7eb8ff] to-[#12b76a] bg-clip-text text-transparent">
-              intelligemment
-            </span>
-          </h1>
-          <p className="text-[14.5px] leading-relaxed max-w-[340px] mb-8" style={{ color: "rgba(255,255,255,0.45)" }}>
-            Détectez les value bets, suivez vos performances et pilotez vos campagnes. Tout basé sur les données.
-          </p>
 
-          <div className="flex flex-col gap-2.5">
+          {/* Stats strip */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { value: "+14.2%", label: "ROI moyen", color: "#12b76a" },
+              { value: "63%", label: "Taux de réussite", color: "#7eb8ff" },
+              { value: "38k+", label: "Matchs analysés", color: "#f79009" },
+            ].map(({ value, label, color }) => (
+              <div key={label} className="rounded-xl px-4 py-3.5" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="text-[22px] font-extrabold tracking-tight" style={{ color }}>{value}</div>
+                <div className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-3">
             {[
               { Icon: ScanSearch, text: "Scan automatique des matchs à fort edge", color: "#7eb8ff", bg: "rgba(79,140,255,0.12)" },
               { Icon: BarChart2, text: "Suivi ROI en temps réel · Historique complet", color: "#12b76a", bg: "rgba(18,183,106,0.12)" },
               { Icon: Bot, text: "Campagnes auto-pilotées par l'algorithme", color: "#f79009", bg: "rgba(247,144,9,0.12)" },
               { Icon: MessageCircle, text: "IA Analyste disponible 24h/24", color: "#a78bfa", bg: "rgba(139,92,246,0.12)" },
             ].map(({ Icon, text, color, bg }) => (
-              <div key={text} className="flex items-center gap-3 text-[13px]" style={{ color: "rgba(255,255,255,0.6)" }}>
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: bg }}>
-                  <Icon size={13} style={{ color }} />
+              <div key={text} className="flex items-center gap-3 text-[13.5px]" style={{ color: "rgba(255,255,255,0.65)" }}>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: bg }}>
+                  <Icon size={14} style={{ color }} />
                 </div>
                 {text}
               </div>
