@@ -12,8 +12,8 @@ __pycache__/
 data/raw/
 data/processed/
 
-# Trained models
-models/
+# Trained models (root only, not src/models/)
+/models/
 
 # Database
 *.db
