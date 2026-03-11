@@ -45,7 +45,7 @@ export default function CampaignDetail() {
   // ── Data ──
   const [detail, setDetail] = useState<CampaignDetailType | null>(null);
   const [recos, setRecos] = useState<CampaignRecommendationsResponse | null>(null);
-  const [_history, setHistory] = useState<BankrollPoint[]>([]);
+  const [, setHistory] = useState<BankrollPoint[]>([]);
   const [bets, setBets] = useState<Bet[]>([]);
 
   // ── UI ──

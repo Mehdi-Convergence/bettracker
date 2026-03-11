@@ -260,7 +260,7 @@ export default function Backtest() {
     try {
       await deleteSavedBacktest(id);
       setSavedList((prev) => prev.filter((s) => s.id !== id));
-    } catch {}
+    } catch { /* ignore */ }
   }, []);
 
   // ── Export CSV ──

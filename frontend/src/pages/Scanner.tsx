@@ -200,7 +200,7 @@ export default function Scanner() {
   const [maxOdds, setMaxOdds] = useState<string>("");
   // New filters
   const [hideInTicket, setHideInTicket] = useState(false);
-  const [minDataScore, _setMinDataScore] = useState<string>("");
+  const [minDataScore] = useState<string>("");
   const [valueOnlyFilter, setValueOnlyFilter] = useState(false);
 
   /* ── Scan ── */
@@ -500,7 +500,7 @@ export default function Scanner() {
     const leg = aiMatchToLeg(am, outcome);
     if (!leg) return;
     setTickets((prev) => {
-      let updated = [...prev];
+      const updated = [...prev];
       if (updated.length === 0) updated.push({ id: "ticket-1", name: "Ticket 1", legs: [], stake: 10, bookmaker: null });
       const idx = activeTicketIdx >= updated.length ? 0 : activeTicketIdx;
       const ticket = { ...updated[idx] };
@@ -597,7 +597,7 @@ export default function Scanner() {
         }
       }
       setTickets((prev) => {
-        let updated = [...prev];
+        const updated = [...prev];
         if (updated.length === 0) updated.push({ id: "ticket-1", name: "Ticket 1", legs: [], stake: 10, bookmaker: null });
         const idx = activeTicketIdx >= updated.length ? 0 : activeTicketIdx;
         const ticket = { ...updated[idx] };
