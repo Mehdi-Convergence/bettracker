@@ -12,7 +12,7 @@ import {
 import KanbanBoard from "@/components/KanbanBoard";
 import type { KanbanColumn, KanbanCardData } from "@/components/KanbanBoard";
 import type { Campaign as CampaignType } from "@/types";
-import { GREEN, RED, AMBER, STATUS_CFG } from "@/utils/campaign";
+import { GREEN, RED, STATUS_CFG } from "@/utils/campaign";
 import { useTour } from "@/hooks/useTour";
 import SpotlightTour from "@/components/SpotlightTour";
 import { campaignsTour } from "@/tours/index";
@@ -638,7 +638,7 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
             </div>
             <div>
               <h2 className="text-lg font-bold text-[#111318]">Nouvelle campagne</h2>
-              <p className="text-xs text-[#8a919e]">Étape {step + 1} sur 4 — {STEPPER_STEPS[step].label}</p>
+              <p className="text-xs text-[#8a919e]">Étape {step + 1} sur 4 : {STEPPER_STEPS[step].label}</p>
             </div>
           </div>
           <button onClick={onClose}

@@ -510,7 +510,7 @@ export default function Settings() {
                     <div className="flex-1">
                       <div className="text-[13.5px] font-medium text-[#111318]">Sessions actives</div>
                       <div className="text-[12px] text-[#8a919e] mt-0.5">
-                        1 appareil — <button className="bg-transparent border-none cursor-pointer text-[#3b5bdb] font-medium p-0 text-[12px]">Tout révoquer</button>
+                        1 appareil.<button className="bg-transparent border-none cursor-pointer text-[#3b5bdb] font-medium p-0 text-[12px]">Tout révoquer</button>
                       </div>
                     </div>
                     <span

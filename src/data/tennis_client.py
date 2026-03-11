@@ -12,6 +12,7 @@ from pathlib import Path
 
 import httpx
 
+from src.cache import cache_get, cache_set as _cache_set_global
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -121,21 +122,16 @@ class TennisClient:
         if not self.api_key:
             return {"matches": [], "_from_cache": False, "_cached_at": time.time(), "_duration_seconds": 0.0}
 
-        # --- Cache check ---
+        # --- Cache check (unified: Redis → in-memory) ---
         today = datetime.now().strftime("%Y%m%d")
-        cache_key = f"scan_{timeframe}_{today}"
-        cache_file = CACHE_DIR / f"{cache_key}.json"
+        redis_cache_key = f"tennis:scan:{timeframe}:{today}"
 
-        if not force and cache_file.exists():
-            try:
-                data = json.loads(cache_file.read_text(encoding="utf-8"))
-                cached_at = data.get("_cached_at", 0)
-                if time.time() - cached_at < CACHE_TTL:
-                    logger.info("Tennis cache hit: %s", cache_key)
-                    data["_from_cache"] = True
-                    return data
-            except Exception:
-                pass
+        if not force:
+            cached = cache_get(redis_cache_key)
+            if cached:
+                logger.info("Tennis cache hit: %s", redis_cache_key)
+                cached["_from_cache"] = True
+                return cached
 
         start = time.time()
 
@@ -194,15 +190,19 @@ class TennisClient:
             "_duration_seconds": duration,
         }
 
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        cache_file.write_text(
-            json.dumps(result, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        # Write to unified cache (Redis + in-memory)
+        _cache_set_global(redis_cache_key, result, ttl=CACHE_TTL)
         return result
 
     def get_cached_result(self) -> dict | None:
         """Return the most recent cached result, regardless of TTL."""
+        # Try unified cache first (worker stores under scan:tennis:all)
+        cached = cache_get("scan:tennis:all")
+        if cached:
+            cached["_from_cache"] = True
+            return cached
+
+        # File fallback for graceful degradation
         if not CACHE_DIR.exists():
             return None
         best_file = None

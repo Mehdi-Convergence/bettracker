@@ -222,7 +222,7 @@ class BacktestRequest(BaseModel):
 class BacktestBetResponse(BaseModel):
     date: str
     match: str
-    league: str
+    league: str | None = None
     outcome_bet: str
     model_prob: float
     odds: float
@@ -233,6 +233,9 @@ class BacktestBetResponse(BaseModel):
     edge: float = 0.0
     clv: float | None = None
     num_legs: int | None = None
+    # Tennis-specific
+    tournament: str | None = None
+    surface: str | None = None
 
 
 class BacktestMetricsResponse(BaseModel):

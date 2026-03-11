@@ -9,6 +9,9 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set in environment}
       - ODDS_API_KEY=${ODDS_API_KEY:-}
       - API_FOOTBALL_KEY=${API_FOOTBALL_KEY:-}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
     depends_on:
       postgres:
         condition: service_healthy
@@ -18,11 +21,31 @@ services:
       - model-data:/app/models
       - cache-data:/app/data/cache
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 15s
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["python", "-m", "src.workers.scan_worker"]
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-bettracker}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-bettracker}
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set in environment}
+      - ODDS_API_KEY=${ODDS_API_KEY:-}
+      - API_FOOTBALL_KEY=${API_FOOTBALL_KEY:-}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - model-data:/app/models
+      - cache-data:/app/data/cache
     restart: unless-stopped
 
   frontend:

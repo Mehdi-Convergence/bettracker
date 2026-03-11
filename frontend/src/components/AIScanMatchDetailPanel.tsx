@@ -1084,7 +1084,7 @@ function CotesTab({ am }: { am: AIScanMatch }) {
                             onChange={(e) => setSelectedBk((prev) => ({ ...prev, [key]: e.target.value }))}
                           >
                             {bkOptions.map(({ bk, odd }) => (
-                              <option key={bk} value={bk}>{bk} — {odd.toFixed(2)}</option>
+                              <option key={bk} value={bk}>{bk} : {odd.toFixed(2)}</option>
                             ))}
                           </select>
                         ) : (
@@ -1119,7 +1119,7 @@ function CotesTab({ am }: { am: AIScanMatch }) {
                           onChange={(e) => setSelectedBk((prev) => ({ ...prev, [key]: e.target.value }))}
                         >
                           {bkOptions.map(({ bk, odd }) => (
-                            <option key={bk} value={bk}>{bk} — {odd.toFixed(2)}</option>
+                            <option key={bk} value={bk}>{bk} : {odd.toFixed(2)}</option>
                           ))}
                         </select>
                       ) : (

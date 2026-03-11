@@ -77,6 +77,7 @@ def build_live_features(
     odds_1x2: dict,
     league_name: str,
     fixture_dt: datetime,
+    **kwargs,
 ) -> dict[str, float]:
     """Return dict mapping MODEL_FEATURES names → float values.
 
@@ -132,13 +133,35 @@ def build_live_features(
     f["away_away_form_5"] = a_away_ppg
 
     # ------------------------------------------------------------------ #
-    # 3. Shots (not available per match from API)
+    # 3. Shots (now parsed from /teams/statistics)
     # ------------------------------------------------------------------ #
-    f["home_shots_avg_5"] = np.nan
-    f["away_shots_avg_5"] = np.nan
-    f["home_sot_avg_5"] = np.nan
-    f["away_sot_avg_5"] = np.nan
-    f["home_shot_accuracy_5"] = np.nan
+    h_shots = stats_h.get("home_shots_pg")
+    a_shots = stats_a.get("away_shots_pg")
+    h_sot = stats_h.get("home_sot_pg")
+    a_sot = stats_a.get("away_sot_pg")
+    f["home_shots_avg_5"] = float(h_shots) if h_shots is not None else np.nan
+    f["away_shots_avg_5"] = float(a_shots) if a_shots is not None else np.nan
+    f["home_sot_avg_5"] = float(h_sot) if h_sot is not None else np.nan
+    f["away_sot_avg_5"] = float(a_sot) if a_sot is not None else np.nan
+    f["home_shot_accuracy_5"] = (h_sot / h_shots) if h_shots and h_sot else np.nan
+
+    # ------------------------------------------------------------------ #
+    # 3b. Possession, corners, cards (from /teams/statistics — 0 extra cost)
+    # ------------------------------------------------------------------ #
+    h_poss = stats_h.get("home_possession_avg")
+    a_poss = stats_a.get("away_possession_avg")
+    f["home_possession"] = float(h_poss) if h_poss is not None else np.nan
+    f["away_possession"] = float(a_poss) if a_poss is not None else np.nan
+
+    h_corners = stats_h.get("home_corners_pg")
+    a_corners = stats_a.get("away_corners_pg")
+    f["home_corners_avg"] = float(h_corners) if h_corners is not None else np.nan
+    f["away_corners_avg"] = float(a_corners) if a_corners is not None else np.nan
+
+    h_cards = stats_h.get("home_yellow_cards_pg")
+    a_cards = stats_a.get("away_yellow_cards_pg")
+    f["home_cards_avg"] = float(h_cards) if h_cards is not None else np.nan
+    f["away_cards_avg"] = float(a_cards) if a_cards is not None else np.nan
 
     # ------------------------------------------------------------------ #
     # 4. H2H
@@ -160,11 +183,14 @@ def build_live_features(
         f["h2h_count"] = 0.0
 
     # ------------------------------------------------------------------ #
-    # 5. Rest days (not available from API scan)
+    # 5. Rest days (computed from last fixture date in worker)
     # ------------------------------------------------------------------ #
-    f["home_rest_days"] = np.nan
-    f["away_rest_days"] = np.nan
-    f["rest_diff"] = 0.0
+    # These come from kwargs if the worker passes them, else from stats dict
+    h_rest = kwargs.get("home_rest_days") or stats_h.get("_rest_days")
+    a_rest = kwargs.get("away_rest_days") or stats_a.get("_rest_days")
+    f["home_rest_days"] = float(h_rest) if h_rest is not None else np.nan
+    f["away_rest_days"] = float(a_rest) if a_rest is not None else np.nan
+    f["rest_diff"] = (f["home_rest_days"] - f["away_rest_days"]) if h_rest is not None and a_rest is not None else 0.0
 
     # ------------------------------------------------------------------ #
     # 6. Positions
@@ -210,14 +236,7 @@ def build_live_features(
         f["bookmaker_vig"] = np.nan
 
     # ------------------------------------------------------------------ #
-    # 9. CLV (not available — opening odds not in API)
-    # ------------------------------------------------------------------ #
-    f["clv_home"] = np.nan
-    f["clv_draw"] = np.nan
-    f["clv_away"] = np.nan
-
-    # ------------------------------------------------------------------ #
-    # 10. Adjusted goals (ELO-weighted not available → use raw as proxy)
+    # 9. Adjusted goals (ELO-weighted not available → use raw as proxy)
     # ------------------------------------------------------------------ #
     f["home_adj_gs_5"] = hgs
     f["home_adj_gc_5"] = hgc
@@ -254,7 +273,24 @@ def build_live_features(
     f["away_elo_change_5"] = float(a_streak * 6)
 
     # ------------------------------------------------------------------ #
-    # 13. Clean sheet rate (season, not last-5 rolling)
+    # 13. Weather features (from OpenWeatherMap — free tier)
+    # ------------------------------------------------------------------ #
+    weather = kwargs.get("weather")
+    if weather and isinstance(weather, dict):
+        f["weather_temp"] = float(weather.get("temp_c", 15))
+        f["weather_wind"] = float(weather.get("wind_speed_ms", 0))
+        f["weather_rain"] = float(weather.get("rain_1h_mm", 0))
+        f["weather_is_rainy"] = 1.0 if weather.get("is_rainy") else 0.0
+        f["weather_is_windy"] = 1.0 if weather.get("is_windy") else 0.0
+    else:
+        f["weather_temp"] = np.nan
+        f["weather_wind"] = np.nan
+        f["weather_rain"] = np.nan
+        f["weather_is_rainy"] = np.nan
+        f["weather_is_windy"] = np.nan
+
+    # ------------------------------------------------------------------ #
+    # 14. Clean sheet rate (season, not last-5 rolling)
     # ------------------------------------------------------------------ #
     h_played = max(1, (stats_h.get("played_home") or 0) + (stats_h.get("played_away") or 0))
     a_played = max(1, (stats_a.get("played_home") or 0) + (stats_a.get("played_away") or 0))

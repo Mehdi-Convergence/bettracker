@@ -3,10 +3,11 @@ import {
   X, ChevronLeft, ChevronRight, CheckCircle2, Activity,
   BarChart3, Flag, Share2,
 } from "lucide-react";
-import { updateBetNote, updatePortfolioBet } from "@/services/api";
+import { updateBetNote } from "@/services/api";
 import { LEAGUE_INFO } from "@/types";
 import type { Bet } from "@/types";
 import { outcomeLabel } from "@/utils/campaign";
+import ShareTicketModal from "./ShareTicketModal";
 
 // ══════════════════════════════════════════════
 // DESIGN TOKENS (match Portfolio.tsx)
@@ -82,6 +83,7 @@ export default function TicketDetailDrawer({
 }: TicketDetailDrawerProps) {
   const [noteValue, setNoteValue] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync note with bet
@@ -235,11 +237,11 @@ export default function TicketDetailDrawer({
                 {/* Signal */}
                 {bet.odds_at_close < bet.odds_at_bet ? (
                   <div className="flex items-center gap-1.5 px-2.5 py-[7px] rounded-[7px] text-[11.5px] font-medium mt-2 bg-[rgba(18,183,106,.08)] text-[#12b76a] border border-[rgba(18,183,106,.2)]">
-                    <CheckCircle2 size={12} /> Cote en baisse — le marché confirme la valeur.
+                    <CheckCircle2 size={12} /> Cote en baisse : le marché confirme la valeur.
                   </div>
                 ) : bet.odds_at_close > bet.odds_at_bet ? (
                   <div className="flex items-center gap-1.5 px-2.5 py-[7px] rounded-[7px] text-[11.5px] font-medium mt-2 bg-[rgba(240,68,56,.07)] text-[#f04438] border border-[rgba(240,68,56,.2)]">
-                    <X size={12} /> Cote en hausse — marché diverge.
+                    <X size={12} /> Cote en hausse : marché diverge.
                   </div>
                 ) : null}
               </>
@@ -335,7 +337,7 @@ export default function TicketDetailDrawer({
               <div className="flex gap-[7px]">
                 <button onClick={() => onUpdateResult(bet.id, "pending")}
                   className="flex-1 py-2 rounded-[9px] bg-[#12b76a] text-white text-[13px] font-semibold flex items-center justify-center gap-1.5 hover:bg-[#0da35e] transition-colors cursor-pointer">
-                  ✓ Valider{bet.bookmaker ? ` — Placer sur ${bet.bookmaker}` : ""}
+                  ✓ Valider{bet.bookmaker ? ` : Placer sur ${bet.bookmaker}` : ""}
                 </button>
               </div>
               <div className="flex gap-[7px]">
@@ -350,10 +352,20 @@ export default function TicketDetailDrawer({
             </>
           )}
           <div className="flex gap-[7px]">
-            <button className="flex-1 py-2 rounded-lg border-[1.5px] border-[rgba(59,91,219,.18)] bg-[rgba(59,91,219,.07)] text-[#3b5bdb] text-[12.5px] font-semibold flex items-center justify-center gap-1.5 hover:bg-[#3b5bdb] hover:text-white transition-colors cursor-pointer">
+            <button onClick={() => setShowShare(true)} className="flex-1 py-2 rounded-lg border-[1.5px] border-[rgba(59,91,219,.18)] bg-[rgba(59,91,219,.07)] text-[#3b5bdb] text-[12.5px] font-semibold flex items-center justify-center gap-1.5 hover:bg-[#3b5bdb] hover:text-white transition-colors cursor-pointer">
               <Share2 size={12} /> Partager ce ticket
             </button>
           </div>
+
+          {/* Share modal */}
+          {bet && (
+            <ShareTicketModal
+              bet={bet}
+              comboLegs={bet.combo_group ? allBets.filter(b => b.combo_group === bet.combo_group && b.id !== bet.id) : undefined}
+              open={showShare}
+              onClose={() => setShowShare(false)}
+            />
+          )}
           {bet.campaign_id && (
             <button className="py-2 rounded-lg border border-[#e3e6eb] text-[#8a919e] text-[12px] font-medium flex items-center justify-center gap-1.5 hover:border-[rgba(59,91,219,.18)] hover:text-[#3b5bdb] hover:bg-[rgba(59,91,219,.07)] transition-colors cursor-pointer w-full">
               → Voir la campagne {getCampaignName(bet.campaign_id)}

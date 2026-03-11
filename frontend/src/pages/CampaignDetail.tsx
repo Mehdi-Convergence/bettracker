@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, TrendingUp, TrendingDown, Wallet, Target, Zap,
+  ArrowLeft, Target,
   Pause, Play, MoreVertical, Copy, Archive, Trash2, Loader2,
   Check, RefreshCw, ChevronDown, ChevronUp, Plus, X,
   LayoutList, Columns3, AlertTriangle, Shield,
@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui";
 import KanbanBoard from "@/components/KanbanBoard";
 import type { KanbanColumn, KanbanCardData } from "@/components/KanbanBoard";
 import type {
-  Campaign, CampaignDetail as CampaignDetailType, CampaignStats,
+  CampaignDetail as CampaignDetailType,
   CampaignRecommendation, CampaignRecommendationsResponse, BankrollPoint, Bet,
 } from "@/types";
 import { useBreadcrumb } from "@/contexts/BreadcrumbContext";
@@ -45,7 +45,7 @@ export default function CampaignDetail() {
   // ── Data ──
   const [detail, setDetail] = useState<CampaignDetailType | null>(null);
   const [recos, setRecos] = useState<CampaignRecommendationsResponse | null>(null);
-  const [history, setHistory] = useState<BankrollPoint[]>([]);
+  const [_history, setHistory] = useState<BankrollPoint[]>([]);
   const [bets, setBets] = useState<Bet[]>([]);
 
   // ── UI ──
@@ -239,7 +239,7 @@ export default function CampaignDetail() {
       {campaign.status === "paused" && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200">
           <AlertTriangle size={16} className="text-amber-600 shrink-0" />
-          <span className="text-sm text-amber-800 flex-1">Campagne en pause — les tickets ne sont plus générés.</span>
+          <span className="text-sm text-amber-800 flex-1">Campagne en pause. Les tickets ne sont plus générés.</span>
           <button onClick={handleTogglePause}
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 transition-colors cursor-pointer">
             <Play size={12} /> Reprendre
@@ -249,13 +249,13 @@ export default function CampaignDetail() {
       {campaign.status === "stoploss" && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200">
           <Shield size={16} className="text-red-600 shrink-0" />
-          <span className="text-sm text-red-800 flex-1">Campagne arrêtée — stop-loss atteint.</span>
+          <span className="text-sm text-red-800 flex-1">Campagne arrêtée : stop-loss atteint.</span>
         </div>
       )}
       {isArchived && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-100 border border-slate-200">
           <Archive size={16} className="text-slate-500 shrink-0" />
-          <span className="text-sm text-slate-600 flex-1">Campagne archivée — consultation seule.</span>
+          <span className="text-sm text-slate-600 flex-1">Campagne archivée : consultation seule.</span>
         </div>
       )}
 

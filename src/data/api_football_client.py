@@ -1,4 +1,4 @@
-"""API-Football client with per-type disk cache.
+"""API-Football client — unified cache via src/cache.py (Redis + in-memory).
 
 Replaces claude_researcher.py for structured football data:
 fixtures, standings, H2H, injuries, team stats, odds, lineups, players.
@@ -20,6 +20,7 @@ from typing import Any
 
 import httpx
 
+from src.cache import cache_get, cache_set as _cache_set_global
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -85,68 +86,44 @@ HOME_ADVANTAGE = 1.10  # facteur Poisson domicile
 
 
 # ---------------------------------------------------------------------------
-# Cache helpers
+# Cache helpers — unified via src/cache.py (Redis + in-memory)
 # ---------------------------------------------------------------------------
 
-def _cache_path(key_type: str, key_id: str) -> Path:
-    return CACHE_DIR / f"{key_type}_{key_id}.json"
+def _cache_key(key_type: str, key_id: str) -> str:
+    """Build Redis-compatible cache key."""
+    return f"af:{key_type}:{key_id}"
 
 
 def _cache_read(key_type: str, key_id: str) -> Any | None:
-    p = _cache_path(key_type, key_id)
-    if not p.exists():
-        return None
-    try:
-        data = json.loads(p.read_text(encoding="utf-8"))
-        age = time.time() - data.get("_cached_at", 0)
-        if age > TTL.get(key_type, 3600):
-            return None
-        return data.get("payload")
-    except Exception:
-        return None
+    return cache_get(_cache_key(key_type, key_id))
 
 
 def _cache_write(key_type: str, key_id: str, payload: Any) -> None:
-    p = _cache_path(key_type, key_id)
-    try:
-        p.write_text(
-            json.dumps({"_cached_at": time.time(), "payload": payload}, ensure_ascii=False),
-            encoding="utf-8",
-        )
-    except Exception as exc:
-        logger.warning("Cache write failed %s/%s: %s", key_type, key_id, exc)
+    ttl = TTL.get(key_type, 3600)
+    _cache_set_global(_cache_key(key_type, key_id), payload, ttl=ttl)
 
 
 # ---------------------------------------------------------------------------
-# Quota tracker
+# Quota tracker — shared via Redis (or in-memory fallback)
 # ---------------------------------------------------------------------------
-
-def _quota_file() -> Path:
-    today = datetime.now().strftime("%Y-%m-%d")
-    return CACHE_DIR / f"quota_{today}.json"
-
 
 def _quota_get() -> dict:
-    p = _quota_file()
-    if p.exists():
-        try:
-            return json.loads(p.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+    today = datetime.now().strftime("%Y-%m-%d")
+    cached = cache_get(f"af_quota:{today}")
+    if cached:
+        return cached
     return {"requests_made": 0, "remaining": 100}
 
 
 def _quota_update(remaining: int | None) -> None:
+    today = datetime.now().strftime("%Y-%m-%d")
     q = _quota_get()
     q["requests_made"] += 1
     if remaining is not None:
         q["remaining"] = remaining
     else:
         q["remaining"] = max(0, q.get("remaining", 100) - 1)
-    try:
-        _quota_file().write_text(json.dumps(q), encoding="utf-8")
-    except Exception:
-        pass
+    _cache_set_global(f"af_quota:{today}", q, ttl=86400)
     if q["remaining"] < 10:
         logger.warning("API-Football quota low: %d requests remaining today", q["remaining"])
 
@@ -245,6 +222,21 @@ class ApiFootballClient:
                 all_fixtures.extend(fixtures)
 
         return all_fixtures
+
+    async def get_last_fixture_date(self, team_id: int) -> datetime | None:
+        """Return the date of the team's most recent played match (for rest_days calc)."""
+        raw = await _get_cached(
+            "fixtures", f"last_{team_id}",
+            "/fixtures",
+            {"team": team_id, "season": SEASON, "last": 1},
+        )
+        if not raw:
+            return None
+        try:
+            dt_str = raw[0]["fixture"]["date"]
+            return datetime.fromisoformat(dt_str.replace("Z", "+00:00")).replace(tzinfo=None)
+        except (KeyError, IndexError, TypeError):
+            return None
 
     # --- Standings ---
 
@@ -388,6 +380,37 @@ class ApiFootballClient:
 
             form_raw = s.get("form", "") or ""
 
+            # Extra fields we already pay for but weren't parsing
+            shots = s.get("shots", {})
+            shots_on = shots.get("on", {})
+            shots_total = shots.get("total", {})
+            possession = s.get("possession", {})
+            corners = s.get("corners", {})
+            cards_yellow = s.get("cards", {}).get("yellow", {})
+            cards_red = s.get("cards", {}).get("red", {})
+            passes_acc = s.get("passes", {}).get("accuracy", {})
+
+            # BTTS % — compute from goals data
+            played_h = _int(fixtures.get("played", {}), "home") or 1
+            played_a = _int(fixtures.get("played", {}), "away") or 1
+            # Goals scored AND conceded in same match = rough BTTS proxy
+            gs_home = goals_for.get("total", {}).get("home") or 0
+            gc_home = goals_against.get("total", {}).get("home") or 0
+            gs_away = goals_for.get("total", {}).get("away") or 0
+            gc_away = goals_against.get("total", {}).get("away") or 0
+            fts_home = _int(failed_score, "home") or 0
+            fts_away = _int(failed_score, "away") or 0
+            cs_home = _int(clean_sheets, "home") or 0
+            cs_away = _int(clean_sheets, "away") or 0
+            btts_home = round((played_h - fts_home - cs_home) / played_h * 100, 1) if played_h else None
+            btts_away = round((played_a - fts_away - cs_away) / played_a * 100, 1) if played_a else None
+
+            # xG approximation from shots on target × historical conversion rate (~0.33)
+            sot_h = _avg(shots_on, "home")
+            sot_a = _avg(shots_on, "away")
+            xg_home = round(sot_h * 0.33, 2) if sot_h else None
+            xg_away = round(sot_a * 0.33, 2) if sot_a else None
+
             return {
                 "team_id": team_id,
                 "league_id": league_id,
@@ -410,6 +433,25 @@ class ApiFootballClient:
                 "clean_sheets_away": _int(clean_sheets, "away"),
                 "failed_to_score_home": _int(failed_score, "home"),
                 "failed_to_score_away": _int(failed_score, "away"),
+                # --- Newly parsed fields (0 extra API calls) ---
+                "home_shots_pg": _avg(shots_total, "home"),
+                "away_shots_pg": _avg(shots_total, "away"),
+                "home_sot_pg": sot_h,
+                "away_sot_pg": sot_a,
+                "home_possession_avg": _avg(possession, "home"),
+                "away_possession_avg": _avg(possession, "away"),
+                "home_corners_pg": _avg(corners, "home"),
+                "away_corners_pg": _avg(corners, "away"),
+                "home_yellow_cards_pg": _avg(cards_yellow, "home"),
+                "away_yellow_cards_pg": _avg(cards_yellow, "away"),
+                "home_red_cards_total": _int(cards_red, "home"),
+                "away_red_cards_total": _int(cards_red, "away"),
+                "home_pass_accuracy": _avg(passes_acc, "home"),
+                "away_pass_accuracy": _avg(passes_acc, "away"),
+                "home_btts_pct": btts_home,
+                "away_btts_pct": btts_away,
+                "home_xg_avg": xg_home,
+                "away_xg_avg": xg_away,
             }
         except Exception as exc:
             logger.error("team_stats parse error team=%d league=%d: %s", team_id, league_id, exc)

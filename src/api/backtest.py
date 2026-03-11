@@ -27,41 +27,13 @@ router = APIRouter(tags=["backtest"])
 
 @router.post("/backtest/run", response_model=BacktestResponse, dependencies=[Depends(require_tier("pro"))])
 def run_backtest(request: BacktestRequest):
-    """Run a backtest with custom parameters."""
-    import pandas as pd
+    """Run a backtest with custom parameters. sport='football' or 'tennis'."""
+    sport = (request.sport or "football").lower()
 
-    features_path = Path("data/processed/football_features.parquet")
-    if not features_path.exists():
-        raise HTTPException(status_code=503, detail="Features not found. Run build_features first.")
-
-    try:
-        df = pd.read_parquet(features_path)
-    except Exception:
-        raise HTTPException(status_code=503, detail="Fichier features corrompu. Relancez build_features.")
-
-    engine = BacktestEngine(
-        staking_strategy=request.staking_strategy,
-        flat_stake_amount=request.flat_stake_amount,
-        pct_bankroll=request.pct_bankroll,
-        kelly_fraction=request.kelly_fraction,
-        max_stake_pct=request.max_stake_pct,
-        initial_bankroll=request.initial_bankroll,
-        min_edge=request.min_edge,
-        min_model_prob=request.min_model_prob,
-        max_odds=request.max_odds,
-        min_odds=request.min_odds,
-        allowed_outcomes=request.allowed_outcomes,
-        excluded_leagues=request.excluded_leagues,
-        stop_loss_daily_pct=request.stop_loss_daily_pct,
-        stop_loss_total_pct=request.stop_loss_total_pct,
-        combo_mode=request.combo_mode,
-        combo_max_legs=request.combo_max_legs,
-        combo_min_odds=request.combo_min_odds,
-        combo_max_odds=request.combo_max_odds,
-        combo_top_n=request.combo_top_n,
-    )
-
-    result = engine.run(df, request.test_seasons)
+    if sport == "tennis":
+        result = _run_tennis_backtest(request)
+    else:
+        result = _run_football_backtest(request)
 
     if not result["bets"]:
         raise HTTPException(status_code=404, detail="Aucun pari généré avec ces paramètres. Élargissez vos filtres.")
@@ -69,7 +41,6 @@ def run_backtest(request: BacktestRequest):
     metrics_calc = BacktestMetrics()
     metrics = metrics_calc.compute_all(result["bets"], request.initial_bankroll)
 
-    # Build bankroll curve
     bankroll_curve = [request.initial_bankroll]
     for b in result["bets"]:
         bankroll_curve.append(bankroll_curve[-1] + b["pnl"])
@@ -78,7 +49,9 @@ def run_backtest(request: BacktestRequest):
         BacktestBetResponse(
             date=str(b["date"])[:10],
             match=b["match"],
-            league=b["league"],
+            league=b.get("league"),
+            tournament=b.get("tournament"),
+            surface=b.get("surface"),
             outcome_bet=b["outcome_bet"],
             model_prob=b["model_prob"],
             odds=b["odds"],
@@ -116,6 +89,83 @@ def run_backtest(request: BacktestRequest):
         bankroll_curve=[round(b, 2) for b in bankroll_curve],
         config=result["config"],
     )
+
+
+def _run_football_backtest(request: BacktestRequest) -> dict:
+    import pandas as pd
+
+    features_path = Path("data/processed/football_features.parquet")
+    if not features_path.exists():
+        raise HTTPException(status_code=503, detail="Features not found. Run build_features first.")
+    try:
+        df = pd.read_parquet(features_path)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Fichier features corrompu. Relancez build_features.")
+
+    engine = BacktestEngine(
+        staking_strategy=request.staking_strategy,
+        flat_stake_amount=request.flat_stake_amount,
+        pct_bankroll=request.pct_bankroll,
+        kelly_fraction=request.kelly_fraction,
+        max_stake_pct=request.max_stake_pct,
+        initial_bankroll=request.initial_bankroll,
+        min_edge=request.min_edge,
+        min_model_prob=request.min_model_prob,
+        max_odds=request.max_odds,
+        min_odds=request.min_odds,
+        allowed_outcomes=request.allowed_outcomes,
+        excluded_leagues=request.excluded_leagues,
+        stop_loss_daily_pct=request.stop_loss_daily_pct,
+        stop_loss_total_pct=request.stop_loss_total_pct,
+        combo_mode=request.combo_mode,
+        combo_max_legs=request.combo_max_legs,
+        combo_min_odds=request.combo_min_odds,
+        combo_max_odds=request.combo_max_odds,
+        combo_top_n=request.combo_top_n,
+    )
+    return engine.run(df, request.test_seasons)
+
+
+def _run_tennis_backtest(request: BacktestRequest) -> dict:
+    import pandas as pd
+    from src.database import SessionLocal
+    from src.models.tennis_match import TennisMatch
+    from src.backtest.tennis_engine import TennisBacktestEngine
+
+    db = SessionLocal()
+    rows = db.query(TennisMatch).all()
+    db.close()
+
+    if not rows:
+        raise HTTPException(status_code=503, detail="Aucune donnée tennis. Relancez la collecte tennis.")
+
+    df = pd.DataFrame([{
+        "id": r.id, "year": r.year, "date": r.date,
+        "tournament": r.tournament, "surface": r.surface,
+        "series": r.series, "round": r.round,
+        "winner": r.winner, "loser": r.loser,
+        "winner_rank": r.winner_rank, "loser_rank": r.loser_rank,
+        "wsets": r.wsets, "lsets": r.lsets,
+        "odds_winner": r.odds_winner, "odds_loser": r.odds_loser,
+        "max_odds_winner": r.max_odds_winner, "max_odds_loser": r.max_odds_loser,
+        "avg_odds_winner": r.avg_odds_winner, "avg_odds_loser": r.avg_odds_loser,
+    } for r in rows])
+
+    engine = TennisBacktestEngine(
+        staking_strategy=request.staking_strategy,
+        flat_stake_amount=request.flat_stake_amount,
+        pct_bankroll=request.pct_bankroll,
+        kelly_fraction=request.kelly_fraction,
+        max_stake_pct=request.max_stake_pct,
+        initial_bankroll=request.initial_bankroll,
+        min_edge=request.min_edge,
+        min_model_prob=request.min_model_prob,
+        max_odds=request.max_odds,
+        min_odds=request.min_odds,
+        stop_loss_daily_pct=request.stop_loss_daily_pct,
+        stop_loss_total_pct=request.stop_loss_total_pct,
+    )
+    return engine.run(df)
 
 
 @router.post("/backtest/save", response_model=SavedBacktestSummary)

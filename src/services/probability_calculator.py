@@ -30,7 +30,10 @@ from typing import Literal
 #   [api]      xg_home/away               -> 2 pts
 #   [api]      lineup_confirmed           -> 1 pt
 #   [api]      h2h_details (structured)   -> 1 pt
-MAX_POINTS = 20
+#   [api]      possession                 -> 1 pt
+#   [api]      rest_days                  -> 1 pt
+#   [api]      corners/cards              -> 1 pt
+MAX_POINTS = 23
 BASE_POINTS = 3  # always available (odds)
 
 GREEN_THRESHOLD = 0.55
@@ -242,6 +245,15 @@ def calculate_football(
     # BTTS% (optional, currently for data quality only)
     btts_pct_home: float | None = None,
     btts_pct_away: float | None = None,
+    # Enriched stats (from /teams/statistics — 0 extra API calls)
+    possession_home: float | None = None,
+    possession_away: float | None = None,
+    corners_pg_home: float | None = None,
+    corners_pg_away: float | None = None,
+    cards_pg_home: float | None = None,
+    cards_pg_away: float | None = None,
+    rest_days_home: int | None = None,
+    rest_days_away: int | None = None,
 ) -> MatchProbabilityResult:
     """Estimate fair probabilities and value edge for a football match.
 
@@ -337,12 +349,40 @@ def calculate_football(
     if btts_pct_home is not None and btts_pct_away is not None:
         data_points += 1
 
+    # --- Possession adjustment ---
+    poss_adj = 0.0
+    if possession_home is not None and possession_away is not None:
+        data_points += 1
+        # Higher possession correlates with more chances — max ±0.04
+        poss_diff = (possession_home - possession_away) / 100  # e.g. 55% - 45% = 0.10
+        poss_adj = max(-0.04, min(0.04, poss_diff * 0.40))
+
+    # --- Rest days adjustment ---
+    rest_adj = 0.0
+    if rest_days_home is not None and rest_days_away is not None:
+        data_points += 1
+        diff = rest_days_home - rest_days_away
+        # Fatigue penalty: ≥2 days difference matters — max ±0.03
+        if abs(diff) >= 2:
+            rest_adj = max(-0.03, min(0.03, diff * 0.01))
+
+    # --- Corners/cards (data quality bonus, minor lambda adjustment) ---
+    corners_adj = 0.0
+    if corners_pg_home is not None and corners_pg_away is not None:
+        data_points += 1
+        # More corners = more attacking intent — max ±0.02
+        c_diff = corners_pg_home - corners_pg_away
+        corners_adj = max(-0.02, min(0.02, c_diff * 0.004))
+
     # --- Combine adjustments ---
     total_adj = (
         (form_adj if form_strength_h is not None and form_strength_a is not None else 0.0)
         + (pos_adj if pos_adj is not None else 0.0)
         + h2h_adj
         + xg_adj
+        + poss_adj
+        + rest_adj
+        + corners_adj
     )
 
     est_h = base_h + total_adj - abs_pen_home

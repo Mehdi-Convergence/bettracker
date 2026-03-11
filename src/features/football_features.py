@@ -112,6 +112,10 @@ class FootballFeatureBuilder:
             "away_shots_target": match.get("away_shots_target"),
             "home_xg": match.get("home_xg"),
             "away_xg": match.get("away_xg"),
+            "home_corners": match.get("home_corners"),
+            "away_corners": match.get("away_corners"),
+            "home_yellow": match.get("home_yellow"),
+            "away_yellow": match.get("away_yellow"),
             # Pre-match ELO of each team (used as opponent strength by the other team)
             "opp_elo_for_home": away_elo_pre,
             "opp_elo_for_away": home_elo_pre,
@@ -185,6 +189,16 @@ class FootballFeatureBuilder:
             features["home_shot_accuracy_5"] = (features["home_sot_avg_5"] or 0) / features["home_shots_avg_5"]
         else:
             features["home_shot_accuracy_5"] = np.nan
+
+        # 4b. CORNERS & CARDS (rolling avg last 5)
+        features["home_corners_avg"] = self._avg_stat_cache(home, team_history[home], 5, "corners") or np.nan
+        features["away_corners_avg"] = self._avg_stat_cache(away, team_history[away], 5, "corners") or np.nan
+        features["home_cards_avg"] = self._avg_stat_cache(home, team_history[home], 5, "yellow") or np.nan
+        features["away_cards_avg"] = self._avg_stat_cache(away, team_history[away], 5, "yellow") or np.nan
+
+        # 4c. POSSESSION (not available in football-data.co.uk CSVs — set to NaN)
+        features["home_possession"] = np.nan
+        features["away_possession"] = np.nan
 
         # 5. H2H
         h2h = self._h2h_from_cache(home, away, team_history[home], 6)
@@ -470,6 +484,8 @@ class FootballFeatureBuilder:
             "shots": ("home_shots", "away_shots"),
             "shots_target": ("home_shots_target", "away_shots_target"),
             "xg": ("home_xg", "away_xg"),
+            "corners": ("home_corners", "away_corners"),
+            "yellow": ("home_yellow", "away_yellow"),
         }
         if stat not in stat_map:
             return None
@@ -589,8 +605,6 @@ FEATURE_COLUMNS = [
     # Weighted λ (exponential decay — recent matches count more)
     "lambda_home_weighted", "lambda_away_weighted", "lambda_ratio_weighted",
     "implied_home", "implied_draw", "implied_away",
-    # CLV features (odds movement: closing/opening - 1)
-    "clv_home", "clv_draw", "clv_away",
     # Opponent-strength adjusted goals (ELO-weighted, last 5)
     "home_adj_gs_5", "home_adj_gc_5",
     "away_adj_gs_5", "away_adj_gc_5",
@@ -605,4 +619,8 @@ FEATURE_COLUMNS = [
     "home_clean_sheet_5", "away_clean_sheet_5",
     # Bookmaker vig (market overround: higher = bookmaker more confident)
     "bookmaker_vig",
+    # Enriched stats (from /teams/statistics — 0 extra API calls)
+    "home_possession", "away_possession",
+    "home_corners_avg", "away_corners_avg",
+    "home_cards_avg", "away_cards_avg",
 ]

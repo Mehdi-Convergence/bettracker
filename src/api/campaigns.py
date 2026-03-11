@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session
 
@@ -260,7 +260,7 @@ def delete_campaign(campaign_id: int, user: User = Depends(require_tier("premium
 
 
 @router.get("/campaigns/{campaign_id}/recommendations", response_model=CampaignRecommendationsResponse)
-def get_campaign_recommendations(campaign_id: int, demo: bool = Query(default=False), user: User = Depends(require_tier("premium")), db: Session = Depends(get_db)):
+def get_campaign_recommendations(campaign_id: int, user: User = Depends(require_tier("premium")), db: Session = Depends(get_db)):
     campaign = _get_user_campaign(db, campaign_id, user)
     if campaign.status != "active":
         return CampaignRecommendationsResponse(campaign_id=campaign_id, current_bankroll=campaign.initial_bankroll, recommendations=[], total_scanned=0)
@@ -274,7 +274,7 @@ def get_campaign_recommendations(campaign_id: int, demo: bool = Query(default=Fa
 
     from src.api.scanner import get_scanned_matches
     filtered_matches, total_scanned, _, _, _ = get_scanned_matches(
-        demo=demo, min_edge=campaign.min_edge, min_prob=campaign.min_model_prob,
+        min_edge=campaign.min_edge, min_prob=campaign.min_model_prob,
         min_odds=campaign.min_odds, max_odds=campaign.max_odds,
         outcomes=allowed, excluded_leagues=excluded,
     )
@@ -375,6 +375,11 @@ def update_bet_result(campaign_id: int, bet_id: int, request: BetUpdateRequest, 
         bet.profit_loss = 0.0
     else:
         bet.profit_loss = None
+
+    # Fetch closing odds and compute CLV on settlement
+    if request.result in ("won", "lost") and bet.clv is None:
+        _fill_clv(bet, db)
+
     db.commit()
     db.refresh(bet)
 
@@ -432,3 +437,56 @@ def get_campaign_version(campaign_id: int, version: int, user: User = Depends(re
     if not v:
         raise HTTPException(status_code=404, detail="Version not found")
     return CampaignVersionResponse(id=v.id, campaign_id=v.campaign_id, version=v.version, snapshot=v.snapshot, changed_at=v.changed_at.isoformat() if v.changed_at else "", change_summary=v.change_summary or "")
+
+
+# ---------------------------------------------------------------------------
+# CLV helper — fetch closing odds from football_matches at settlement time
+# ---------------------------------------------------------------------------
+
+def _fill_clv(bet: Bet, db: Session) -> None:
+    """Look up closing odds in football_matches and compute CLV for a settled bet.
+
+    CLV = (odds_at_close / odds_at_bet) - 1
+      > 0 : beat the closing line (positive edge signal)
+      < 0 : market moved against us (late money came in the other direction)
+
+    Only applied to football bets with a known outcome (H/D/A).
+    Silently skips if match not found or closing odds unavailable.
+    """
+    if bet.sport != "football":
+        return
+    if bet.odds_at_bet is None or bet.odds_at_bet <= 1.0:
+        return
+
+    try:
+        from datetime import timedelta
+        from src.models.match import FootballMatch
+
+        # Match by team names + date (±2 days tolerance for timezone issues)
+        match = (
+            db.query(FootballMatch)
+            .filter(
+                FootballMatch.home_team == bet.home_team,
+                FootballMatch.away_team == bet.away_team,
+                FootballMatch.date >= bet.match_date - timedelta(days=2),
+                FootballMatch.date <= bet.match_date + timedelta(days=2),
+            )
+            .first()
+        )
+        if match is None:
+            return
+
+        outcome_map = {
+            "H": match.odds_home_close,
+            "D": match.odds_draw_close,
+            "A": match.odds_away_close,
+        }
+        close_odds = outcome_map.get(bet.outcome_bet)
+        if close_odds is None or close_odds <= 1.0:
+            return
+
+        bet.odds_at_close = close_odds
+        bet.clv = round(close_odds / bet.odds_at_bet - 1.0, 4)
+    except Exception:
+        # Non-blocking: CLV is a nice-to-have, not critical
+        pass

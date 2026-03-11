@@ -20,7 +20,7 @@ FOOTBALL_LEAGUES = {
     "SC0": "Scottish Premiership",
 }
 
-FOOTBALL_SEASONS = ["2021", "2122", "2223", "2324", "2425"]
+FOOTBALL_SEASONS = ["1819", "1920", "2021", "2122", "2223", "2324", "2425"]
 
 FOOTBALL_DATA_BASE_URL = "https://www.football-data.co.uk/mmz4281"  # canonical: also in config.py
 
@@ -74,6 +74,8 @@ FOOTBALL_ODDS_FALLBACK = {
 
 # Season code to display name
 SEASON_DISPLAY = {
+    "1819": "2018/19",
+    "1920": "2019/20",
     "2021": "2020/21",
     "2122": "2021/22",
     "2223": "2022/23",

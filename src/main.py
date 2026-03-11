@@ -14,6 +14,7 @@ from src.api.auth import router as auth_router
 from src.api.dashboard import router as dashboard_router
 from src.api.settings import router as settings_router
 from src.api.notifications import router as notifications_router
+from src.api.feedback import router as feedback_router
 
 from src.config import settings
 from src.rate_limit import limiter
@@ -68,3 +69,4 @@ app.include_router(campaigns_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 app.include_router(notifications_router, prefix="/api")
+app.include_router(feedback_router, prefix="/api")

@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Plus, X, Loader2, Search, Layers, Download, Clock, CheckCircle2,
-  XCircle, AlertCircle, Eye, ChevronLeft, ChevronRight, ArrowUpDown,
-  Filter, Trash2,
+  XCircle, AlertCircle,
+  Trash2,
 } from "lucide-react";
 import {
   getPortfolioStats, getPortfolioBets, getCampaigns, createBet, aiScan,
@@ -372,6 +372,7 @@ export default function Portfolio() {
         home_team: match.home_team ?? "", away_team: match.away_team ?? "",
         league: match.league, match_date: match.date.split("T")[0],
         outcome_bet: outcome, odds_at_bet: String(bestOdds), stake: addForm.stake,
+        bookmaker: "", note: "",
       });
       setFormMode("manual");
     }
@@ -474,13 +475,13 @@ export default function Portfolio() {
   }
 
   return (
-    <div className="space-y-3.5" style={{ animation: "fu .3s ease both" }}>
+    <div className="flex flex-col gap-3.5 h-[calc(100vh-64px)]" style={{ animation: "fu .3s ease both" }}>
 
       {/* ══════ HEADER ══════ */}
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-xl font-extrabold text-[#111318] tracking-tight">Tickets & Portfolio</h1>
-          <p className="text-[12.5px] text-[#8a919e] mt-0.5">Vue globale de tous vos paris — campagnes et hors campagne</p>
+          <p className="text-[12.5px] text-[#8a919e] mt-0.5">Vue globale de tous vos paris, campagnes et hors campagne</p>
         </div>
         <div className="flex items-center gap-2">
           {viewMode !== "kanban" && (
@@ -606,7 +607,6 @@ export default function Portfolio() {
       {viewMode === "kanban" && (
         <TicketsKanban
           bets={filteredBets}
-          campaigns={campaigns}
           campRecos={campRecos}
           statusFilter={statusFilter}
           acceptingReco={acceptingReco}
@@ -625,7 +625,7 @@ export default function Portfolio() {
 
       {/* ══════ LIST VIEW ══════ */}
       {viewMode === "list" && (
-        <div className="space-y-3" style={{ animation: "fu .3s ease both" }}>
+        <div className="flex flex-col gap-3 flex-1 min-h-0" style={{ animation: "fu .3s ease both" }}>
           {/* List KPIs */}
           <div className="grid grid-cols-3 lg:grid-cols-6 gap-2.5">
             <LKpi label="ROI période" value={`${listKpis.roi >= 0 ? "+" : ""}${listKpis.roi.toFixed(1)}%`} color={listKpis.roi >= 0 ? C.green : C.red} />
@@ -668,7 +668,7 @@ export default function Portfolio() {
             </select>
             <select value={clvFilter} onChange={(e) => { setClvFilter(e.target.value); setPage(1); }}
               className="px-2.5 py-1.5 border border-[#e3e6eb] rounded-lg bg-white text-[12.5px] text-[#3c4149] outline-none cursor-pointer">
-              <option value="all">CLV — tous</option>
+              <option value="all">CLV : tous</option>
               <option value="positive">CLV positif</option>
               <option value="negative">CLV négatif</option>
             </select>
@@ -687,8 +687,8 @@ export default function Portfolio() {
           </div>
 
           {/* Table */}
-          <div data-tour="bets-table" className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl overflow-hidden" style={{ boxShadow: SH_SM }}>
-            <div className="overflow-x-auto">
+          <div data-tour="bets-table" className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl overflow-hidden flex flex-col flex-1 min-h-0" style={{ boxShadow: SH_SM }}>
+            <div className="overflow-x-auto flex-1 min-h-0 overflow-y-auto">
               <table className="w-full text-[12.5px] border-collapse">
                 <thead className="bg-[#f4f5f7] border-b-[1.5px] border-[#e3e6eb]">
                   <tr>
@@ -849,7 +849,7 @@ export default function Portfolio() {
           {/* Campaign detail */}
           <div className="flex flex-col gap-3 min-w-0">
             {selectedCampId != null && selectedCampId > 0 && campDetail && (
-              <CampMiniDash detail={campDetail} history={campHistory} campaigns={campaigns} getCampaignColor={getCampaignColor} campBets={campBets} />
+              <CampMiniDash detail={campDetail} history={campHistory} campBets={campBets} />
             )}
             {selectedCampId === 0 && (
               <div className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl p-4" style={{ boxShadow: SH_SM }}>
@@ -886,8 +886,6 @@ export default function Portfolio() {
                   : bets.filter((b) => b.campaign_id === selectedCampId)
                 }
                 campaigns={campaigns}
-                getCampaignName={getCampaignName}
-                getCampaignColor={getCampaignColor}
                 onUpdateResult={handleUpdateResult}
                 onDeleteBet={handleDeleteBet}
                 onExport={(data) => exportCsv(data, `tickets-camp-${selectedCampId}.csv`)}
@@ -993,12 +991,12 @@ export default function Portfolio() {
             {isCombo && comboLegs.length > 0 && (
               <div className="space-y-1.5">
                 <p className="text-xs font-medium text-slate-700">
-                  Legs ({comboLegs.length}) — Cote combinée : <span className="text-amber-600 font-bold">{combinedOdds.toFixed(2)}</span>
+                  Legs ({comboLegs.length}), cote combinée : <span className="text-amber-600 font-bold">{combinedOdds.toFixed(2)}</span>
                 </p>
                 {comboLegs.map((leg, i) => (
                   <div key={i} className="flex items-center gap-2 bg-blue-50 rounded px-2.5 py-1.5 text-xs">
                     <span className="text-slate-700 flex-1">
-                      {leg.home_team} vs {leg.away_team} —
+                      {leg.home_team} vs {leg.away_team} :
                       <Badge variant={leg.outcome_bet === "H" ? "blue" : leg.outcome_bet === "D" ? "amber" : "red"} size="xs" className="ml-1">
                         {leg.outcome_bet}
                       </Badge>
@@ -1230,12 +1228,11 @@ const TICKET_KANBAN_COLUMNS: KanbanColumn[] = [
 ];
 
 function TicketsKanban({
-  bets, campaigns, campRecos, statusFilter, acceptingReco,
+  bets, campRecos, statusFilter, acceptingReco,
   onAcceptReco, onIgnoreReco, onUpdateResult, onDeleteBet, onAddManual,
   getCampaignName, getCampaignColor, onOpenDetail,
 }: {
   bets: Bet[];
-  campaigns: Campaign[];
   campRecos: { campId: number; reco: CampaignRecommendation }[];
   statusFilter: StatusFilter;
   acceptingReco: string | null;
@@ -1460,11 +1457,9 @@ function TicketsKanban({
 // CAMPAIGN MINI DASHBOARD
 // ══════════════════════════════════════════════
 
-function CampMiniDash({ detail, history, campaigns, getCampaignColor, campBets }: {
+function CampMiniDash({ detail, history, campBets }: {
   detail: CampaignDetail;
   history: BankrollPoint[];
-  campaigns: Campaign[];
-  getCampaignColor: (id: number | null) => string;
   campBets: Bet[];
 }) {
   const { campaign, stats } = detail;
@@ -1546,11 +1541,9 @@ function CampMiniDash({ detail, history, campaigns, getCampaignColor, campBets }
 // CAMPAIGN BETS TABLE (reused in Par Campagne view)
 // ══════════════════════════════════════════════
 
-function CampBetsTable({ bets, campaigns, getCampaignName, getCampaignColor, onUpdateResult, onDeleteBet, onExport, onOpenDetail }: {
+function CampBetsTable({ bets, campaigns: _campaigns, onUpdateResult, onDeleteBet, onExport, onOpenDetail }: {
   bets: Bet[];
   campaigns: Campaign[];
-  getCampaignName: (id: number | null) => string;
-  getCampaignColor: (id: number | null) => string;
   onUpdateResult: (betId: number, result: string) => void;
   onDeleteBet: (betId: number) => void;
   onExport: (data: Bet[]) => void;
@@ -1566,7 +1559,7 @@ function CampBetsTable({ bets, campaigns, getCampaignName, getCampaignColor, onU
     if (filter !== "all") r = r.filter((b) => b.result === filter);
     if (tagF !== "all") r = r.filter((b) => getTag(b) === tagF);
     return r.sort((a, b) => b.match_date.localeCompare(a.match_date));
-  }, [bets, filter, tagF, campaigns]);
+  }, [bets, filter, tagF, _campaigns]);
 
   const tp = Math.max(1, Math.ceil(filtered.length / ps));
   const paged = filtered.slice((pg - 1) * ps, pg * ps);

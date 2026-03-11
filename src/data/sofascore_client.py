@@ -13,6 +13,8 @@ from typing import Any
 
 import httpx
 
+from src.cache import cache_get, cache_set as _cache_set_global
+
 logger = logging.getLogger(__name__)
 
 CACHE_DIR = Path("data/cache/sofascore")
@@ -118,6 +120,14 @@ class SofascoreClient:
             if p2_id:
                 self._enrich_player(m, "p2", p2_id, m.get("surface"))
 
+            # H2H between the two players (2 calls per pair, cached 7 days)
+            if p1_id and p2_id and not m.get("h2h"):
+                h2h = self._get_h2h(p1_id, p2_id, m.get("surface"))
+                if h2h:
+                    m["h2h"] = h2h.get("summary")
+                    m["h2h_surface"] = h2h.get("surface_summary")
+                    m["h2h_last3"] = h2h.get("last3", [])
+
             # Round info from sofascore
             round_info = sofa_ev.get("roundInfo", {})
             if round_info and not m.get("round"):
@@ -139,15 +149,19 @@ class SofascoreClient:
 
     def _enrich_player(self, match: dict, prefix: str, player_id: int, surface: str | None):
         """Fill match dict with player stats for given prefix (p1 or p2)."""
-        # Get player info (ranking)
+        # Get player info (ranking + age)
         info = self._get_player_info(player_id)
         if info:
             team = info.get("team", {})
             if team.get("ranking"):
                 match[f"{prefix}_ranking"] = team["ranking"]
 
-            # Age from playerTeamInfo or timeActive
-            # We'll compute from last events if needed
+            # Age from dateOfBirthTimestamp (already in the response, 0 extra calls)
+            dob_ts = team.get("dateOfBirthTimestamp")
+            if dob_ts:
+                from datetime import timezone
+                age = int((datetime.now(timezone.utc).timestamp() - dob_ts) / (365.25 * 86400))
+                match[f"{prefix}_age"] = age
 
         # Get last events for form, record, surface record, serve stats
         events = self._get_player_last_events(player_id)
@@ -266,6 +280,10 @@ class SofascoreClient:
         total_return_first_total = 0
         total_return_second_won = 0
         total_return_second_total = 0
+        total_bp_saved = 0
+        total_bp_faced = 0
+        total_tb_won = 0
+        total_tb_played = 0
         matches_with_stats = 0
 
         # Only check last 5 finished ATP/WTA matches
@@ -322,6 +340,12 @@ class SofascoreClient:
                     elif key == "secondReturnPoints":
                         total_return_second_won += item.get(f"{side}Value", 0)
                         total_return_second_total += item.get(f"{side}Total", 0)
+                    elif key == "breakPointsSaved":
+                        total_bp_saved += item.get(f"{side}Value", 0)
+                        total_bp_faced += item.get(f"{side}Total", 0)
+                    elif key == "tiebreaks":
+                        total_tb_won += item.get(f"{side}Value", 0)
+                        total_tb_played += item.get(f"{side}Total", 0)
 
             matches_with_stats += 1
             time.sleep(0.1)  # Rate limiting
@@ -330,6 +354,8 @@ class SofascoreClient:
             "serve_pct": None,
             "return_pct": None,
             "aces_avg": None,
+            "bp_saved_pct": None,
+            "tb_win_pct": None,
         }
 
         if matches_with_stats == 0:
@@ -349,6 +375,14 @@ class SofascoreClient:
 
         # Aces average per match
         result["aces_avg"] = round(total_aces / matches_with_stats, 1)
+
+        # Break points saved % (clutch metric)
+        if total_bp_faced > 0:
+            result["bp_saved_pct"] = round(total_bp_saved / total_bp_faced * 100, 1)
+
+        # Tiebreak win %
+        if total_tb_played > 0:
+            result["tb_win_pct"] = round(total_tb_won / total_tb_played * 100, 1)
 
         return result
 
@@ -411,6 +445,69 @@ class SofascoreClient:
             logger.error("Sofascore last events error: %s", e)
             return []
 
+    def _get_h2h(self, p1_id: int, p2_id: int, surface: str | None = None) -> dict | None:
+        """Get H2H between two players. Returns {summary, surface_summary, last3}."""
+        cache_key = f"h2h_{min(p1_id, p2_id)}_{max(p1_id, p2_id)}"
+        cached = self._read_cache(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            resp = self._client.get(f"{API_BASE}/team/{p1_id}/matches-with/{p2_id}")
+            if resp.status_code != 200:
+                return None
+
+            events = resp.json().get("events", [])
+            if not events:
+                return None
+
+            p1_wins, p2_wins = 0, 0
+            surface_p1, surface_p2 = 0, 0
+            last3: list[str] = []
+            surface_norm = _SURFACE_MAP.get(surface or "", surface or "")
+
+            for e in events:
+                if e.get("status", {}).get("type") != "finished":
+                    continue
+                wc = e.get("winnerCode", 0)
+                home_id = e.get("homeTeam", {}).get("id")
+                p1_is_home = (home_id == p1_id)
+                p1_won = (wc == 1 and p1_is_home) or (wc == 2 and not p1_is_home)
+
+                if p1_won:
+                    p1_wins += 1
+                else:
+                    p2_wins += 1
+
+                gt = e.get("groundType", "")
+                if surface_norm and _SURFACE_MAP.get(gt, gt) == surface_norm:
+                    if p1_won:
+                        surface_p1 += 1
+                    else:
+                        surface_p2 += 1
+
+                if len(last3) < 3:
+                    hs = e.get("homeScore", {}).get("current", "?")
+                    as_ = e.get("awayScore", {}).get("current", "?")
+                    opp_name = e.get("awayTeam" if p1_is_home else "homeTeam", {}).get("name", "?")
+                    result_char = "W" if p1_won else "L"
+                    last3.append(f"{result_char} vs {opp_name} ({hs}-{as_})")
+
+            total = p1_wins + p2_wins
+            if total == 0:
+                return None
+
+            result = {
+                "summary": f"{p1_wins}W {p2_wins}L",
+                "surface_summary": f"{surface_p1}W {surface_p2}L on {surface_norm}" if surface_norm and (surface_p1 + surface_p2) > 0 else None,
+                "last3": last3,
+            }
+            self._write_cache(cache_key, result, ttl=7 * 86400)  # 7 days
+            return result
+        except Exception as e:
+            logger.debug("H2H fetch error %d vs %d: %s", p1_id, p2_id, e)
+            return None
+
     def _get_event_statistics(self, event_id: int) -> list[dict] | None:
         """Get match statistics (aces, serve %, etc.) for a finished event."""
         cache_key = f"event_stats_{event_id}"
@@ -434,27 +531,10 @@ class SofascoreClient:
     # ------------------------------------------------------------------
 
     def _read_cache(self, key: str) -> Any:
-        cache_file = CACHE_DIR / f"{key}.json"
-        if not cache_file.exists():
-            return None
-        try:
-            data = json.loads(cache_file.read_text(encoding="utf-8"))
-            ttl = data.get("_ttl", CACHE_TTL)
-            if time.time() - data.get("_ts", 0) > ttl:
-                return None
-            return data.get("_data")
-        except Exception:
-            return None
+        return cache_get(f"sofa:{key}")
 
     def _write_cache(self, key: str, data: Any, ttl: int = CACHE_TTL):
-        cache_file = CACHE_DIR / f"{key}.json"
-        try:
-            cache_file.write_text(
-                json.dumps({"_data": data, "_ts": time.time(), "_ttl": ttl}, ensure_ascii=False),
-                encoding="utf-8",
-            )
-        except Exception as e:
-            logger.debug("Cache write error for %s: %s", key, e)
+        _cache_set_global(f"sofa:{key}", data, ttl=ttl)
 
     # ------------------------------------------------------------------
     # Fuzzy matching

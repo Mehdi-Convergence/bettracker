@@ -109,6 +109,8 @@ export interface BacktestParams {
   combo_top_n: number;
   test_seasons: string[];
   sport: string;
+  allowed_outcomes: string[] | null;
+  excluded_leagues: string[] | null;
 }
 
 export interface SavedBacktestSummary {

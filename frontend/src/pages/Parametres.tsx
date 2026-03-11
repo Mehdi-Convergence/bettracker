@@ -54,7 +54,7 @@ const NOTIF_EVENTS: {
 }[] = [
   { key: "new_ticket", label: "Nouveau ticket proposé", desc: "Campagne génère un ticket à valider", prefKey: "notif_new_ticket" },
   { key: "stop_loss", label: "Stop-loss déclenché", desc: "Perte journalière atteint votre limite", prefKey: "notif_stop_loss" },
-  { key: "smart_stop", label: "Smart Stop — pause recommandée", desc: "ROI des 20 derniers paris sous -15%", prefKey: "notif_smart_stop" },
+  { key: "smart_stop", label: "Smart Stop : pause recommandée", desc: "ROI des 20 derniers paris sous -15%", prefKey: "notif_smart_stop" },
   { key: "campaign_ending", label: "Fin de campagne imminente", desc: "Objectif de bankroll atteint", prefKey: "notif_campaign_ending" },
   { key: "low_bankroll", label: "Alerte bankroll basse", desc: "Bankroll sous le seuil configuré", prefKey: "notif_low_bankroll" },
 ];
@@ -415,7 +415,7 @@ export default function Parametres() {
               <div className={sectionTitleCls}>
                 <Share2 size={16} style={{ color: C.accent }} /> Partage de tickets
               </div>
-              <div className={sectionDescCls}>Générez une image PNG de vos tickets à partager sur X/Twitter. Tous les tickets sont partageables — transparence totale.</div>
+              <div className={sectionDescCls}>Générez une image PNG de vos tickets à partager sur X/Twitter. Tous les tickets sont partageables, transparence totale.</div>
             </div>
             <div className="p-5">
               <div className="flex gap-5 items-start flex-wrap">
@@ -506,14 +506,14 @@ export default function Parametres() {
                     <div className={rowCls}>
                       <div className="flex-1 pr-5">
                         <div className="text-[13px] font-medium text-[#111318]">Afficher le CLV</div>
-                        <div className="text-[11px] text-[#8a919e] mt-0.5">Crédibilise la valeur long terme — recommandé</div>
+                        <div className="text-[11px] text-[#8a919e] mt-0.5">Crédibilise la valeur long terme, recommandé</div>
                       </div>
                       <Toggle checked={getVal("share_show_clv") ?? true} onChange={(v) => setVal("share_show_clv", v)} />
                     </div>
                     <div className={rowCls + " bg-[#f4f5f7]"}>
                       <div className="flex-1 pr-5">
                         <div className="text-[13px] font-medium text-[#111318]">Watermark BetTracker</div>
-                        <div className="text-[11px] text-[#8a919e] mt-0.5">Toujours affiché — contrepartie de la feature gratuite</div>
+                        <div className="text-[11px] text-[#8a919e] mt-0.5">Toujours affiché, contrepartie de la feature gratuite</div>
                       </div>
                       <Toggle checked={true} onChange={() => {}} disabled />
                     </div>
@@ -587,7 +587,7 @@ export default function Parametres() {
                 <div className={rowCls}>
                   <div className="flex-1 pr-5">
                     <div className="text-[13.5px] font-medium text-[#111318]">Devise d'affichage</div>
-                    <div className="text-[12px] text-[#8a919e] mt-0.5">Cosmétique — affiche le symbole, ne convertit pas les montants</div>
+                    <div className="text-[12px] text-[#8a919e] mt-0.5">Cosmétique : affiche le symbole, ne convertit pas les montants</div>
                   </div>
                   <select
                     value={getVal("currency") ?? "EUR"}
@@ -617,7 +617,7 @@ export default function Parametres() {
                 </div>
                 <div className={rowCls}>
                   <div className="flex-1 pr-5">
-                    <div className="text-[13.5px] font-medium text-[#111318]">Vue par défaut — Tickets</div>
+                    <div className="text-[13.5px] font-medium text-[#111318]">Vue par défaut : Tickets</div>
                     <div className="text-[12px] text-[#8a919e] mt-0.5">Vue affichée à l'ouverture du module Tickets</div>
                   </div>
                   <select
@@ -632,7 +632,7 @@ export default function Parametres() {
                 </div>
                 <div className={rowCls}>
                   <div className="flex-1 pr-5">
-                    <div className="text-[13.5px] font-medium text-[#111318]">Vue par défaut — Campagnes</div>
+                    <div className="text-[13.5px] font-medium text-[#111318]">Vue par défaut : Campagnes</div>
                     <div className="text-[12px] text-[#8a919e] mt-0.5">Vue affichée à l'ouverture du module Campagnes</div>
                   </div>
                   <select
@@ -720,7 +720,7 @@ export default function Parametres() {
                 <div className="mt-2.5 p-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg">
                   <div className="text-[10.5px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-1.5">Texte X/Twitter</div>
                   <div className="text-[12.5px] text-[#3c4149] leading-relaxed">
-                    <strong className="text-[#111318]">✅ Sinner vs Fritz — Dom @ 1.65</strong><br />
+                    <strong className="text-[#111318]">✅ Sinner vs Fritz : Dom @ 1.65</strong><br />
                     Edge : +5.8% | CLV : +3.8%<br />
                     +19.50€<br /><br />
                     <span className="text-[#3b5bdb]">#ValueBetting #BetTracker</span>
@@ -731,7 +731,7 @@ export default function Parametres() {
               {/* Options + Actions */}
               <div className="flex-1 min-w-0">
                 <div className="text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">Options pour ce partage</div>
-                <div className="text-[11.5px] text-[#8a919e] mb-2">Modifiables à la volée — ne change pas vos paramètres globaux</div>
+                <div className="text-[11.5px] text-[#8a919e] mb-2">Modifiables à la volée, ne change pas vos paramètres globaux</div>
                 <div className="border border-[#e3e6eb] rounded-[10px] overflow-hidden mb-4">
                   {[
                     { label: "Afficher la mise", desc: null },
@@ -785,7 +785,7 @@ export default function Parametres() {
             </div>
 
             <div className="px-5 py-4 border-t border-[#e3e6eb] flex items-center justify-between shrink-0">
-              <span className="text-[12px] text-[#8a919e]">Génération côté client — aucune donnée envoyée</span>
+              <span className="text-[12px] text-[#8a919e]">Génération côté client, aucune donnée envoyée</span>
               <button
                 onClick={() => setShowShareModal(false)}
                 className="px-3.5 py-2 rounded-lg border border-[#e3e6eb] bg-transparent text-[#8a919e] text-[12.5px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] transition-all"

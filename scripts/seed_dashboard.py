@@ -1,9 +1,11 @@
 """
-Seed the database with ~35 realistic football + tennis bets + 1 campaign for dashboard demo.
-Cleans previous seed data first (non-backtest bets without campaign, then re-seeds).
+Seed the database with ~35 realistic football + tennis bets + 2 campaigns for dashboard demo.
+Creates a demo user (or reuses existing) and links all data to that user.
+Cleans previous seed data first, then re-seeds.
 
 Usage:
-    uv run python scripts/seed_dashboard.py
+    uv run python scripts/seed_dashboard.py                    # uses default demo@bettracker.com
+    uv run python scripts/seed_dashboard.py user@example.com   # seeds for specific user email
 """
 
 import sys
@@ -15,11 +17,13 @@ from datetime import datetime, timedelta
 # Ensure project root is on sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import bcrypt
 from sqlalchemy.orm import Session
 
 from src.database import SessionLocal
 from src.models.bet import Bet
 from src.models.campaign import Campaign
+from src.models.user import User
 
 # ---------------------------------------------------------------------------
 # Data pools
@@ -265,40 +269,86 @@ def assign_results(bets: list[dict], win_rate: float = 0.60) -> list[dict]:
     return settled + combo + pending
 
 
-def seed():
+def _get_or_create_user(db: Session, email: str) -> User:
+    """Get existing user or create a demo user."""
+    user = db.query(User).filter(User.email == email).first()
+    if user:
+        print(f"Using existing user: {email} (id={user.id})")
+        return user
+    hashed = bcrypt.hashpw("DemoPass1".encode(), bcrypt.gensalt()).decode()
+    user = User(
+        email=email,
+        hashed_password=hashed,
+        display_name="Demo User",
+        tier="premium",
+        is_active=True,
+        onboarding_completed=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    print(f"Created demo user: {email} / DemoPass1 (id={user.id}, tier=premium)")
+    return user
+
+
+def seed(email: str = "demo@bettracker.com"):
     db: Session = SessionLocal()
     try:
-        # Clean previous seed data (non-backtest, non-campaign bets)
+        user = _get_or_create_user(db, email)
+
+        # Clean previous seed data for this user (non-backtest bets)
         db.query(Bet).filter(
+            Bet.user_id == user.id,
             Bet.is_backtest == False,
-            Bet.campaign_id == None,
         ).delete(synchronize_session=False)
+        # Clean previous campaigns for this user
+        db.query(Campaign).filter(Campaign.user_id == user.id).delete(synchronize_session=False)
         db.commit()
 
-        # Create or get a demo campaign
-        campaign = db.query(Campaign).filter(Campaign.name == "Value Bet Auto").first()
-        if not campaign:
-            campaign = Campaign(
-                name="Value Bet Auto",
-                status="active",
-                initial_bankroll=500.0,
-                flat_stake=0.05,
-                min_edge=0.03,
-                min_model_prob=0.55,
-                min_odds=None,
-                max_odds=None,
-                allowed_outcomes="H,D,A",
-                excluded_leagues=None,
-                combo_mode=False,
-                combo_max_legs=4,
-                combo_min_odds=1.8,
-                combo_max_odds=3.0,
-                combo_top_n=3,
-                target_bankroll=1000.0,
-            )
-            db.add(campaign)
-            db.commit()
-            db.refresh(campaign)
+        # Create campaign 1: Value Bet Auto (active)
+        campaign1 = Campaign(
+            user_id=user.id,
+            name="Value Bet Auto",
+            status="active",
+            initial_bankroll=500.0,
+            flat_stake=0.05,
+            min_edge=0.03,
+            min_model_prob=0.55,
+            min_odds=None,
+            max_odds=None,
+            allowed_outcomes="H,D,A",
+            excluded_leagues=None,
+            combo_mode=False,
+            combo_max_legs=4,
+            combo_min_odds=1.8,
+            combo_max_odds=3.0,
+            combo_top_n=3,
+            target_bankroll=1000.0,
+        )
+        # Create campaign 2: Tennis Edge (active)
+        campaign2 = Campaign(
+            user_id=user.id,
+            name="Tennis Edge ATP",
+            status="active",
+            initial_bankroll=300.0,
+            flat_stake=0.04,
+            min_edge=0.04,
+            min_model_prob=0.58,
+            min_odds=1.40,
+            max_odds=3.00,
+            allowed_outcomes="H,A",
+            excluded_leagues=None,
+            combo_mode=False,
+            combo_max_legs=2,
+            combo_min_odds=1.8,
+            combo_max_odds=3.0,
+            combo_top_n=2,
+            target_bankroll=600.0,
+        )
+        db.add_all([campaign1, campaign2])
+        db.commit()
+        db.refresh(campaign1)
+        db.refresh(campaign2)
 
         # Build and seed bets
         all_bets = (
@@ -309,13 +359,25 @@ def seed():
         )
         all_bets = assign_results(all_bets, win_rate=0.60)
 
-        # Assign some settled bets to the campaign
-        settled_bets = [b for b in all_bets if b["result"] in ("won", "lost") and b.get("combo_group") is None]
-        campaign_bets = settled_bets[:8]  # First 8 settled bets belong to campaign
-        campaign_ids = set(id(b) for b in campaign_bets)
+        # Assign some settled bets to campaigns
+        settled_football = [b for b in all_bets if b["result"] in ("won", "lost") and b.get("combo_group") is None and b["sport"] == "football"]
+        settled_tennis = [b for b in all_bets if b["result"] in ("won", "lost") and b.get("combo_group") is None and b["sport"] == "tennis"]
+
+        campaign1_ids = set(id(b) for b in settled_football[:8])
+        campaign2_ids = set(id(b) for b in settled_tennis[:3])
+
+        sources = ["scanner", "scanner", "scanner", "manual", "algo"]
+        bookmakers = ["Betclic", "Winamax", "Unibet", "Pinnacle", "Bet365"]
 
         for b in all_bets:
+            cid = None
+            if id(b) in campaign1_ids:
+                cid = campaign1.id
+            elif id(b) in campaign2_ids:
+                cid = campaign2.id
+
             bet = Bet(
+                user_id=user.id,
                 sport=b["sport"],
                 match_date=b["match_date"],
                 home_team=b["home_team"],
@@ -329,8 +391,11 @@ def seed():
                 clv=b["clv"],
                 league=b["league"],
                 combo_group=b.get("combo_group"),
-                campaign_id=campaign.id if id(b) in campaign_ids else None,
+                campaign_id=cid,
                 is_backtest=False,
+                source=random.choice(sources),
+                bookmaker=random.choice(bookmakers),
+                edge_at_bet=round(random.uniform(0.02, 0.12), 3) if b["result"] != "pending" else None,
             )
             db.add(bet)
 
@@ -341,12 +406,15 @@ def seed():
         lost = sum(1 for b in all_bets if b["result"] == "lost")
         pending = sum(1 for b in all_bets if b["result"] == "pending")
         combo_count = sum(1 for b in all_bets if b.get("combo_group"))
-        camp_count = sum(1 for b in all_bets if id(b) in campaign_ids)
+        camp1_count = len(campaign1_ids)
+        camp2_count = len(campaign2_ids)
         total_pl = sum(b["profit_loss"] for b in all_bets if b["profit_loss"] is not None)
-        print(f"Seeded {len(all_bets)} bets (incl. {combo_count} combo legs, {camp_count} campaign bets)")
+        print(f"\nSeeded {len(all_bets)} bets (incl. {combo_count} combo legs)")
         print(f"  Won: {won}  |  Lost: {lost}  |  Pending: {pending}")
         print(f"  Total P/L: {total_pl:+.2f} EUR")
-        print(f"  Campaign '{campaign.name}' (id={campaign.id}): {camp_count} bets linked")
+        print(f"  Campaign '{campaign1.name}' (id={campaign1.id}): {camp1_count} bets")
+        print(f"  Campaign '{campaign2.name}' (id={campaign2.id}): {camp2_count} bets")
+        print(f"\nAll data linked to user: {user.email} (id={user.id})")
     except Exception:
         db.rollback()
         raise
@@ -355,4 +423,5 @@ def seed():
 
 
 if __name__ == "__main__":
-    seed()
+    email = sys.argv[1] if len(sys.argv) > 1 else "demo@bettracker.com"
+    seed(email)

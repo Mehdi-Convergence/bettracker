@@ -91,7 +91,7 @@ export const scannerTour: TourStep[] = [
   {
     target: '[data-tour="value-toggle"]',
     title: "Value Bets uniquement",
-    content: "Activez pour ne voir que les paris avec un edge positif — la valeur détectée par le modèle par rapport aux cotes du marché.",
+    content: "Activez pour ne voir que les paris avec un edge positif : la valeur détectée par le modèle par rapport aux cotes du marché.",
     placement: "bottom",
   },
   {
