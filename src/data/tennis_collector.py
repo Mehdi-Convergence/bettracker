@@ -1,7 +1,6 @@
 """Tennis data collector from tennis-data.co.uk (ATP CSV files)."""
 
 from pathlib import Path
-from datetime import datetime
 
 import pandas as pd
 from rich.console import Console

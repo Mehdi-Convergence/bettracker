@@ -5,7 +5,6 @@ Rain/wind can affect goal scoring patterns (~15% fewer goals in rain).
 """
 
 import logging
-import time
 from typing import Any
 
 import httpx

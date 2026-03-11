@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 import sqlalchemy as sa
 from sqlalchemy import ForeignKey, String, UniqueConstraint

@@ -1,7 +1,5 @@
 """SavedBacktest model: persist backtest configs and results."""
 
-from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column

@@ -4,7 +4,6 @@ Scrapes player stats (ranking, form, surface record, serve %, aces, H2H)
 from Sofascore's internal API to enrich tennis scanner matches.
 """
 
-import json
 import logging
 import time
 from datetime import datetime, timezone
