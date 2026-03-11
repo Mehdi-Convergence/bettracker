@@ -10,7 +10,6 @@ import {
   Settings,
   User,
   LogOut,
-  Search,
   ChevronsLeft,
   ChevronsRight,
   HelpCircle,

@@ -200,7 +200,7 @@ export default function Scanner() {
   const [maxOdds, setMaxOdds] = useState<string>("");
   // New filters
   const [hideInTicket, setHideInTicket] = useState(false);
-  const [minDataScore, setMinDataScore] = useState<string>("");
+  const [minDataScore, _setMinDataScore] = useState<string>("");
   const [valueOnlyFilter, setValueOnlyFilter] = useState(false);
 
   /* ── Scan ── */
