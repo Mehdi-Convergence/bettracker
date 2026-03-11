@@ -82,6 +82,13 @@ async def ai_scan(
     league_list = [lg.strip() for lg in leagues.split(",") if lg.strip()]
 
     if sport == "tennis":
+        cached_tennis = cache_get("scan:tennis:all")
+        if cached_tennis is None and force:
+            try:
+                from src.workers.scan_worker import run_tennis_scan
+                await run_tennis_scan()
+            except Exception as exc:
+                logger.error("Inline tennis scan failed: %s", exc)
         return _read_tennis_scan()
 
     # --- Football: read from cache ---

@@ -1,6 +1,7 @@
 """Pydantic schemas for API request/response models."""
 
 import re
+from typing import Any
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -523,8 +524,8 @@ class AIScanMatch(BaseModel):
     odds: dict = {}
     form_home: str | None = None
     form_away: str | None = None
-    form_home_detail: list[str] = []
-    form_away_detail: list[str] = []
+    form_home_detail: list[Any] = []
+    form_away_detail: list[Any] = []
     form_home_home: str | None = None       # football: home form at home
     form_away_away: str | None = None       # football: away form away
     position_home: int | None = None
@@ -579,10 +580,10 @@ class AIScanMatch(BaseModel):
     p2_season_record: str | None = None
     p1_surface_record: str | None = None
     p2_surface_record: str | None = None
-    p1_serve_pct: int | None = None
-    p2_serve_pct: int | None = None
-    p1_return_pct: int | None = None
-    p2_return_pct: int | None = None
+    p1_serve_pct: float | None = None
+    p2_serve_pct: float | None = None
+    p1_return_pct: float | None = None
+    p2_return_pct: float | None = None
     p1_aces_avg: float | None = None
     p2_aces_avg: float | None = None
     p1_rest_days: int | None = None

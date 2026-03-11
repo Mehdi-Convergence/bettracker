@@ -1050,7 +1050,7 @@ export default function Scanner() {
 
       {/* Action Bar */}
       <div className="shrink-0 px-5 py-2 bg-[#f4f5f7] border-b border-[#e3e6eb] flex items-center gap-3">
-        <button data-tour="refresh-btn" onClick={() => handleAIScan()} disabled={loading}
+        <button data-tour="refresh-btn" onClick={() => handleAIScan(!hasScanned)} disabled={loading}
           className="bg-[#3b5bdb] hover:bg-[#2b4bc7] disabled:bg-[#b0b7c3] text-white px-4 py-[6px] rounded-lg text-[12px] flex items-center gap-1.5 font-semibold shadow-sm transition-colors">
           <Search size={13} />
           {loading ? "Scan..." : "Scanner"}
