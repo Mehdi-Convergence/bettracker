@@ -59,9 +59,9 @@ export default function Login() {
   const labelCls = "text-[11.5px] font-semibold text-[#3c4149] tracking-wide";
 
   return (
-    <div className="grid min-h-screen" style={{ gridTemplateColumns: "1fr 1fr" }}>
+    <div className="grid min-h-screen grid-cols-1 md:grid-cols-2">
       {/* ── LEFT PANEL: BRANDING ── */}
-      <div className="relative overflow-hidden flex flex-col" style={{ background: "#0f1623" }}>
+      <div className="hidden md:flex md:flex-col relative overflow-hidden" style={{ background: "#0f1623" }}>
         {/* Grid decoration */}
         <div
           className="absolute inset-0 pointer-events-none"

@@ -28,7 +28,7 @@ jobs:
           port: ${{ secrets.VPS_PORT || 22 }}
           script: |
             set -e
-            cd /app/bettracker
+            cd /opt/bettracker
 
             echo "→ Pulling latest code..."
             git pull origin main

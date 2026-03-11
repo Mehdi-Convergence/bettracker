@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, Outlet, useLocation, Link } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -15,6 +15,7 @@ import {
   HelpCircle,
   Send,
   X,
+  Menu,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { BreadcrumbProvider, useBreadcrumb } from "@/contexts/BreadcrumbContext";
@@ -223,14 +224,27 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Ferme le drawer mobile à chaque navigation
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   const w = collapsed ? "w-[60px] min-w-[60px]" : "w-[228px] min-w-[228px]";
 
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* ── OVERLAY MOBILE ── */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 md:hidden"
+          style={{ background: "rgba(0,0,0,0.45)" }}
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
       {/* ── SIDEBAR ── */}
       <aside
-        className={`${w} flex flex-col transition-all duration-200`}
+        className={`${w} flex flex-col transition-all duration-200 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-[228px] max-md:min-w-[228px] ${mobileOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full"}`}
         style={{ background: SB.bg }}
       >
         {/* Logo */}
@@ -316,10 +330,10 @@ export default function Layout() {
 
         {/* Bottom */}
         <div style={{ borderTop: `1px solid ${SB.border}` }} className="p-2">
-          {/* Collapse toggle */}
+          {/* Collapse toggle — masqué sur mobile */}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className={`w-full flex items-center ${collapsed ? "justify-center" : "gap-[9px]"} ${collapsed ? "px-0" : "px-2.5"} py-2 rounded-lg text-[13.5px] transition-all cursor-pointer border-none bg-transparent`}
+            className={`max-md:hidden w-full flex items-center ${collapsed ? "justify-center" : "gap-[9px]"} ${collapsed ? "px-0" : "px-2.5"} py-2 rounded-lg text-[13.5px] transition-all cursor-pointer border-none bg-transparent`}
             style={{ color: SB.text }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = SB.hover;
@@ -410,7 +424,14 @@ export default function Layout() {
       <TourProvider>
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Topbar */}
-          <div className="h-14 min-h-14 border-b border-[#e3e6eb] bg-white flex items-center px-7 gap-3">
+          <div className="h-14 min-h-14 border-b border-[#e3e6eb] bg-white flex items-center px-7 gap-3 max-md:px-4">
+            {/* Hamburger mobile */}
+            <button
+              className="hidden max-md:flex items-center justify-center w-8 h-8 rounded-lg bg-transparent border-none cursor-pointer text-[#5a6272] hover:bg-[#f4f5f7] shrink-0"
+              onClick={() => setMobileOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
             <Breadcrumb />
             <div className="ml-auto flex items-center gap-2">
               <NotificationBell />

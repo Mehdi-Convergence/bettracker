@@ -145,9 +145,9 @@ export default function Dashboard() {
   const betGroups = useMemo(() => groupBets(recentBets).slice(0, 5), [recentBets]);
 
   return (
-    <div className="flex flex-col gap-2 animate-fade-up h-full overflow-hidden">
+    <div className="flex flex-col gap-2 animate-fade-up h-full overflow-hidden max-md:h-auto max-md:overflow-visible">
       {/* ── HEADER ── */}
-      <div className="flex items-end justify-between">
+      <div className="flex items-end justify-between max-md:flex-col max-md:items-start max-md:gap-2">
         <div>
           <h1 className="text-[20px] font-extrabold tracking-tight text-[#111318]">Bonjour, {firstName}</h1>
           <p className="text-[12.5px] text-[#8a919e] mt-0.5">Voici un aperçu de vos performances · Semaine {getWeekNumber()}</p>
@@ -191,13 +191,13 @@ export default function Dashboard() {
 
       {/* ── KPIs ── */}
       {loading ? (
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="bg-white rounded-xl border border-[#e3e6eb] p-[14px_16px] shadow-[0_1px_3px_rgba(16,24,40,0.06)] animate-pulse"><div className="h-3 w-16 bg-[#e3e6eb] rounded mb-3" /><div className="h-6 w-20 bg-[#e3e6eb] rounded" /></div>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <KPICard dataTour="kpi-roi" label="ROI global" value={`${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`} valueColor={roi >= 0 ? "#12b76a" : "#f04438"} icon={<TrendingUp size={14} />} iconBg={roi >= 0 ? "rgba(18,183,106,0.08)" : "rgba(240,68,56,0.07)"} iconColor={roi >= 0 ? "#12b76a" : "#f04438"} delta={roiDelta != null ? `${roiDelta >= 0 ? "+" : ""}${roiDelta.toFixed(1)}% vs mois dernier` : undefined} deltaUp={roiDelta != null ? roiDelta >= 0 : undefined} />
           <KPICard dataTour="kpi-staked" label="Mise totale" value={`${totalStaked.toLocaleString("fr-FR")}€`} icon={<DollarSign size={14} />} iconBg="rgba(59,91,219,0.07)" iconColor="#3b5bdb" delta={stakedDelta != null ? `${stakedDelta >= 0 ? "+" : ""}${Math.round(stakedDelta)}€ vs mois dernier` : undefined} deltaUp={stakedDelta != null ? stakedDelta >= 0 : undefined} />
           <KPICard dataTour="kpi-tickets" label="Tickets ce mois" value={`${totalBets}`} icon={<CheckSquare size={14} />} iconBg="rgba(247,144,9,0.08)" iconColor="#f79009" delta={pendingBets > 0 ? `dont ${pendingBets} en attente` : undefined} />
@@ -206,11 +206,11 @@ export default function Dashboard() {
       )}
 
       {/* ── MAIN: 2 columns ── */}
-      <div className="grid gap-3 items-stretch flex-1 min-h-0" style={{ gridTemplateColumns: "1fr 340px" }}>
+      <div className="grid gap-3 items-stretch flex-1 min-h-0 max-md:flex max-md:flex-col" style={{ gridTemplateColumns: "1fr 340px" }}>
         {/* LEFT column */}
         <div className="flex flex-col gap-3 min-h-0">
           {/* ROW 1: ROI chart + P&L résumé side by side */}
-          <div className="grid grid-cols-2 gap-3 flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1">
             {/* ROI Chart */}
             <div data-tour="roi-chart" className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col">
               <div className="flex items-center px-4 py-2.5 border-b border-[#e3e6eb]">
@@ -247,7 +247,7 @@ export default function Dashboard() {
           </div>
 
           {/* ROW 2: 2 cards side by side, pushed to bottom */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Sport + Donut merged */}
             <div data-tour="sport-breakdown" className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col">
               <div className="px-4 py-2.5 border-b border-[#e3e6eb] shrink-0">
