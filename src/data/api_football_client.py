@@ -11,9 +11,7 @@ Cache TTLs:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -171,13 +169,7 @@ async def _get_cached(key_type: str, key_id: str, path: str, params: dict | None
 
     quota = _quota_get()
     if quota["remaining"] <= 0:
-        logger.warning("API-Football quota exhausted, serving stale cache for %s/%s", key_type, key_id)
-        p = _cache_path(key_type, key_id)
-        if p.exists():
-            try:
-                return json.loads(p.read_text(encoding="utf-8")).get("payload")
-            except Exception:
-                pass
+        logger.warning("API-Football quota exhausted for %s/%s", key_type, key_id)
         return None
 
     data = await _get(path, params)

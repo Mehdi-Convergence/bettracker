@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.cache import cache_set, cache_get
+from src.cache import cache_set
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s %(message)s")
 logger = logging.getLogger("scan_worker")
@@ -332,7 +332,6 @@ async def run_football_scan(league_list: list[str] | None = None):
     duration = time.time() - t0
 
     # Store in cache — one global key + per-league keys
-    from src.api.schemas import AIScanMatch as _Schema
     matches_dicts = [m.model_dump() for m in matches_out]
 
     cache_payload = {
