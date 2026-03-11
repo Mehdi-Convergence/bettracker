@@ -59,12 +59,9 @@ export default function Login() {
   const labelCls = "text-[11.5px] font-semibold text-[#3c4149] tracking-wide";
 
   return (
-    <div className="grid min-h-screen" style={{ gridTemplateColumns: "1fr 480px" }}>
+    <div className="grid min-h-screen" style={{ gridTemplateColumns: "1fr 1fr" }}>
       {/* ── LEFT PANEL: BRANDING ── */}
-      <div
-        className="relative overflow-hidden flex flex-col justify-between py-10"
-        style={{ background: "#0f1623", padding: "40px 32px 40px 80px" }}
-      >
+      <div className="relative overflow-hidden flex flex-col" style={{ background: "#0f1623" }}>
         {/* Grid decoration */}
         <div
           className="absolute inset-0 pointer-events-none"
@@ -77,8 +74,8 @@ export default function Login() {
         <div className="absolute -top-30 -right-30 w-[600px] h-[600px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(79,140,255,0.12) 0%, transparent 65%)" }} />
         <div className="absolute -bottom-20 -left-20 w-[400px] h-[400px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(18,183,106,0.08) 0%, transparent 65%)" }} />
 
-        {/* Logo */}
-        <div className="relative z-10 flex items-center gap-2.5">
+        {/* Logo — ancré en haut à gauche */}
+        <div className="relative z-10 flex items-center gap-2.5" style={{ padding: "40px 0 0 44px" }}>
           <div className="w-8 h-8 bg-[#4f8cff] rounded-lg flex items-center justify-center">
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" className="w-[17px] h-[17px]">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
@@ -89,70 +86,78 @@ export default function Login() {
           </span>
         </div>
 
-        {/* Center content */}
-        <div className="relative z-10 flex-1 flex flex-col justify-center" style={{ gap: "36px" }}>
-          <div>
-            <div
-              className="font-semibold uppercase mb-5"
-              style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "12px", letterSpacing: "0.18em", color: "rgba(79,140,255,0.8)" }}
-            >
-              Value Bet Detection · Algorithme IA
-            </div>
-            <h1
-              className="tracking-tight leading-[1.05] text-white mb-6"
-              style={{ fontSize: "62px", fontWeight: 900 }}
-            >
-              Pariez avec l&apos;<span className="bg-gradient-to-r from-[#7eb8ff] to-[#4f8cff] bg-clip-text text-transparent">edge</span>
-              <br />
-              et la <span className="bg-gradient-to-r from-[#12b76a] to-[#3ee09c] bg-clip-text text-transparent">probabilité</span>.
-              <br />
-              <span style={{ color: "rgba(255,255,255,0.35)" }}>Pas l&apos;instinct.</span>
-            </h1>
-            <p
-              className="leading-[1.75] max-w-[540px]"
-              style={{ fontSize: "20px", color: "rgba(255,255,255,0.42)", textAlign: "justify" }}
-            >
-              BetTracker analyse chaque match en temps réel, calibre les probabilités et détecte automatiquement les value bets — là où les bookmakers sous-estiment vos chances.
-            </p>
-          </div>
-
-          <div className="flex flex-col" style={{ gap: "18px" }}>
-            {[
-              { Icon: ScanSearch, text: "Scan automatique des matchs à fort edge", color: "#7eb8ff", bg: "rgba(79,140,255,0.15)" },
-              { Icon: BarChart2, text: "Suivi ROI en temps réel · Historique complet", color: "#12b76a", bg: "rgba(18,183,106,0.15)" },
-              { Icon: Bot, text: "Campagnes auto-pilotées par l'algorithme", color: "#f79009", bg: "rgba(247,144,9,0.15)" },
-              { Icon: MessageCircle, text: "IA Analyste disponible 24h/24", color: "#a78bfa", bg: "rgba(139,92,246,0.15)" },
-            ].map(({ Icon, text, color, bg }) => (
-              <div key={text} className="flex items-center gap-4" style={{ fontSize: "15.5px", color: "rgba(255,255,255,0.72)" }}>
-                <div
-                  className="rounded-xl flex items-center justify-center shrink-0"
-                  style={{ width: "38px", height: "38px", background: bg }}
-                >
-                  <Icon size={17} style={{ color }} />
-                </div>
-                {text}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Social proof */}
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="flex">
-            {["#4f8cff", "#12b76a", "#f79009", "#7c3aed", "#f04438"].map((c, i) => (
+        {/* Center content — centré horizontalement */}
+        <div className="relative z-10 flex-1 flex flex-col justify-center items-center">
+          <div className="w-full max-w-[580px]" style={{ gap: "36px", display: "flex", flexDirection: "column" }}>
+            <div>
               <div
-                key={i}
-                className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2"
-                style={{ background: c, borderColor: "#0f1623", marginLeft: i > 0 ? "-8px" : 0 }}
+                className="font-semibold uppercase mb-5"
+                style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "12px", letterSpacing: "0.18em", color: "rgba(79,140,255,0.8)" }}
               >
-                {["A", "T", "R", "M", "K"][i]}
+                Value Bet Detection
               </div>
-            ))}
-          </div>
-          <div className="text-[12.5px]" style={{ color: "rgba(255,255,255,0.45)" }}>
-            Rejoignez nos parieurs · ROI moyen <strong style={{ color: "#12b76a" }}>+18%</strong>
+              <h1
+                className="tracking-tight leading-[1.05] text-white mb-6"
+                style={{ fontSize: "62px", fontWeight: 900 }}
+              >
+                Pariez avec l&apos;<span className="bg-gradient-to-r from-[#7eb8ff] to-[#4f8cff] bg-clip-text text-transparent">edge</span>
+                <br />
+                et la <span className="bg-gradient-to-r from-[#12b76a] to-[#3ee09c] bg-clip-text text-transparent">probabilité</span>.
+                <br />
+                Pas l&apos;instinct.
+              </h1>
+              <p
+                className="leading-[1.75]"
+                style={{ fontSize: "20px", color: "rgba(255,255,255,0.42)", textAlign: "justify" }}
+              >
+                Détectez les value bets en temps réel, suivez vos performances match par match et pilotez vos campagnes de paris avec un algorithme entraîné sur des années de données.
+              </p>
+            </div>
+
+            <div className="flex flex-col" style={{ gap: "18px" }}>
+              {[
+                { Icon: ScanSearch, text: "Scan automatique des matchs à fort edge", color: "#7eb8ff", bg: "rgba(79,140,255,0.15)" },
+                { Icon: BarChart2, text: "Suivi ROI en temps réel · Historique complet", color: "#12b76a", bg: "rgba(18,183,106,0.15)" },
+                { Icon: Bot, text: "Campagnes auto-pilotées par l'algorithme", color: "#f79009", bg: "rgba(247,144,9,0.15)" },
+                { Icon: MessageCircle, text: "IA Analyste disponible 24h/24", color: "#a78bfa", bg: "rgba(139,92,246,0.15)" },
+              ].map(({ Icon, text, color, bg }) => (
+                <div key={text} className="flex items-center gap-4" style={{ fontSize: "15.5px", color: "rgba(255,255,255,0.72)" }}>
+                  <div
+                    className="rounded-xl flex items-center justify-center shrink-0"
+                    style={{ width: "38px", height: "38px", background: bg }}
+                  >
+                    <Icon size={17} style={{ color }} />
+                  </div>
+                  {text}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
+
+        {/* Social proof — ancré en bas à gauche */}
+        <div className="relative z-10" style={{ padding: "0 0 40px 44px" }}>
+          <div
+            className="inline-flex items-center gap-3 px-4 py-3.5 rounded-xl"
+            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
+          >
+            <div className="flex">
+              {["#4f8cff", "#12b76a", "#f79009", "#7c3aed", "#f04438"].map((c, i) => (
+                <div
+                  key={i}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2"
+                  style={{ background: c, borderColor: "#0f1623", marginLeft: i > 0 ? "-8px" : 0 }}
+                >
+                  {["A", "T", "R", "M", "K"][i]}
+                </div>
+              ))}
+            </div>
+            <div className="text-[12.5px] whitespace-nowrap" style={{ color: "rgba(255,255,255,0.55)" }}>
+              Rejoignez nos parieurs · ROI moyen <strong style={{ color: "#12b76a" }}>+18%</strong>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* ── RIGHT PANEL: FORM ── */}

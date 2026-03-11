@@ -35,7 +35,7 @@ describe('Login page — branding panel', () => {
 
   it('affiche la description', () => {
     renderWithRouter(<Login />)
-    expect(screen.getByText(/BetTracker analyse chaque match/)).toBeInTheDocument()
+    expect(screen.getByText(/Détectez les value bets/)).toBeInTheDocument()
   })
 
   it('affiche les 4 features', () => {
