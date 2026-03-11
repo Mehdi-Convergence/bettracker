@@ -16,12 +16,15 @@ COPY src/ src/
 COPY alembic/ alembic/
 COPY alembic.ini ./
 COPY scripts/ scripts/
-COPY models/ models/
+RUN mkdir -p models/
 
 # Production image
 FROM python:3.12-slim
 
 WORKDIR /app
+
+# Runtime deps for LightGBM/XGBoost (OpenMP)
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 && rm -rf /var/lib/apt/lists/*
 
 # Copy virtual environment from builder
 COPY --from=builder /app/.venv /app/.venv
@@ -30,6 +33,7 @@ COPY --from=builder /app/alembic /app/alembic
 COPY --from=builder /app/alembic.ini /app/alembic.ini
 COPY --from=builder /app/scripts /app/scripts
 COPY --from=builder /app/models /app/models
+
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH=/app
