@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Layout from "./components/Layout";
+import Landing from "./pages/Landing";
 
 // Lazy-loaded pages for code-splitting
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -17,15 +18,20 @@ const Settings = lazy(() => import("./pages/Settings"));
 const Parametres = lazy(() => import("./pages/Parametres"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const MentionsLegales = lazy(() => import("./pages/MentionsLegales"));
+const CGU = lazy(() => import("./pages/CGU"));
+const ConfidentialitePolicy = lazy(() => import("./pages/ConfidentialitePolicy"));
+
+const PageLoader = () => (
+  <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+  </div>
+);
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-      </div>
-    );
+    return <PageLoader />;
   }
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
@@ -34,38 +40,43 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
-const PageLoader = () => (
-  <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-  </div>
-);
+function LandingRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return <PageLoader />;
+  if (user) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
 
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Suspense fallback={<PageLoader />}>
-        <Routes>
-          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-          <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-          <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
-          <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
-          <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            <Route index element={<Dashboard />} />
-            <Route path="scanner" element={<Scanner />} />
-            <Route path="backtest" element={<Backtest />} />
-            <Route path="campaign" element={<Campaign />} />
-            <Route path="campaign/:id" element={<CampaignDetail />} />
-            <Route path="portfolio" element={<Portfolio />} />
-            <Route path="ai-analyst" element={<AIAnalyste />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="parametres" element={<Parametres />} />
-          </Route>
-        </Routes>
+          <Routes>
+            <Route path="/" element={<LandingRoute><Landing /></LandingRoute>} />
+            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+            <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+            <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+            <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
+            <Route path="/mentions-legales" element={<MentionsLegales />} />
+            <Route path="/cgu" element={<CGU />} />
+            <Route path="/confidentialite" element={<ConfidentialitePolicy />} />
+            <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="scanner" element={<Scanner />} />
+              <Route path="backtest" element={<Backtest />} />
+              <Route path="campaign" element={<Campaign />} />
+              <Route path="campaign/:id" element={<CampaignDetail />} />
+              <Route path="portfolio" element={<Portfolio />} />
+              <Route path="ai-analyst" element={<AIAnalyste />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="parametres" element={<Parametres />} />
+            </Route>
+          </Routes>
         </Suspense>
       </AuthProvider>
     </BrowserRouter>

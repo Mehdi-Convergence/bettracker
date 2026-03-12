@@ -31,7 +31,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate("/");
+      navigate("/dashboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur de connexion");
     } finally {
@@ -46,7 +46,7 @@ export default function Login() {
     setSignupLoading(true);
     try {
       await register(signupEmail, signupPwd, signupName);
-      navigate("/");
+      navigate("/dashboard");
     } catch (err: unknown) {
       setSignupErr(err instanceof Error ? err.message : "Erreur");
     } finally {
@@ -169,7 +169,7 @@ export default function Login() {
               {mode === "login" ? "Bon retour" : "Créez votre compte"}
             </h2>
             <p className="text-[13px] text-[#8a919e] mt-1">
-              {mode === "login" ? "Connectez-vous à votre espace BetTracker" : "7 jours gratuits · aucune carte requise"}
+              {mode === "login" ? "Connectez-vous à votre espace BetTracker" : "3 jours gratuits · aucune carte requise"}
             </p>
           </div>
 
@@ -274,7 +274,7 @@ export default function Login() {
               <div className="text-center text-[13px] text-[#8a919e] mt-5 pt-5 border-t border-[#e3e6eb]">
                 Pas encore de compte ?{" "}
                 <button type="button" onClick={() => setMode("signup")} className="text-[#3b5bdb] font-semibold bg-transparent border-none cursor-pointer hover:underline p-0">
-                  Essai gratuit 7 jours →
+                  Essai gratuit 3 jours →
                 </button>
               </div>
             </form>
@@ -290,7 +290,7 @@ export default function Login() {
                   style={{ background: "linear-gradient(90deg, rgba(18,183,106,0.07), rgba(18,183,106,0.03))", border: "1px solid rgba(18,183,106,0.2)" }}
                 >
                   <Check size={16} className="text-[#12b76a] shrink-0" />
-                  <span><strong className="text-[#12b76a]">7 jours gratuits</strong> · Aucune CB requise · Résiliation en 1 clic</span>
+                  <span><strong className="text-[#12b76a]">3 jours gratuits</strong> · Aucune CB requise · Résiliation en 1 clic</span>
                 </div>
 
                 {signupErr && (
@@ -359,8 +359,8 @@ export default function Login() {
 
                 <p className="text-[11px] text-[#b0b7c3] text-center leading-relaxed">
                   En créant un compte vous acceptez les{" "}
-                  <Link to="#" className="text-[#3b5bdb] no-underline">CGU</Link> et la{" "}
-                  <Link to="#" className="text-[#3b5bdb] no-underline">politique de confidentialité</Link>.
+                  <Link to="/cgu" className="text-[#3b5bdb] no-underline">CGU</Link> et la{" "}
+                  <Link to="/confidentialite" className="text-[#3b5bdb] no-underline">politique de confidentialité</Link>.
                 </p>
               </div>
 

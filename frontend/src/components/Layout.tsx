@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink, Outlet, useLocation, Link } from "react-router-dom";
+import FooterLegal from "@/components/FooterLegal";
 import {
   LayoutDashboard,
   ScanSearch,
@@ -39,7 +40,7 @@ const NAV_SECTIONS = [
   {
     label: "Analyse",
     items: [
-      { to: "/", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/scanner", label: "Scan matchs", icon: ScanSearch },
     ],
   },
@@ -66,7 +67,7 @@ const TIER_CONFIG: Record<string, { label: string; color: string }> = {
 
 /* ── Breadcrumb map ── */
 const PAGE_NAMES: Record<string, string> = {
-  "/": "Dashboard",
+  "/dashboard": "Dashboard",
   "/scanner": "Scan matchs",
   "/backtest": "Backtest",
   "/campaign": "Campagnes",
@@ -258,9 +259,14 @@ export default function Layout() {
             </svg>
           </div>
           {!collapsed && (
-            <span className="font-extrabold text-[15px] tracking-tight text-white whitespace-nowrap">
-              Bet<span className="text-[#7eb8ff]">Tracker</span>
-            </span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-extrabold text-[15px] tracking-tight text-white whitespace-nowrap">
+                Bet<span className="text-[#7eb8ff]">Tracker</span>
+              </span>
+              <span className="text-[9px] font-bold tracking-widest uppercase px-[5px] py-[2px] rounded-full bg-gradient-to-r from-orange-500 to-red-500 text-white leading-none shrink-0">
+                BETA
+              </span>
+            </div>
           )}
         </div>
 
@@ -283,7 +289,7 @@ export default function Layout() {
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    end={item.to === "/"}
+                    end={item.to === "/dashboard"}
                     title={collapsed ? item.label : undefined}
                     className={({ isActive }) =>
                       `flex items-center ${collapsed ? "justify-center" : "gap-[9px]"} ${collapsed ? "px-0 py-2" : "px-2.5 py-2"} rounded-lg text-[13.5px] transition-all duration-100 no-underline ${
@@ -440,10 +446,11 @@ export default function Layout() {
           </div>
 
           {/* Content */}
-          <main className="flex-1 overflow-y-auto px-6 py-5">
+          <main className="flex-1 overflow-y-auto px-6 py-5 flex flex-col">
             <BreadcrumbProvider>
               <Outlet />
             </BreadcrumbProvider>
+            <FooterLegal />
           </main>
         </div>
       </TourProvider>
