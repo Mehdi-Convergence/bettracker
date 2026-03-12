@@ -38,27 +38,35 @@ jobs:
             --exclude='data/' \
             --exclude='frontend/node_modules' \
             --exclude='frontend/dist' \
+            --exclude='bettracker.db' \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/bettracker/
 
-      - name: Build and restart containers
+      - name: Install, build, and restart services
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
           script: |
             set -e
             cd /opt/bettracker
 
-            echo "→ Building and restarting containers..."
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --remove-orphans
+            echo "-> Installing Python dependencies..."
+            uv sync --frozen --no-dev
 
-            echo "→ Running DB migrations..."
-            docker compose exec -T backend uv run alembic upgrade head
+            echo "-> Building frontend..."
+            cd frontend && npm ci && npm run build && cd ..
 
-            echo "→ Cleaning up old images..."
-            docker image prune -f
+            echo "-> Running DB migrations..."
+            uv run alembic upgrade head
 
-            echo "✓ Deployment complete"
+            echo "-> Restarting services..."
+            sudo systemctl restart bettracker-api
+            sudo systemctl restart bettracker-worker
+
+            echo "-> Health check..."
+            sleep 3
+            curl -sf http://localhost:8000/health
+
+            echo "-> Deployment complete"
