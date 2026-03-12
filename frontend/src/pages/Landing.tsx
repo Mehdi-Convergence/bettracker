@@ -108,13 +108,14 @@ export default function Landing() {
           <div className="lp-hero-content">
             <h1 className="lp-hero-title lp-fade-up">
               Pariez avec l{"'"}
-              <em>edge</em>.<br />
-              Pas avec l{"'"}instinct.
+              <em>edge</em> et la <em>probabilit&eacute;</em>.<br />
+              Pas l{"'"}instinct.
             </h1>
 
             <p className="lp-hero-subtitle lp-fade-up lp-fade-up-delay-1">
-              BetTracker analyse les matchs en temps r&eacute;el, calcule votre edge
-              sur les bookmakers et vous propose uniquement les paris &agrave; valeur positive.
+              D&eacute;tectez les value bets en temps r&eacute;el, suivez vos performances
+              match par match et pilotez vos campagnes de paris avec un algorithme
+              entra&icirc;n&eacute; sur des ann&eacute;es de donn&eacute;es.
             </p>
 
             <div className="lp-hero-actions lp-fade-up lp-fade-up-delay-2">
@@ -126,9 +127,9 @@ export default function Landing() {
               </Link>
               <a href="#features" className="lp-btn-hero-secondary">
                 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
-                  <polygon points="5 3 19 12 5 21 5 3" />
+                  <path d="M7 13l5 5 5-5M7 6l5 5 5-5" />
                 </svg>
-                En savoir plus
+                D&eacute;couvrir
               </a>
             </div>
 
@@ -289,7 +290,7 @@ export default function Landing() {
       </section>
 
       {/* ── FONCTIONNALITES ── */}
-      <section className="lp-section lp-section-dark lp-glow-features" id="features">
+      <section className="lp-section lp-section-dark" id="features">
         <div className="lp-section-header">
           <span className="lp-section-label">Fonctionnalit&eacute;s</span>
           <h2 className="lp-section-title">Chaque fonctionnalit&eacute;, un avantage concret</h2>
@@ -374,7 +375,7 @@ export default function Landing() {
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
                 IA Analyste
-                <span className="lp-feature-badge">Elite</span>
+                <span className="lp-feature-badge">Bient&ocirc;t</span>
               </div>
               <h3 className="lp-feature-title">Posez vos questions, obtenez des r&eacute;ponses</h3>
               <p className="lp-feature-desc">
@@ -392,7 +393,7 @@ export default function Landing() {
       </section>
 
       {/* ── TEMOIGNAGES ── */}
-      <section className="lp-section lp-section-dark lp-glow-testimonials" id="temoignages">
+      <section className="lp-section lp-section-dark" id="temoignages">
         <div className="lp-section-header">
           <span className="lp-section-label">T&eacute;moignages</span>
           <h2 className="lp-section-title">Ce que disent nos parieurs</h2>
@@ -402,8 +403,8 @@ export default function Landing() {
           <div className="lp-testimonial-card">
             <div className="lp-testimonial-stars" aria-label="5 &eacute;toiles sur 5">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
             <p className="lp-testimonial-text">
-              &laquo;&nbsp;Avant BetTracker je pariais &agrave; l&rsquo;instinct. Depuis 3 mois j&rsquo;utilise le scanner
-              et mon ROI s&rsquo;est nettement am&eacute;lior&eacute;. Le backtest m&rsquo;a vraiment aid&eacute; &agrave; comprendre quelles
+              &laquo;&nbsp;Avant BetTracker je pariais &agrave; l&rsquo;instinct. Le scanner m&rsquo;a ouvert les yeux sur
+              les value bets. Le backtest m&rsquo;a vraiment aid&eacute; &agrave; comprendre quelles
               strat&eacute;gies fonctionnent.&nbsp;&raquo;
             </p>
             <div className="lp-testimonial-author">
@@ -434,7 +435,7 @@ export default function Landing() {
             <div className="lp-testimonial-stars" aria-label="5 &eacute;toiles sur 5">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
             <p className="lp-testimonial-text">
               &laquo;&nbsp;Les campagnes Elite changent tout. J&rsquo;ai configur&eacute; une campagne Bundesliga avec des crit&egrave;res
-              pr&eacute;cis et BetTracker s&eacute;lectionne automatiquement. +4% ROI ce trimestre sans y passer mes soir&eacute;es.&nbsp;&raquo;
+              pr&eacute;cis et BetTracker s&eacute;lectionne automatiquement. Un gain de temps &eacute;norme.&nbsp;&raquo;
             </p>
             <div className="lp-testimonial-author">
               <div className="lp-testimonial-avatar" style={{ background: "linear-gradient(135deg, #f59e0b, #fde68a)" }} aria-hidden="true">J</div>
@@ -448,193 +449,240 @@ export default function Landing() {
       </section>
 
       {/* ── TARIFS ── */}
-      <section className="lp-section lp-section-dark lp-glow-pricing" id="tarifs">
+      <section className="lp-section lp-section-dark" id="tarifs">
         <div className="lp-section-header">
           <span className="lp-section-label">Tarifs</span>
-          <h2 className="lp-section-title">Simple et transparent</h2>
-          <p className="lp-section-desc">Commencez gratuitement, passez au Pro quand vous &ecirc;tes pr&ecirc;t.</p>
-        </div>
-
-        <div className="lp-billing-toggle">
-          <button
-            type="button"
-            className={`lp-billing-option ${billing === "monthly" ? "active" : ""}`}
-            onClick={() => setBilling("monthly")}
-            aria-pressed={billing === "monthly"}
-          >
-            Mensuel
-          </button>
-          <button
-            className={`lp-billing-toggle-btn ${billing === "annual" ? "annual" : ""}`}
-            onClick={() => setBilling(billing === "monthly" ? "annual" : "monthly")}
-            type="button"
-            aria-label="Basculer entre mensuel et annuel"
-          >
-            <span className="lp-billing-toggle-thumb" />
-          </button>
-          <button
-            type="button"
-            className={`lp-billing-option ${billing === "annual" ? "active" : ""}`}
-            onClick={() => setBilling("annual")}
-            aria-pressed={billing === "annual"}
-          >
-            Annuel
-          </button>
-          {billing === "annual" && <span className="lp-billing-badge">-20%</span>}
+          <h2 className="lp-section-title">Simple. Transparent.<br />Sans surprise.</h2>
+          <p className="lp-section-desc">3 jours d&rsquo;acc&egrave;s complet. Aucune carte bancaire requise.</p>
+          <div className="lp-billing-pill">
+            <button
+              type="button"
+              className={`lp-billing-pill-btn${billing === "monthly" ? " on" : ""}`}
+              onClick={() => setBilling("monthly")}
+            >
+              Mensuel
+            </button>
+            <button
+              type="button"
+              className={`lp-billing-pill-btn${billing === "annual" ? " on" : ""}`}
+              onClick={() => setBilling("annual")}
+            >
+              Annuel <span className="lp-billing-pill-badge">&minus;20%</span>
+            </button>
+          </div>
         </div>
 
         <div className="lp-pricing-grid">
+          {/* Free */}
           <div className="lp-plan-card">
             <div className="lp-plan-name">Free</div>
-            <div className="lp-plan-desc">Pour d&eacute;couvrir BetTracker</div>
-            <div className="lp-plan-price">
-              <span className="lp-plan-currency">EUR</span>
-              <span className="lp-plan-amount">0</span>
-              <span className="lp-plan-period">/mois</span>
+            <div className="lp-plan-pricing">
+              <div className="lp-plan-price-row">
+                <span className="lp-plan-currency">&euro;</span>
+                <span className="lp-plan-amount">0</span>
+              </div>
+              <div className="lp-plan-period">pendant 3 jours</div>
+              <div className="lp-plan-annual-note">&nbsp;</div>
             </div>
-            <div className="lp-plan-annual-note">3 jours &mdash; toutes les features</div>
-            <div className="lp-plan-divider" />
+            <div className="lp-plan-desc">
+              Acc&egrave;s &agrave; toutes les fonctionnalit&eacute;s pendant 3 jours. Aucune carte bancaire requise.
+            </div>
+            <Link to="/login" className="lp-plan-cta cta-free">Commencer gratuitement</Link>
+            <div className="lp-plan-features-label">Inclus pendant 3 jours</div>
             <ul className="lp-plan-features">
-              <li className="lp-plan-feature">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12" /></svg>
-                Scanner IA (acc&egrave;s complet 3j)
-              </li>
-              <li className="lp-plan-feature">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12" /></svg>
-                Portfolio &amp; Dashboard
-              </li>
-              <li className="lp-plan-feature">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12" /></svg>
-                Backtest historique
-              </li>
-              <li className="lp-plan-feature">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12" /></svg>
-                Aucune CB requise
-              </li>
+              {["Scanner IA illimit\u00e9", "Portfolio", "Dashboard", "Backtest", "Campagnes", "Partage de tickets", "Export CSV"].map(f => (
+                <li className="lp-plan-feature" key={f}>
+                  <span className="lp-plan-check green">
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="2 6 5 9 10 3" /></svg>
+                  </span>
+                  {f}
+                </li>
+              ))}
             </ul>
-            <Link to="/login" className="lp-plan-cta">Essayer gratuitement</Link>
           </div>
 
-          <div className="lp-plan-card popular">
+          {/* Pro */}
+          <div className="lp-plan-card featured">
             <span className="lp-plan-popular-badge">Le plus populaire</span>
-            <div className="lp-plan-name">Pro</div>
-            <div className="lp-plan-desc">Pour le parieur s&eacute;rieux</div>
-            <div className="lp-plan-price">
-              <span className="lp-plan-currency">EUR</span>
-              <span className="lp-plan-amount">{proPrice}</span>
-              <span className="lp-plan-period">/mois</span>
+            <div className="lp-plan-name pro">Pro</div>
+            <div className="lp-plan-pricing">
+              <div className="lp-plan-price-row">
+                <span className="lp-plan-currency">&euro;</span>
+                <span className="lp-plan-amount">{proPrice}</span>
+              </div>
+              <div className="lp-plan-period">/ mois</div>
+              <div className="lp-plan-annual-note">
+                {billing === "annual" ? <><span className="lp-green">276&euro;/an</span> &mdash; &eacute;conomisez 72&euro;</> : "\u00a0"}
+              </div>
             </div>
-            <div className="lp-plan-annual-note">
-              {billing === "annual" ? "Soit 276 EUR/an (\u00e9conomisez 72 EUR)" : ""}
+            <div className="lp-plan-desc">
+              L&rsquo;algo analyse tous les matchs pour vous. Placez selon les recommandations, au bon moment.
             </div>
-            <div className="lp-plan-divider" />
+            <Link to="/login" className="lp-plan-cta cta-pro">Commencer &mdash; Pro</Link>
+            <div className="lp-plan-features-label">Inclus</div>
             <ul className="lp-plan-features">
-              <li className="lp-plan-feature">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12" /></svg>
-                Scanner IA illimit&eacute;
-              </li>
-              <li className="lp-plan-feature">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12" /></svg>
-                Portfolio &amp; Dashboard
-              </li>
-              <li className="lp-plan-feature">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12" /></svg>
-                Backtest historique complet
-              </li>
-              <li className="lp-plan-feature">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12" /></svg>
-                Tickets &amp; export
-              </li>
+              {[
+                { text: "Scanner IA illimit\u00e9", bold: true },
+                { text: "Portfolio" },
+                { text: "Dashboard" },
+                { text: "Backtest" },
+                { text: "Partage de tickets" },
+              ].map(f => (
+                <li className="lp-plan-feature" key={f.text}>
+                  <span className="lp-plan-check green">
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="2 6 5 9 10 3" /></svg>
+                  </span>
+                  {f.bold ? <strong>{f.text}</strong> : f.text}
+                </li>
+              ))}
             </ul>
-            <Link to="/login" className="lp-plan-cta primary">Commencer avec Pro</Link>
           </div>
 
-          <div className="lp-plan-card">
-            <div className="lp-plan-name">Elite</div>
-            <div className="lp-plan-desc">Pour les professionnels</div>
-            <div className="lp-plan-price">
-              <span className="lp-plan-currency">EUR</span>
-              <span className="lp-plan-amount">{elitePrice}</span>
-              <span className="lp-plan-period">/mois</span>
+          {/* Elite */}
+          <div className="lp-plan-card elite">
+            <span className="lp-plan-elite-badge">Elite</span>
+            <div className="lp-plan-name gold">Elite</div>
+            <div className="lp-plan-pricing">
+              <div className="lp-plan-price-row">
+                <span className="lp-plan-currency">&euro;</span>
+                <span className="lp-plan-amount">{elitePrice}</span>
+              </div>
+              <div className="lp-plan-period">/ mois</div>
+              <div className="lp-plan-annual-note">
+                {billing === "annual" ? <><span className="lp-green">660&euro;/an</span> &mdash; &eacute;conomisez 168&euro;</> : "\u00a0"}
+              </div>
             </div>
-            <div className="lp-plan-annual-note">
-              {billing === "annual" ? "Soit 660 EUR/an (\u00e9conomisez 168 EUR)" : ""}
+            <div className="lp-plan-desc">
+              L&rsquo;algo tourne en automatique via les Campagnes. L&rsquo;IA analyse. Vous supervisez.
             </div>
-            <div className="lp-plan-divider" />
+            <Link to="/login" className="lp-plan-cta cta-elite">Commencer &mdash; Elite</Link>
+            <div className="lp-plan-features-label">Tout le Pro, et aussi</div>
             <ul className="lp-plan-features">
-              <li className="lp-plan-feature">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12" /></svg>
-                Tout ce qu&rsquo;inclut Pro
-              </li>
-              <li className="lp-plan-feature">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12" /></svg>
-                Campagnes automatis&eacute;es
-              </li>
-              <li className="lp-plan-feature">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12" /></svg>
-                IA Analyste
-              </li>
-              <li className="lp-plan-feature">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="14" height="14"><polyline points="20 6 9 17 4 12" /></svg>
-                Support prioritaire
-              </li>
+              {[
+                { text: "Campagnes illimit\u00e9es", bold: true },
+                { text: "IA Analyste (bient\u00f4t)", bold: true },
+                { text: "Support prioritaire" },
+                { text: "Acc\u00e8s prioritaire nouvelles features" },
+              ].map(f => (
+                <li className="lp-plan-feature" key={f.text}>
+                  <span className="lp-plan-check gold">
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="2 6 5 9 10 3" /></svg>
+                  </span>
+                  {f.bold ? <strong>{f.text}</strong> : f.text}
+                </li>
+              ))}
             </ul>
-            <Link to="/login" className="lp-plan-cta">Commencer avec Elite</Link>
           </div>
         </div>
 
+        {/* Comparaison detaillee */}
         <div className="lp-plan-comparison">
+          <h3 className="lp-comp-title">Comparaison d&eacute;taill&eacute;e</h3>
           <table className="lp-plan-comparison-table">
             <thead>
               <tr>
-                <th className="col-feature">Fonctionnalit&eacute;</th>
+                <th className="col-feature" style={{ width: "42%" }}>Fonctionnalit&eacute;</th>
                 <th>Free</th>
                 <th className="col-pro">Pro</th>
                 <th className="col-elite">Elite</th>
               </tr>
             </thead>
             <tbody>
+              <tr className="lp-comp-section-row"><td colSpan={4}>Acc&egrave;s</td></tr>
+              <tr>
+                <td className="col-feature">Prix mensuel</td>
+                <td>0&euro;</td>
+                <td className="lp-check-yes">29&euro;/mois</td>
+                <td className="lp-check-gold">69&euro;/mois</td>
+              </tr>
+              <tr>
+                <td className="col-feature">Prix annuel (&minus;20%)</td>
+                <td>0&euro;</td>
+                <td className="lp-check-yes">23&euro;/mois</td>
+                <td className="lp-check-gold">55&euro;/mois</td>
+              </tr>
+              <tr>
+                <td className="col-feature">Dur&eacute;e</td>
+                <td><span className="lp-comp-note">3 jours</span></td>
+                <td className="lp-check-yes">Illimit&eacute;</td>
+                <td className="lp-check-gold">Illimit&eacute;</td>
+              </tr>
+              <tr className="lp-comp-section-row"><td colSpan={4}>Scanner IA</td></tr>
               <tr>
                 <td className="col-feature">Scanner IA</td>
-                <td><span style={{ color: "#f59e0b", fontSize: "11px", fontWeight: 600 }}>3 jours</span></td>
-                <td><span style={{ color: "#12b76a" }} aria-hidden="true">&#10003;</span></td>
-                <td><span style={{ color: "#12b76a" }} aria-hidden="true">&#10003;</span></td>
+                <td className="lp-check-free">&#10003;</td>
+                <td className="lp-check-yes">&#10003;</td>
+                <td className="lp-check-gold">&#10003;</td>
               </tr>
               <tr>
-                <td className="col-feature">Dashboard &amp; Portfolio</td>
-                <td><span style={{ color: "#f59e0b", fontSize: "11px", fontWeight: 600 }}>3 jours</span></td>
-                <td><span style={{ color: "#12b76a" }} aria-hidden="true">&#10003;</span></td>
-                <td><span style={{ color: "#12b76a" }} aria-hidden="true">&#10003;</span></td>
+                <td className="col-feature">Recommandations &amp; analyse</td>
+                <td className="lp-check-free">&#10003;</td>
+                <td className="lp-check-yes">&#10003;</td>
+                <td className="lp-check-gold">&#10003;</td>
               </tr>
               <tr>
-                <td className="col-feature">Backtest historique</td>
-                <td><span style={{ color: "#f59e0b", fontSize: "11px", fontWeight: 600 }}>3 jours</span></td>
-                <td><span style={{ color: "#12b76a" }} aria-hidden="true">&#10003;</span></td>
-                <td><span style={{ color: "#12b76a" }} aria-hidden="true">&#10003;</span></td>
+                <td className="col-feature">Football + Tennis</td>
+                <td className="lp-check-free">&#10003;</td>
+                <td className="lp-check-yes">&#10003;</td>
+                <td className="lp-check-gold">&#10003;</td>
+              </tr>
+              <tr className="lp-comp-section-row"><td colSpan={4}>Portfolio &amp; Dashboard</td></tr>
+              <tr>
+                <td className="col-feature">Dashboard</td>
+                <td className="lp-check-free">&#10003;</td>
+                <td className="lp-check-yes">&#10003;</td>
+                <td className="lp-check-gold">&#10003;</td>
               </tr>
               <tr>
-                <td className="col-feature">Tickets &amp; export</td>
-                <td><span style={{ color: "rgba(255,255,255,0.2)" }} aria-hidden="true">&#10007;</span></td>
-                <td><span style={{ color: "#12b76a" }} aria-hidden="true">&#10003;</span></td>
-                <td><span style={{ color: "#12b76a" }} aria-hidden="true">&#10003;</span></td>
+                <td className="col-feature">Portfolio</td>
+                <td className="lp-check-free">&#10003;</td>
+                <td className="lp-check-yes">&#10003;</td>
+                <td className="lp-check-gold">&#10003;</td>
               </tr>
               <tr>
-                <td className="col-feature">Campagnes automatis&eacute;es</td>
-                <td><span style={{ color: "rgba(255,255,255,0.2)" }} aria-hidden="true">&#10007;</span></td>
-                <td><span style={{ color: "rgba(255,255,255,0.2)" }} aria-hidden="true">&#10007;</span></td>
-                <td><span style={{ color: "#12b76a" }} aria-hidden="true">&#10003;</span></td>
+                <td className="col-feature">Export CSV</td>
+                <td className="lp-check-no">&times;</td>
+                <td className="lp-check-no">&times;</td>
+                <td className="lp-check-gold">&#10003;</td>
+              </tr>
+              <tr>
+                <td className="col-feature">Partage de tickets</td>
+                <td className="lp-check-no">&times;</td>
+                <td className="lp-check-yes">&#10003;</td>
+                <td className="lp-check-gold">&#10003;</td>
+              </tr>
+              <tr className="lp-comp-section-row"><td colSpan={4}>Backtest</td></tr>
+              <tr>
+                <td className="col-feature">Backtest</td>
+                <td className="lp-check-free">&#10003;</td>
+                <td className="lp-check-yes">&#10003;</td>
+                <td className="lp-check-gold">&#10003;</td>
+              </tr>
+              <tr className="lp-comp-section-row"><td colSpan={4}>Campagnes &amp; IA</td></tr>
+              <tr>
+                <td className="col-feature">Campagnes actives</td>
+                <td><span className="lp-comp-note">1 campagne</span></td>
+                <td className="lp-check-no">&times;</td>
+                <td className="lp-check-gold">&#10003; Illimit&eacute;es</td>
               </tr>
               <tr>
                 <td className="col-feature">IA Analyste</td>
-                <td><span style={{ color: "rgba(255,255,255,0.2)" }} aria-hidden="true">&#10007;</span></td>
-                <td><span style={{ color: "rgba(255,255,255,0.2)" }} aria-hidden="true">&#10007;</span></td>
-                <td><span style={{ color: "#12b76a" }} aria-hidden="true">&#10003;</span></td>
+                <td className="lp-check-no">&times;</td>
+                <td className="lp-check-no">&times;</td>
+                <td><span className="lp-comp-note">Bient&ocirc;t</span></td>
+              </tr>
+              <tr className="lp-comp-section-row"><td colSpan={4}>Support</td></tr>
+              <tr>
+                <td className="col-feature">Support</td>
+                <td><span className="lp-comp-note">Standard</span></td>
+                <td><span className="lp-comp-note">Standard</span></td>
+                <td className="lp-check-gold">&#10003; Prioritaire</td>
               </tr>
               <tr>
-                <td className="col-feature">Support prioritaire</td>
-                <td><span style={{ color: "rgba(255,255,255,0.2)" }} aria-hidden="true">&#10007;</span></td>
-                <td><span style={{ color: "rgba(255,255,255,0.2)" }} aria-hidden="true">&#10007;</span></td>
-                <td><span style={{ color: "#12b76a" }} aria-hidden="true">&#10003;</span></td>
+                <td className="col-feature">Acc&egrave;s nouvelles features</td>
+                <td className="lp-check-no">&times;</td>
+                <td className="lp-check-no">&times;</td>
+                <td className="lp-check-gold">&#10003; Prioritaire</td>
               </tr>
             </tbody>
           </table>
@@ -642,7 +690,7 @@ export default function Landing() {
       </section>
 
       {/* ── FAQ ── */}
-      <section className="lp-section lp-section-dark lp-glow-faq" id="faq">
+      <section className="lp-section lp-section-dark" id="faq">
         <div className="lp-section-header">
           <span className="lp-section-label">FAQ</span>
           <h2 className="lp-section-title">Questions fr&eacute;quentes</h2>
