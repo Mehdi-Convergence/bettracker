@@ -1,3 +1,21 @@
+RUGBY_LEAGUES = {
+    61:  "Top 14",
+    45:  "Premiership",
+    111: "URC",
+    21:  "Champions Cup",
+}
+
+RUGBY_SEASONS = [2019, 2020, 2021, 2022, 2023, 2024]
+
+# Rugby point values
+RUGBY_POINTS = {
+    "try": 5,
+    "conversion": 2,
+    "penalty": 3,
+    "drop_goal": 3,
+}
+
+
 FOOTBALL_LEAGUES = {
     # Top 5 leagues
     "E0": "Premier League",

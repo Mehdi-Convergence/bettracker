@@ -4,12 +4,15 @@ CRITICAL: All features use only data BEFORE the match date. No look-ahead bias.
 Optimized with incremental caches for O(n) performance instead of O(n^2).
 """
 
+import logging
 from collections import defaultdict
 
 import numpy as np
 import pandas as pd
 
 from src.features.elo import EloRatingSystem
+
+logger = logging.getLogger(__name__)
 
 
 class FootballFeatureBuilder:
@@ -42,7 +45,7 @@ class FootballFeatureBuilder:
 
         for idx, match in matches_sorted.iterrows():
             if progress and idx % log_interval == 0:
-                print(f"  Processing match {idx}/{total} ({idx*100//total}%)")
+                logger.info("  Processing match %d/%d (%d%%)", idx, total, idx * 100 // total)
 
             home = match["home_team"]
             away = match["away_team"]
@@ -84,7 +87,7 @@ class FootballFeatureBuilder:
             self._update_caches(match, team_history, team_home_history, team_away_history, standings, result_map, league_draws, league_match_count)
 
         if progress:
-            print(f"  Processing complete: {len(features_list)} feature vectors built")
+            logger.info("  Processing complete: %d feature vectors built", len(features_list))
 
         return pd.DataFrame(features_list)
 
@@ -116,6 +119,8 @@ class FootballFeatureBuilder:
             "away_corners": match.get("away_corners"),
             "home_yellow": match.get("home_yellow"),
             "away_yellow": match.get("away_yellow"),
+            "home_red": match.get("home_red"),
+            "away_red": match.get("away_red"),
             # Pre-match ELO of each team (used as opponent strength by the other team)
             "opp_elo_for_home": away_elo_pre,
             "opp_elo_for_away": home_elo_pre,
@@ -195,6 +200,8 @@ class FootballFeatureBuilder:
         features["away_corners_avg"] = self._avg_stat_cache(away, team_history[away], 5, "corners") or np.nan
         features["home_cards_avg"] = self._avg_stat_cache(home, team_history[home], 5, "yellow") or np.nan
         features["away_cards_avg"] = self._avg_stat_cache(away, team_history[away], 5, "yellow") or np.nan
+        features["home_red_avg_5"] = self._avg_stat_cache(home, team_history[home], 5, "red") or np.nan
+        features["away_red_avg_5"] = self._avg_stat_cache(away, team_history[away], 5, "red") or np.nan
 
         # 4c. POSSESSION (not available in football-data.co.uk CSVs — set to NaN)
         features["home_possession"] = np.nan
@@ -222,10 +229,25 @@ class FootballFeatureBuilder:
         features["home_xg_avg_5"] = self._avg_stat_cache(home, team_history[home], 5, "xg")
         features["away_xg_avg_5"] = self._avg_stat_cache(away, team_history[away], 5, "xg")
         home_xg_c = self._avg_stat_conceded_cache(home, team_history[home], 5, "xg")
+        away_xg_c = self._avg_stat_conceded_cache(away, team_history[away], 5, "xg")
         if features["home_xg_avg_5"] is not None and home_xg_c is not None:
             features["home_xg_diff_5"] = features["home_xg_avg_5"] - home_xg_c
         else:
             features["home_xg_diff_5"] = np.nan
+        if features["away_xg_avg_5"] is not None and away_xg_c is not None:
+            features["away_xg_diff_5"] = features["away_xg_avg_5"] - away_xg_c
+        else:
+            features["away_xg_diff_5"] = np.nan
+
+        # 8b. xG overperformance (goals - xG over last 5 matches)
+        # Positive = team scores more than expected (hot streak vs luck indicator)
+        # Negative = team scores less than expected (cold streak, regression candidate)
+        features["home_xg_overperformance"] = self._xg_overperformance_cache(
+            home, team_history[home], 5
+        )
+        features["away_xg_overperformance"] = self._xg_overperformance_cache(
+            away, team_history[away], 5
+        )
 
         # 10. LAMBDA FEATURES (Poisson attack x defense matchup)
         # lambda_home = home_attack * away_defense (predicts home goals)
@@ -486,6 +508,7 @@ class FootballFeatureBuilder:
             "xg": ("home_xg", "away_xg"),
             "corners": ("home_corners", "away_corners"),
             "yellow": ("home_yellow", "away_yellow"),
+            "red": ("home_red", "away_red"),
         }
         if stat not in stat_map:
             return None
@@ -500,11 +523,13 @@ class FootballFeatureBuilder:
         return np.mean(values) if values else None
 
     def _avg_stat_conceded_cache(self, team: str, history: list[dict], n: int, stat: str) -> float | None:
-        """Average opponent stat from cache."""
+        """Average opponent stat from cache (xG conceded = opponent's xG against this team)."""
         recent = history[-n:] if len(history) >= n else history
         if not recent:
             return None
 
+        # For xG conceded: when team is home, opponent (away) xG is "away_xg"
+        # When team is away, opponent (home) xG is "home_xg"
         stat_map = {"xg": ("away_xg", "home_xg")}
         if stat not in stat_map:
             return None
@@ -517,6 +542,30 @@ class FootballFeatureBuilder:
                 values.append(float(val))
 
         return np.mean(values) if values else None
+
+    def _xg_overperformance_cache(self, team: str, history: list[dict], n: int) -> float:
+        """xG overperformance: mean(actual goals - xG) over last n matches.
+
+        Positive = team scores more than model predicts (hot streak or finishing quality).
+        Negative = team scores less than model predicts (cold streak or regression candidate).
+        Returns NaN if xG data not available.
+        """
+        recent = history[-n:] if len(history) >= n else history
+        if not recent:
+            return np.nan
+
+        diffs = []
+        for m in recent:
+            if m["home_team"] == team:
+                goals = m["fthg"]
+                xg = m.get("home_xg")
+            else:
+                goals = m["ftag"]
+                xg = m.get("away_xg")
+            if xg is not None and not (isinstance(xg, float) and np.isnan(xg)):
+                diffs.append(float(goals) - float(xg))
+
+        return float(np.mean(diffs)) if diffs else np.nan
 
     def _h2h_from_cache(self, home: str, away: str, home_history: list[dict], n: int) -> dict:
         """H2H stats from cache."""
@@ -598,7 +647,10 @@ FEATURE_COLUMNS = [
     "h2h_home_win_rate", "h2h_draw_rate", "h2h_avg_goals", "h2h_count",
     "home_rest_days", "away_rest_days", "rest_diff",
     "home_position", "away_position", "position_diff",
-    "home_xg_avg_5", "away_xg_avg_5", "home_xg_diff_5",
+    "home_xg_avg_5", "away_xg_avg_5", "home_xg_diff_5", "away_xg_diff_5",
+    # xG overperformance: actual goals minus expected goals (last 5 matches avg)
+    # Positive = scoring above model (hot streak), Negative = below (cold streak)
+    "home_xg_overperformance", "away_xg_overperformance",
     # Poisson λ features (attack × defense matchup)
     "lambda_home_5", "lambda_away_5", "lambda_ratio_5",
     "lambda_home_venue", "lambda_away_venue",
@@ -623,4 +675,6 @@ FEATURE_COLUMNS = [
     "home_possession", "away_possession",
     "home_corners_avg", "away_corners_avg",
     "home_cards_avg", "away_cards_avg",
+    # Red cards (disciplinary — correlates with tactics / match intensity)
+    "home_red_avg_5", "away_red_avg_5",
 ]

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, TrendingUp, Trophy, Target, Zap } from "lucide-react";
+import { X, TrendingUp, Trophy, Target, Zap, Activity, BarChart2 } from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import type { AIScanMatch } from "@/types";
 
@@ -27,10 +27,10 @@ const OUTCOME_COLORS = { H: "#3b82f6", D: "#eab308", A: "#ef4444" };
 
 type Tab = "analyse" | "equipes" | "cotes";
 
-function getTabs(isTennis: boolean): { key: Tab; label: string }[] {
+function getTabs(sport: string): { key: Tab; label: string }[] {
   return [
     { key: "analyse", label: "Analyse" },
-    { key: "equipes", label: isTennis ? "Joueurs & Stats" : "Equipes & Stats" },
+    { key: "equipes", label: sport === "tennis" ? "Joueurs & Stats" : "Equipes & Stats" },
     { key: "cotes", label: "Cotes" },
   ];
 }
@@ -38,7 +38,9 @@ function getTabs(isTennis: boolean): { key: Tab; label: string }[] {
 export default function AIScanMatchDetailPanel({ am, home, away, onClose, inline }: Props) {
   const [tab, setTab] = useState<Tab>("analyse");
   const isTennis = am.sport === "tennis";
-  const tabs = getTabs(isTennis);
+  const isNBA = am.sport === "nba";
+  const isRugby = am.sport === "rugby";
+  const tabs = getTabs(am.sport ?? "football");
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -99,16 +101,24 @@ export default function AIScanMatchDetailPanel({ am, home, away, onClose, inline
               {am.model_prob_home != null && <PredictionSection am={am} home={home} away={away} />}
               {isTennis ? (
                 <TennisAnalyseTab am={am} home={home} away={away} />
+              ) : isNBA ? (
+                <NBAnalyseTab am={am} home={home} away={away} />
+              ) : isRugby ? (
+                <RugbyAnalyseTab am={am} home={home} away={away} />
               ) : (
                 <IADataTab am={am} home={home} away={away} />
               )}
-              <IAConseilTab am={am} home={home} away={away} />
+              {!isNBA && !isRugby && <IAConseilTab am={am} home={home} away={away} />}
             </>
           )}
           {tab === "equipes" && (
             <>
               {isTennis ? (
                 <TennisStatsTab am={am} home={home} away={away} />
+              ) : isNBA ? (
+                <NBAStatsTab am={am} home={home} away={away} />
+              ) : isRugby ? (
+                <RugbyStatsTab am={am} home={home} away={away} />
               ) : (
                 <>
                   <FormSection am={am} home={home} away={away} />
@@ -116,7 +126,6 @@ export default function AIScanMatchDetailPanel({ am, home, away, onClose, inline
                     <RecentMatchesSection am={am} home={home} away={away} />
                   )}
                   <H2HSection am={am} home={home} away={away} />
-                  <JoueursTab am={am} home={home} away={away} />
                   <CompoTab am={am} home={home} away={away} />
                 </>
               )}
@@ -137,7 +146,7 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
   const probD = am.model_prob_draw ?? 0;
   const probA = am.model_prob_away ?? 0;
 
-  const pieData = isTennis
+  const pieData = isTennis || am.sport === "nba"
     ? [
         { name: home, value: probH, color: OUTCOME_COLORS.H },
         { name: away, value: probA, color: OUTCOME_COLORS.A },
@@ -150,13 +159,19 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
 
   const bestOutcome = isTennis
     ? (probH >= probA ? "P1" : "P2")
-    : (probH >= probD && probH >= probA ? "H" : probD >= probH && probD >= probA ? "D" : "A");
+    : am.sport === "nba"
+      ? (probH >= probA ? "Home" : "Away")
+      : (probH >= probD && probH >= probA ? "H" : probD >= probH && probD >= probA ? "D" : "A");
   const bestOutcomeLabel = isTennis
     ? (bestOutcome === "P1" ? home : away)
-    : (bestOutcome === "H" ? home : bestOutcome === "D" ? "Nul" : away);
+    : am.sport === "nba"
+      ? (bestOutcome === "Home" ? home : away)
+      : (bestOutcome === "H" ? home : bestOutcome === "D" ? "Nul" : away);
   const bestProb = isTennis
     ? (bestOutcome === "P1" ? probH : probA)
-    : (bestOutcome === "H" ? probH : bestOutcome === "D" ? probD : probA);
+    : am.sport === "nba"
+      ? (bestOutcome === "Home" ? probH : probA)
+      : (bestOutcome === "H" ? probH : bestOutcome === "D" ? probD : probA);
 
   const bestEdgeEntry = Object.entries(am.edges ?? {}).sort((a, b) => b[1] - a[1])[0];
   const bestEdgeKey = bestEdgeEntry?.[0];
@@ -164,7 +179,7 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
 
   const oddForEdge = (() => {
     const o = am.odds as Record<string, Record<string, unknown>>;
-    const marketKey = isTennis ? "winner" : "1x2";
+    const marketKey = isTennis || am.sport === "nba" ? "winner" : "1x2";
     const market = o?.[marketKey];
     if (!market || !bestEdgeKey) return null;
     const entry = market[bestEdgeKey];
@@ -177,8 +192,8 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
     return null;
   })();
 
-  // Data score display: /18 for tennis, /20 for football
-  const maxPts = isTennis ? 18 : 20;
+  // Data score display: /18 for tennis, /20 for football, /6 for NBA, /7 for rugby
+  const maxPts = isTennis ? 18 : am.sport === "nba" ? 6 : am.sport === "rugby" ? 7 : 20;
 
   return (
     <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
@@ -216,6 +231,11 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
                 <ProbBar label={home.split(" ").pop() ?? "P1"} prob={probH} color="bg-blue-500" edge={am.edges?.P1 ?? null} />
                 <ProbBar label={away.split(" ").pop() ?? "P2"} prob={probA} color="bg-red-500" edge={am.edges?.P2 ?? null} />
               </>
+            ) : am.sport === "nba" ? (
+              <>
+                <ProbBar label="DOM" prob={probH} color="bg-blue-500" edge={am.edges?.Home ?? null} />
+                <ProbBar label="EXT" prob={probA} color="bg-red-500" edge={am.edges?.Away ?? null} />
+              </>
             ) : (
               <>
                 <ProbBar label="DOM" prob={probH} color="bg-blue-500" edge={am.edges?.H ?? null} />
@@ -234,12 +254,14 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
               <p className="text-sm text-slate-500">
                 Value bet :{" "}
                 <span className={`font-semibold ${
-                  bestEdgeKey === "H" || bestEdgeKey === "P1" ? "text-blue-600" :
+                  bestEdgeKey === "H" || bestEdgeKey === "P1" || bestEdgeKey === "Home" ? "text-blue-600" :
                   bestEdgeKey === "D" ? "text-amber-600" : "text-red-600"
                 }`}>
                   {isTennis
                     ? (bestEdgeKey === "P1" ? home.split(" ").pop() : away.split(" ").pop())
-                    : (bestEdgeKey === "H" ? "DOM" : bestEdgeKey === "D" ? "NUL" : "EXT")}
+                    : am.sport === "nba"
+                      ? (bestEdgeKey === "Home" ? "DOM" : "EXT")
+                      : (bestEdgeKey === "H" ? "DOM" : bestEdgeKey === "D" ? "NUL" : "EXT")}
                 </span>
                 <span className="text-emerald-600 ml-2 font-medium">+{(bestEdge * 100).toFixed(1)}% edge</span>
                 {oddForEdge && <span className="text-amber-600 ml-2">@ {oddForEdge.toFixed(2)}</span>}
@@ -289,7 +311,8 @@ function FormSection({ am, home, away }: { am: AIScanMatch; home: string; away: 
     { label: "Possession balle %", hv: am.home_possession_avg != null ? `${am.home_possession_avg}%` : null, av: am.away_possession_avg != null ? `${am.away_possession_avg}%` : null },
     { label: "Tirs par match", hv: am.home_shots_pg != null ? am.home_shots_pg.toFixed(1) : null, av: am.away_shots_pg != null ? am.away_shots_pg.toFixed(1) : null },
     { label: "Corners par match", hv: am.home_corners_avg != null ? am.home_corners_avg.toFixed(1) : null, av: am.away_corners_avg != null ? am.away_corners_avg.toFixed(1) : null },
-    { label: "Cartons par match", hv: am.home_cards_avg != null ? am.home_cards_avg.toFixed(1) : null, av: am.away_cards_avg != null ? am.away_cards_avg.toFixed(1) : null, lowerBetter: true },
+    { label: "Cartons jaunes / match", hv: am.home_cards_avg != null ? am.home_cards_avg.toFixed(1) : null, av: am.away_cards_avg != null ? am.away_cards_avg.toFixed(1) : null, lowerBetter: true },
+    { label: "Cartons rouges / match", hv: am.home_red_cards_pg != null ? am.home_red_cards_pg.toFixed(2) : null, av: am.away_red_cards_pg != null ? am.away_red_cards_pg.toFixed(2) : null, lowerBetter: true },
     { label: "Les 2 equipes marquent %", hv: am.home_btts_pct != null ? `${am.home_btts_pct}%` : null, av: am.away_btts_pct != null ? `${am.away_btts_pct}%` : null },
     { label: "Plus de 2.5 buts %", hv: am.home_over25_pct != null ? `${am.home_over25_pct}%` : null, av: am.away_over25_pct != null ? `${am.away_over25_pct}%` : null },
     { label: "Matchs sans encaisser", hv: am.home_clean_sheets != null ? `${am.home_clean_sheets}/5` : null, av: am.away_clean_sheets != null ? `${am.away_clean_sheets}/5` : null },
@@ -627,17 +650,43 @@ function IADataTab({ am, home, away }: { am: AIScanMatch; home: string; away: st
         <div>
           <div className="text-xs font-semibold text-slate-600 mb-2">Absences cles</div>
           <div className="grid grid-cols-2 gap-3">
-            {[{ label: home, list: am.key_absences_home }, { label: away, list: am.key_absences_away }].map(({ label, list }) => (
-              <div key={label}>
-                <div className="text-[10px] text-slate-500 mb-1 font-medium truncate">{label}</div>
-                {list && list.length > 0 ? list.map((ab, i) => (
-                  <div key={i} className="flex items-start gap-1 text-[11px] text-red-600 mb-0.5">
-                    <span className="text-red-400 shrink-0 mt-0.5">•</span>
-                    <span>{ab}</span>
-                  </div>
-                )) : <span className="text-[11px] text-slate-300">Aucune absence</span>}
-              </div>
-            ))}
+            {[
+              { label: home, list: am.key_absences_home, keyPlayers: am.key_players_home },
+              { label: away, list: am.key_absences_away, keyPlayers: am.key_players_away },
+            ].map(({ label, list, keyPlayers }) => {
+              const posImpact: Record<string, string> = { Goalkeeper: "-10% GK", Attacker: "-7% ATT", Midfielder: "-5% MIL", Defender: "-3% DEF" };
+              const absentKeys = (keyPlayers ?? []).filter((p) => p.is_absent);
+              const absentKeyNames = new Set(absentKeys.map((p) => p.name));
+              const otherAbsences = (list ?? []).filter((name) => !absentKeyNames.has(name));
+              return (
+                <div key={label}>
+                  <div className="text-[10px] text-slate-500 mb-1 font-medium truncate">{label}</div>
+                  {absentKeys.length === 0 && otherAbsences.length === 0
+                    ? <span className="text-[11px] text-slate-300">Aucune absence</span>
+                    : <>
+                      {absentKeys.map((p, i) => (
+                        <div key={i} className="flex items-center gap-1 text-[11px] mb-0.5">
+                          <span className="text-red-400 shrink-0">•</span>
+                          <span className="text-red-700 font-medium truncate">{p.name}</span>
+                          {p.position && (
+                            <span className="text-[9px] text-slate-400 shrink-0">{p.position.slice(0, 3).toUpperCase()}</span>
+                          )}
+                          {p.position && posImpact[p.position] && (
+                            <span className="text-[9px] text-amber-600 font-medium shrink-0">{posImpact[p.position]}</span>
+                          )}
+                        </div>
+                      ))}
+                      {otherAbsences.map((ab, i) => (
+                        <div key={i} className="flex items-start gap-1 text-[11px] text-red-500 mb-0.5">
+                          <span className="text-red-300 shrink-0 mt-0.5">•</span>
+                          <span>{ab}</span>
+                        </div>
+                      ))}
+                    </>
+                  }
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -668,7 +717,10 @@ function JoueursTab({ am, home, away }: { am: AIScanMatch; home: string; away: s
                 <div key={i} className={`px-2 py-1.5 rounded-lg border text-[11px] ${p.is_absent ? "bg-red-50 border-red-100" : "bg-white border-slate-100"}`}>
                   <div className="flex items-center justify-between gap-1">
                     <span className={`font-medium truncate ${p.is_absent ? "text-red-700 line-through" : "text-slate-800"}`}>{p.name}</span>
-                    {p.is_absent && <span className="text-[9px] bg-red-500 text-white px-1 py-0.5 rounded font-bold shrink-0">ABSENT</span>}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {p.position && <span className="text-[9px] text-slate-400 uppercase">{p.position.slice(0, 3)}</span>}
+                      {p.is_absent && <span className="text-[9px] bg-red-500 text-white px-1 py-0.5 rounded font-bold">ABSENT</span>}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
                     {p.goals > 0 && <span className="text-emerald-600 font-medium">{p.goals} buts</span>}
@@ -702,6 +754,13 @@ function TennisAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; a
 
   return (
     <div className="space-y-4">
+      {/* ML model badge */}
+      {am.tennis_ml_used && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-violet-50 border border-violet-200 rounded-lg">
+          <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />
+          <span className="text-xs text-violet-700 font-medium">Modele ML actif (XGBoost + LightGBM, 60 features)</span>
+        </div>
+      )}
       {/* Rankings comparison */}
       {(am.ranking_p1 != null || am.ranking_p2 != null) && (
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
@@ -910,6 +969,39 @@ function TennisStatsTab({ am, home, away }: { am: AIScanMatch; home: string; awa
         </div>
       </div>
 
+      {/* Historical serve stats (Tennis Abstract) */}
+      {(am.p1_serve_stats || am.p2_serve_stats) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={15} className="text-violet-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Stats de service (moy. 5 derniers matchs)</h4>
+            <span className="ml-auto text-[10px] text-slate-400">Tennis Abstract</span>
+          </div>
+          <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-sm">
+            <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
+            <div className="text-center text-slate-400 text-xs"></div>
+            <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
+            {[
+              { key: "1st_serve_in", label: "1re balle %", pct: true },
+              { key: "1st_serve_won", label: "1re balle gagnee %", pct: true },
+              { key: "2nd_serve_won", label: "2e balle gagnee %", pct: true },
+              { key: "bp_save", label: "Balle de break sauvee", pct: true },
+              { key: "ace_rate", label: "Aces / point servi", pct: true, lowerBetter: false },
+              { key: "df_rate", label: "Double fautes / point", pct: true, lowerBetter: true },
+            ].map(({ key, label, pct, lowerBetter }) => {
+              const v1 = am.p1_serve_stats?.[key];
+              const v2 = am.p2_serve_stats?.[key];
+              if (v1 == null && v2 == null) return null;
+              const fmt = (v: number | undefined) => v != null ? (pct ? `${(v * 100).toFixed(1)}%` : v.toFixed(2)) : "-";
+              const homeBetter = v1 != null && v2 != null
+                ? (lowerBetter === true ? v1 < v2 : v1 > v2)
+                : undefined;
+              return <FormRow key={key} label={label} homeVal={fmt(v1)} awayVal={fmt(v2)} homeBetter={homeBetter} />;
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Recent matches */}
       {((am.form_home_detail && am.form_home_detail.length > 0) || (am.form_away_detail && am.form_away_detail.length > 0)) && (
         <RecentMatchesSection am={am} home={home} away={away} />
@@ -1016,6 +1108,18 @@ function CotesTab({ am }: { am: AIScanMatch }) {
   const maxProb = Math.max(...Object.values(modelProbs));
   const mainMarket = isTennis ? "winner" : "1x2";
 
+  // Model info for alternative markets (BTTS, Over 2.5)
+  function getAltModelInfo(market: string, outcome: string): { prob: number | null; edge: number | null } {
+    const o = outcome.toLowerCase();
+    if ((market === "btts" || market === "both_teams_to_score") && (o === "yes" || o === "oui")) {
+      return { prob: am.btts_model_prob ?? null, edge: am.btts_edge ?? null };
+    }
+    if ((market === "over_under_2.5" || market === "over_under") && o.startsWith("over 2.5")) {
+      return { prob: am.over25_model_prob ?? null, edge: am.over25_edge ?? null };
+    }
+    return { prob: null, edge: null };
+  }
+
   function buildBkOptions(val: unknown): { bk: string; odd: number }[] {
     if (typeof val === "number") return [{ bk: "Modèle IA", odd: val }];
     if (val && typeof val === "object") {
@@ -1057,12 +1161,19 @@ function CotesTab({ am }: { am: AIScanMatch }) {
                   const currentOdd = bkOptions.find((b) => b.bk === currentBk)?.odd ?? bestBk.odd;
                   const prob = market === mainMarket ? (modelProbs[outcome] ?? 0) : 0;
                   const isFav = market === mainMarket && prob === maxProb && maxProb > 0;
+                  const altModel = getAltModelInfo(market, outcome);
+                  const hasAltModel = altModel.prob !== null;
+                  const hasValueEdge = altModel.edge !== null && altModel.edge > 0;
 
                   return (
-                    <div key={outcome} className={`flex flex-col rounded-xl overflow-hidden border-2 bg-white shadow-sm ${isFav ? "border-emerald-300" : "border-slate-100"}`}>
+                    <div key={outcome} className={`flex flex-col rounded-xl overflow-hidden border-2 bg-white shadow-sm ${isFav ? "border-emerald-300" : hasValueEdge ? "border-amber-300" : "border-slate-100"}`}>
                       {/* Prob bar top */}
                       {market === mainMarket && prob > 0 && (
                         <div className={`h-1 w-full ${isFav ? "bg-emerald-400" : "bg-slate-200"}`} />
+                      )}
+                      {hasAltModel && (
+                        <div className={`h-1 w-full ${hasValueEdge ? "bg-amber-400" : "bg-slate-200"}`}
+                          style={{ width: `${(altModel.prob! * 100).toFixed(0)}%` }} />
                       )}
                       {/* Card body */}
                       <div className="flex flex-col items-center px-2 pt-2.5 pb-2 gap-1">
@@ -1075,6 +1186,14 @@ function CotesTab({ am }: { am: AIScanMatch }) {
                         {market === mainMarket && prob > 0 && (
                           <span className={`text-[9px] font-medium ${isFav ? "text-emerald-500" : "text-slate-400"}`}>
                             {(prob * 100).toFixed(0)}%
+                          </span>
+                        )}
+                        {hasAltModel && (
+                          <span className={`text-[9px] font-medium ${hasValueEdge ? "text-amber-600" : "text-slate-400"}`}>
+                            modele {(altModel.prob! * 100).toFixed(1)}%
+                            {altModel.edge !== null && altModel.edge > 0 && (
+                              <span className="text-emerald-600 ml-1">+{(altModel.edge * 100).toFixed(1)}% edge</span>
+                            )}
                           </span>
                         )}
                         {bkOptions.length > 1 ? (
@@ -1106,9 +1225,18 @@ function CotesTab({ am }: { am: AIScanMatch }) {
                   const currentBk = selectedBk[key] ?? bestBk.bk;
                   const currentOdd = bkOptions.find((b) => b.bk === currentBk)?.odd ?? bestBk.odd;
 
+                  const listAltModel = getAltModelInfo(market, outcome);
+                  const listHasEdge = listAltModel.edge !== null && listAltModel.edge > 0;
+
                   return (
-                    <div key={outcome} className="flex items-center gap-3 bg-white px-3 py-2.5 hover:bg-slate-50 transition-colors">
+                    <div key={outcome} className={`flex items-center gap-3 bg-white px-3 py-2.5 hover:bg-slate-50 transition-colors ${listHasEdge ? "border-l-2 border-amber-400" : ""}`}>
                       <span className="flex-1 text-sm text-slate-600 truncate">{outcome}</span>
+                      {listAltModel.prob !== null && (
+                        <span className="text-[10px] text-slate-400">
+                          {(listAltModel.prob * 100).toFixed(1)}%
+                          {listHasEdge && <span className="text-emerald-600 ml-1 font-semibold">+{(listAltModel.edge! * 100).toFixed(1)}%</span>}
+                        </span>
+                      )}
                       <span className="text-base font-bold tabular-nums text-slate-900 min-w-[3rem] text-right">
                         {currentOdd.toFixed(2)}
                       </span>
@@ -1351,9 +1479,78 @@ function IAConseilTab({ am, home, away }: { am: AIScanMatch; home: string; away:
 
 // ─── Compo Tab ────────────────────────────────────────────────────────────────
 
+type KeyPlayer = { name: string; goals: number; assists: number; goals_per_match: number; rating: number; is_absent: boolean; position?: string };
+
+function _normName(s: string) {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+function findKeyPlayer(lineupName: string, keyPlayers: KeyPlayer[]): KeyPlayer | undefined {
+  const norm = _normName(lineupName);
+  const parts = norm.split(/\s+/);
+  const last = parts[parts.length - 1];
+  return keyPlayers.find((kp) => {
+    const kn = _normName(kp.name);
+    if (kn === norm) return true;
+    const kp_parts = kn.split(/\s+/);
+    const kp_last = kp_parts[kp_parts.length - 1];
+    if (kp_last === last) return true;
+    // abbreviated: "A. Trezza" vs "Antonio Trezza"
+    if (kp_last === last && kp_parts[0][0] === parts[0][0]) return true;
+    return false;
+  });
+}
+
+function PlayerRow({ name, pos, number, stats }: {
+  name: string; pos: string; number: number | null;
+  stats: KeyPlayer | null;
+}) {
+  const isAbsent = stats?.is_absent ?? false;
+  const hasStats = stats && (stats.goals > 0 || stats.assists > 0 || stats.rating > 0);
+
+  if (hasStats) {
+    return (
+      <div className={`px-2 py-1.5 rounded-lg border text-[11px] ${isAbsent ? "bg-red-50 border-red-100" : "bg-white border-slate-100"}`}>
+        <div className="flex items-center justify-between gap-1">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {number != null && <span className="text-slate-300 w-4 text-right text-[9px] shrink-0">{number}</span>}
+            <span className="text-[9px] text-slate-400 w-6 shrink-0 uppercase">{pos}</span>
+            <span className={`font-medium truncate ${isAbsent ? "text-red-700 line-through" : "text-slate-800"}`}>{name}</span>
+          </div>
+          {isAbsent && <span className="text-[9px] bg-red-500 text-white px-1 py-0.5 rounded font-bold shrink-0">ABSENT</span>}
+        </div>
+        <div className="flex items-center gap-2 mt-0.5 text-[10px] pl-[26px]">
+          {stats!.goals > 0 && <span className="text-emerald-600 font-semibold">{stats!.goals} buts</span>}
+          {stats!.assists > 0 && <span className="text-blue-500">{stats!.assists} PD</span>}
+          {stats!.rating > 0 && <span className="text-amber-500">★ {stats!.rating.toFixed(1)}</span>}
+          {stats!.goals_per_match > 0 && <span className="text-slate-400">{stats!.goals_per_match.toFixed(2)}/m</span>}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex items-center gap-2 text-[11px] py-[3px] ${isAbsent ? "text-red-400" : "text-slate-600"}`}>
+      {number != null && <span className="text-slate-300 w-4 text-right text-[9px] shrink-0">{number}</span>}
+      <span className="text-[9px] text-slate-400 w-6 shrink-0 uppercase">{pos}</span>
+      <span className={isAbsent ? "line-through" : ""}>{name}</span>
+      {isAbsent && <span className="text-[9px] bg-red-500 text-white px-1 py-0.5 rounded font-bold ml-1">ABSENT</span>}
+    </div>
+  );
+}
+
 function CompoTab({ am, home, away }: { am: AIScanMatch; home: string; away: string }) {
   const lineupH = am.lineup_home ?? [];
   const lineupA = am.lineup_away ?? [];
+  const keyH = am.key_players_home ?? [];
+  const keyA = am.key_players_away ?? [];
+
+  const hasLineup = lineupH.length > 0 || lineupA.length > 0;
+  const hasKeyPlayers = keyH.length > 0 || keyA.length > 0;
+
+  if (!hasLineup && !hasKeyPlayers) {
+    return <p className="text-sm text-slate-400">Composition non disponible pour ce match.</p>;
+  }
 
   return (
     <div>
@@ -1368,24 +1565,322 @@ function CompoTab({ am, home, away }: { am: AIScanMatch; home: string; away: str
            "Compo non disponible"}
         </span>
       </div>
-      {lineupH.length === 0 && lineupA.length === 0 ? (
-        <p className="text-sm text-slate-400">Composition non disponible pour ce match.</p>
-      ) : (
+
+      {hasLineup ? (
         <div className="grid grid-cols-2 gap-4">
-          {[{ label: home, lineup: lineupH, color: "text-blue-600" }, { label: away, lineup: lineupA, color: "text-red-600" }].map(({ label, lineup, color }) => (
+          {[{ label: home, lineup: lineupH, keyPlayers: keyH, color: "text-blue-600" }, { label: away, lineup: lineupA, keyPlayers: keyA, color: "text-red-600" }].map(({ label, lineup, keyPlayers, color }) => (
             <div key={label}>
               <div className={`text-xs font-semibold mb-2 truncate ${color}`}>{label}</div>
               <div className="space-y-0.5">
-                {lineup.map((p, i) => (
-                  <div key={i} className="flex items-center gap-2 text-[11px] text-slate-600">
-                    {p.number != null && <span className="text-slate-300 w-4 text-right text-[9px] shrink-0">{p.number}</span>}
-                    <span className="text-[9px] text-slate-400 w-5 shrink-0">{p.pos}</span>
-                    <span>{p.name}</span>
-                  </div>
+                {lineup.map((p, i) => {
+                  // Prefer inline stats from backend enrichment, fallback to key_players matching
+                  const hasInline = p.goals != null || p.assists != null || p.rating != null;
+                  const inlineStats: KeyPlayer | null = hasInline ? {
+                    name: p.name,
+                    goals: p.goals ?? 0,
+                    assists: p.assists ?? 0,
+                    goals_per_match: (p.games && p.games > 0) ? (p.goals ?? 0) / p.games : 0,
+                    rating: p.rating ?? 0,
+                    is_absent: p.is_absent ?? false,
+                  } : null;
+                  const stats = inlineStats ?? findKeyPlayer(p.name, keyPlayers) ?? null;
+                  return <PlayerRow key={i} name={p.name} pos={p.pos} number={p.number} stats={stats} />;
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* No lineup but key players exist — show key players only */
+        <div className="grid grid-cols-2 gap-4">
+          {[{ label: home, players: keyH, color: "text-blue-600" }, { label: away, players: keyA, color: "text-red-600" }].map(({ label, players, color }) => (
+            <div key={label}>
+              <div className={`text-xs font-semibold mb-2 truncate ${color}`}>{label}</div>
+              <div className="space-y-0.5">
+                {players.map((p, i) => (
+                  <PlayerRow key={i} name={p.name} pos={p.position?.slice(0, 3) ?? ""} number={null} stats={p} />
                 ))}
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── NBA Analyse Tab ──────────────────────────────────────────────────────────
+
+function NBAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away: string }) {
+  return (
+    <div className="space-y-4">
+      {am.nba_ml_used && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
+          <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
+          <span className="text-xs text-orange-700 font-medium">Modele ML actif (XGBoost + LightGBM, 38 features)</span>
+        </div>
+      )}
+      {/* Win rates + point differential */}
+      {(am.home_win_rate_10 != null || am.away_win_rate_10 != null) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={15} className="text-orange-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Forme & attaque (10 derniers matchs)</h4>
+          </div>
+          <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-sm">
+            <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
+            <div className="text-center text-slate-400 text-xs"></div>
+            <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
+            {[
+              { label: "Win rate (10j)", h: am.home_win_rate_10, a: am.away_win_rate_10, fmt: (v: number) => `${(v * 100).toFixed(0)}%`, higherBetter: true },
+              { label: "Pts marques / match", h: am.home_pts_avg_10, a: am.away_pts_avg_10, fmt: (v: number) => v.toFixed(1), higherBetter: true },
+              { label: "Pts encaisses / match", h: am.home_pts_allowed_10, a: am.away_pts_allowed_10, fmt: (v: number) => v.toFixed(1), higherBetter: false },
+              { label: "Diff. pts (10j)", h: am.home_pt_diff_10, a: am.away_pt_diff_10, fmt: (v: number) => (v > 0 ? `+${v.toFixed(1)}` : v.toFixed(1)), higherBetter: true },
+            ].map(({ label, h, a, fmt, higherBetter }) => {
+              if (h == null && a == null) return null;
+              const homeBetter = h != null && a != null ? (higherBetter ? h > a : h < a) : undefined;
+              return <FormRow key={label} label={label} homeVal={h != null ? fmt(h) : "-"} awayVal={a != null ? fmt(a) : "-"} homeBetter={homeBetter} />;
+            })}
+          </div>
+        </div>
+      )}
+      {/* Streak + B2B */}
+      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+        <div className="flex items-center gap-2 mb-3">
+          <Activity size={15} className="text-slate-500" />
+          <h4 className="text-slate-900 font-semibold text-sm">Contexte du match</h4>
+        </div>
+        <div className="space-y-2">
+          {am.home_streak != null && (
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Streak {home}</span>
+              <span className={`font-semibold ${am.home_streak > 0 ? "text-emerald-600" : am.home_streak < 0 ? "text-red-500" : "text-slate-600"}`}>
+                {am.home_streak > 0 ? `+${am.home_streak}V` : am.home_streak < 0 ? `${Math.abs(am.home_streak)}D` : "Neutre"}
+              </span>
+            </div>
+          )}
+          {am.away_streak != null && (
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Streak {away}</span>
+              <span className={`font-semibold ${am.away_streak > 0 ? "text-emerald-600" : am.away_streak < 0 ? "text-red-500" : "text-slate-600"}`}>
+                {am.away_streak > 0 ? `+${am.away_streak}V` : am.away_streak < 0 ? `${Math.abs(am.away_streak)}D` : "Neutre"}
+              </span>
+            </div>
+          )}
+          {(am.home_b2b || am.away_b2b) && (
+            <div className="flex gap-2 flex-wrap pt-1">
+              {am.home_b2b && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">{home} B2B</span>}
+              {am.away_b2b && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">{away} B2B</span>}
+            </div>
+          )}
+          {am.total_line != null && (
+            <div className="flex justify-between text-sm pt-1">
+              <span className="text-slate-500">Total O/U</span>
+              <span className="font-semibold text-slate-700">{am.total_line}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── NBA Stats Tab ────────────────────────────────────────────────────────────
+
+function NBAStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: string }) {
+  const rows: { label: string; hv: string | null; av: string | null; lowerBetter?: boolean }[] = [
+    { label: "Win rate (10j)", hv: am.home_win_rate_10 != null ? `${(am.home_win_rate_10 * 100).toFixed(0)}%` : null, av: am.away_win_rate_10 != null ? `${(am.away_win_rate_10 * 100).toFixed(0)}%` : null },
+    { label: "Pts/match (10j)", hv: am.home_pts_avg_10?.toFixed(1) ?? null, av: am.away_pts_avg_10?.toFixed(1) ?? null },
+    { label: "Pts encaisses/match", hv: am.home_pts_allowed_10?.toFixed(1) ?? null, av: am.away_pts_allowed_10?.toFixed(1) ?? null, lowerBetter: true },
+    { label: "Differentiel pts", hv: am.home_pt_diff_10 != null ? (am.home_pt_diff_10 > 0 ? `+${am.home_pt_diff_10.toFixed(1)}` : am.home_pt_diff_10.toFixed(1)) : null, av: am.away_pt_diff_10 != null ? (am.away_pt_diff_10 > 0 ? `+${am.away_pt_diff_10.toFixed(1)}` : am.away_pt_diff_10.toFixed(1)) : null },
+  ].filter(r => r.hv != null || r.av != null);
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+        <div className="flex items-center gap-2 mb-3">
+          <TrendingUp size={15} className="text-orange-500" />
+          <h4 className="text-slate-900 font-semibold text-sm">Statistiques des equipes</h4>
+        </div>
+        <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-sm">
+          <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
+          <div className="text-center text-slate-400 text-xs">VS</div>
+          <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
+          {rows.map(({ label, hv, av, lowerBetter }) => {
+            const hNum = parseFloat(hv?.replace(/[^0-9.-]/g, "") ?? "");
+            const aNum = parseFloat(av?.replace(/[^0-9.-]/g, "") ?? "");
+            const canCompare = !isNaN(hNum) && !isNaN(aNum) && hNum !== aNum;
+            const homeBetter = canCompare ? (lowerBetter ? hNum < aNum : hNum > aNum) : undefined;
+            return <FormRow key={label} label={label} homeVal={hv ?? "-"} awayVal={av ?? "-"} homeBetter={homeBetter} />;
+          })}
+        </div>
+      </div>
+      {/* Total O/U context */}
+      {(am.total_line != null || am.odds_over != null) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <BarChart2 size={15} className="text-slate-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Total Over/Under</h4>
+          </div>
+          <div className="space-y-1 text-sm">
+            {am.total_line != null && <div className="flex justify-between"><span className="text-slate-500">Ligne O/U</span><span className="font-semibold">{am.total_line}</span></div>}
+            {am.odds_over != null && <div className="flex justify-between"><span className="text-slate-500">Cote Over {am.total_line}</span><span className="font-semibold text-blue-600">{am.odds_over.toFixed(2)}</span></div>}
+            {am.odds_under != null && <div className="flex justify-between"><span className="text-slate-500">Cote Under {am.total_line}</span><span className="font-semibold text-blue-600">{am.odds_under.toFixed(2)}</span></div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Rugby Analyse Tab ────────────────────────────────────────────────────────
+
+function RugbyAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away: string }) {
+  return (
+    <div className="space-y-4">
+      {am.rugby_ml_used && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+          <span className="w-2 h-2 rounded-full bg-green-600 flex-shrink-0" />
+          <span className="text-xs text-green-700 font-medium">Modele ML actif (XGBoost + LightGBM, 36 features)</span>
+        </div>
+      )}
+      {/* Win rates + point differential */}
+      {(am.home_win_rate_10 != null || am.away_win_rate_10 != null) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={15} className="text-green-600" />
+            <h4 className="text-slate-900 font-semibold text-sm">Forme (10 derniers matchs)</h4>
+          </div>
+          <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-sm">
+            <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
+            <div className="text-center text-slate-400 text-xs"></div>
+            <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
+            {[
+              { label: "Win rate (10j)", h: am.home_win_rate_10, a: am.away_win_rate_10, fmt: (v: number) => `${(v * 100).toFixed(0)}%`, higherBetter: true },
+              { label: "Points marques/match", h: am.home_pts_avg_10, a: am.away_pts_avg_10, fmt: (v: number) => v.toFixed(1), higherBetter: true },
+              { label: "Points encaisses/match", h: am.home_pts_allowed_10, a: am.away_pts_allowed_10, fmt: (v: number) => v.toFixed(1), higherBetter: false },
+              { label: "Diff. points (10j)", h: am.home_pt_diff_10, a: am.away_pt_diff_10, fmt: (v: number) => (v > 0 ? `+${v.toFixed(1)}` : v.toFixed(1)), higherBetter: true },
+            ].map(({ label, h, a, fmt, higherBetter }) => {
+              if (h == null && a == null) return null;
+              const homeBetter = h != null && a != null ? (higherBetter ? h > a : h < a) : undefined;
+              return <FormRow key={label} label={label} homeVal={h != null ? fmt(h) : "-"} awayVal={a != null ? fmt(a) : "-"} homeBetter={homeBetter} />;
+            })}
+          </div>
+        </div>
+      )}
+      {/* Rugby specifics: tries & penalties */}
+      {(am.home_tries_avg_10 != null || am.away_tries_avg_10 != null) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <Trophy size={15} className="text-amber-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Stats rugby (10 derniers)</h4>
+          </div>
+          <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-sm">
+            <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
+            <div className="text-center text-slate-400 text-xs"></div>
+            <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
+            {[
+              { label: "Essais / match", h: am.home_tries_avg_10, a: am.away_tries_avg_10, fmt: (v: number) => v.toFixed(1), higherBetter: true },
+              { label: "Penalites / match", h: am.home_penalties_avg_10, a: am.away_penalties_avg_10, fmt: (v: number) => v.toFixed(1), higherBetter: false },
+            ].map(({ label, h, a, fmt, higherBetter }) => {
+              if (h == null && a == null) return null;
+              const homeBetter = h != null && a != null ? (higherBetter ? h > a : h < a) : undefined;
+              return <FormRow key={label} label={label} homeVal={h != null ? fmt(h) : "-"} awayVal={a != null ? fmt(a) : "-"} homeBetter={homeBetter} />;
+            })}
+          </div>
+        </div>
+      )}
+      {/* Streak context */}
+      {(am.home_streak != null || am.away_streak != null) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity size={15} className="text-slate-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Contexte</h4>
+          </div>
+          <div className="space-y-2">
+            {am.home_streak != null && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Streak {home}</span>
+                <span className={`font-semibold ${am.home_streak > 0 ? "text-emerald-600" : am.home_streak < 0 ? "text-red-500" : "text-slate-600"}`}>
+                  {am.home_streak > 0 ? `+${am.home_streak}V` : am.home_streak < 0 ? `${Math.abs(am.home_streak)}D` : "Neutre"}
+                </span>
+              </div>
+            )}
+            {am.away_streak != null && (
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Streak {away}</span>
+                <span className={`font-semibold ${am.away_streak > 0 ? "text-emerald-600" : am.away_streak < 0 ? "text-red-500" : "text-slate-600"}`}>
+                  {am.away_streak > 0 ? `+${am.away_streak}V` : am.away_streak < 0 ? `${Math.abs(am.away_streak)}D` : "Neutre"}
+                </span>
+              </div>
+            )}
+            {am.total_line != null && (
+              <div className="flex justify-between text-sm pt-1">
+                <span className="text-slate-500">Total O/U</span>
+                <span className="font-semibold text-slate-700">{am.total_line} pts</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Rugby Stats Tab ──────────────────────────────────────────────────────────
+
+function RugbyStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: string }) {
+  const rows: { label: string; hv: string | null; av: string | null; lowerBetter?: boolean }[] = [
+    { label: "Win rate (10j)", hv: am.home_win_rate_10 != null ? `${(am.home_win_rate_10 * 100).toFixed(0)}%` : null, av: am.away_win_rate_10 != null ? `${(am.away_win_rate_10 * 100).toFixed(0)}%` : null },
+    { label: "Points/match (10j)", hv: am.home_pts_avg_10?.toFixed(1) ?? null, av: am.away_pts_avg_10?.toFixed(1) ?? null },
+    { label: "Points encaisses/match", hv: am.home_pts_allowed_10?.toFixed(1) ?? null, av: am.away_pts_allowed_10?.toFixed(1) ?? null, lowerBetter: true },
+    { label: "Differentiel pts", hv: am.home_pt_diff_10 != null ? (am.home_pt_diff_10 > 0 ? `+${am.home_pt_diff_10.toFixed(1)}` : am.home_pt_diff_10.toFixed(1)) : null, av: am.away_pt_diff_10 != null ? (am.away_pt_diff_10 > 0 ? `+${am.away_pt_diff_10.toFixed(1)}` : am.away_pt_diff_10.toFixed(1)) : null },
+    { label: "Essais / match (10j)", hv: am.home_tries_avg_10?.toFixed(1) ?? null, av: am.away_tries_avg_10?.toFixed(1) ?? null },
+    { label: "Penalites / match (10j)", hv: am.home_penalties_avg_10?.toFixed(1) ?? null, av: am.away_penalties_avg_10?.toFixed(1) ?? null, lowerBetter: true },
+  ].filter(r => r.hv != null || r.av != null);
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+        <div className="flex items-center gap-2 mb-3">
+          <TrendingUp size={15} className="text-green-600" />
+          <h4 className="text-slate-900 font-semibold text-sm">Statistiques des equipes</h4>
+        </div>
+        <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-sm">
+          <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
+          <div className="text-center text-slate-400 text-xs">VS</div>
+          <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
+          {rows.map(({ label, hv, av, lowerBetter }) => {
+            const hNum = parseFloat(hv?.replace(/[^0-9.-]/g, "") ?? "");
+            const aNum = parseFloat(av?.replace(/[^0-9.-]/g, "") ?? "");
+            const canCompare = !isNaN(hNum) && !isNaN(aNum) && hNum !== aNum;
+            const homeBetter = canCompare ? (lowerBetter ? hNum < aNum : hNum > aNum) : undefined;
+            return <FormRow key={label} label={label} homeVal={hv ?? "-"} awayVal={av ?? "-"} homeBetter={homeBetter} />;
+          })}
+        </div>
+      </div>
+      {/* Scoring guide */}
+      <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
+        <div className="text-xs font-semibold text-amber-700 mb-1.5">Systeme de points rugby</div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px] text-amber-800">
+          <span>Essai : 5 pts</span>
+          <span>Transformation : 2 pts</span>
+          <span>Penalite : 3 pts</span>
+          <span>Drop : 3 pts</span>
+        </div>
+      </div>
+      {/* Total O/U */}
+      {(am.total_line != null || am.odds_over != null) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <BarChart2 size={15} className="text-slate-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Total Over/Under</h4>
+          </div>
+          <div className="space-y-1 text-sm">
+            {am.total_line != null && <div className="flex justify-between"><span className="text-slate-500">Ligne O/U</span><span className="font-semibold">{am.total_line} pts</span></div>}
+            {am.odds_over != null && <div className="flex justify-between"><span className="text-slate-500">Cote Over {am.total_line}</span><span className="font-semibold text-blue-600">{am.odds_over.toFixed(2)}</span></div>}
+            {am.odds_under != null && <div className="flex justify-between"><span className="text-slate-500">Cote Under {am.total_line}</span><span className="font-semibold text-blue-600">{am.odds_under.toFixed(2)}</span></div>}
+          </div>
         </div>
       )}
     </div>

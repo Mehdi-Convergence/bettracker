@@ -163,6 +163,17 @@ def build_live_features(
     f["home_cards_avg"] = float(h_cards) if h_cards is not None else np.nan
     f["away_cards_avg"] = float(a_cards) if a_cards is not None else np.nan
 
+    h_red = stats_h.get("home_red_cards_pg")
+    a_red = stats_a.get("away_red_cards_pg")
+    f["home_red_avg_5"] = float(h_red) if h_red is not None else np.nan
+    f["away_red_avg_5"] = float(a_red) if a_red is not None else np.nan
+
+    # Key player absent flags (1.0 = a key player is injured, 0.0 = none)
+    key_absent_home = kwargs.get("key_player_absent_home")
+    key_absent_away = kwargs.get("key_player_absent_away")
+    f["key_player_absent_home"] = 1.0 if key_absent_home else 0.0
+    f["away_key_player_absent"] = 1.0 if key_absent_away else 0.0
+
     # ------------------------------------------------------------------ #
     # 4. H2H
     # ------------------------------------------------------------------ #
@@ -298,5 +309,41 @@ def build_live_features(
     a_cs = (stats_a.get("clean_sheets_home") or 0) + (stats_a.get("clean_sheets_away") or 0)
     f["home_clean_sheet_5"] = h_cs / h_played
     f["away_clean_sheet_5"] = a_cs / a_played
+
+    # ------------------------------------------------------------------ #
+    # 15. xG features — use API-Football season averages as proxy for
+    #     rolling-5 values when real FBref historical data is unavailable.
+    #     API-Football provides xG via /teams/statistics (home_xg_avg /
+    #     away_xg_avg) which is already computed in get_team_stats().
+    #     Fallback: SOT × 0.33 approximation (same as before enrichment).
+    # ------------------------------------------------------------------ #
+    h_xg = stats_h.get("home_xg_avg")
+    a_xg = stats_a.get("away_xg_avg")
+
+    # Fallback to SOT-based approximation if API xG unavailable
+    if h_xg is None and h_sot is not None:
+        h_xg = round(float(h_sot) * 0.33, 2)
+    if a_xg is None and a_sot is not None:
+        a_xg = round(float(a_sot) * 0.33, 2)
+
+    f["home_xg_avg_5"] = float(h_xg) if h_xg is not None else np.nan
+    f["away_xg_avg_5"] = float(a_xg) if a_xg is not None else np.nan
+
+    # xG diff (attack minus defense pressure)
+    h_xg_c = stats_h.get("away_xg_avg")   # xG conceded at home = opponent away xG
+    a_xg_c = stats_a.get("home_xg_avg")   # xG conceded away = opponent home xG
+    if h_xg is not None and h_xg_c is not None:
+        f["home_xg_diff_5"] = float(h_xg) - float(h_xg_c)
+    else:
+        f["home_xg_diff_5"] = np.nan
+    if a_xg is not None and a_xg_c is not None:
+        f["away_xg_diff_5"] = float(a_xg) - float(a_xg_c)
+    else:
+        f["away_xg_diff_5"] = np.nan
+
+    # xG overperformance: not available from season stats (need per-match data)
+    # Set to 0.0 as neutral prior (no evidence of over/under performance)
+    f["home_xg_overperformance"] = 0.0
+    f["away_xg_overperformance"] = 0.0
 
     return f

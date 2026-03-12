@@ -150,9 +150,9 @@ export default function Scanner() {
   const [hasScanned, setHasScanned] = useState(false);
   const [isCached, setIsCached] = useState(false);
   const [cachedAt, setCachedAt] = useState<string | null>(null);
-  const [sports, setSports] = useState<Set<"football" | "tennis">>(new Set(["football"]));
+  const [sports, setSports] = useState<Set<"football" | "tennis" | "nba" | "rugby">>(new Set(["football"]));
 
-  function toggleSport(s: "football" | "tennis") {
+  function toggleSport(s: "football" | "tennis" | "nba" | "rugby") {
     setSports(prev => {
       const next = new Set(prev);
       if (next.has(s)) {
@@ -202,17 +202,18 @@ export default function Scanner() {
   const [hideInTicket, setHideInTicket] = useState(false);
   const [minDataScore] = useState<string>("");
   const [valueOnlyFilter, setValueOnlyFilter] = useState(false);
+  const [nbaConference, setNbaConference] = useState<"all" | "est" | "ouest">("all");
 
   /* ── Scan ── */
   async function handleAIScan(forceRefresh = false, silent = false) {
     if (!silent) { setLoading(true); setError(""); }
     try {
-      const timeframeMap: Record<string, string> = { today: "24h", "48h": "48h", "72h": "72h", week: "1w", month: "1m" };
+      const timeframeMap: Record<string, string> = { today: "24h", "48h": "48h", "72h": "72h", week: "1w" };
       const sportList = [...sports];
       const results = await Promise.all(
         sportList.map(s => aiScan({
           sport: s,
-          leagues: s === "tennis" ? "ATP,WTA" : "",
+          leagues: s === "tennis" ? "ATP,WTA" : s === "nba" ? "NBA" : s === "rugby" ? "Rugby" : "",
           timeframe: timeframeMap[datePreset] || "48h",
           force: forceRefresh || undefined,
           cacheOnly: silent || undefined,
@@ -252,6 +253,17 @@ export default function Scanner() {
       result = result.filter((am) => {
         if (am.sport !== "tennis") return true;
         return !excludedTournaments.has(am.league || "");
+      });
+    }
+
+    // NBA conference filter
+    if (sports.has("nba") && nbaConference !== "all") {
+      const NBA_EAST = new Set(["Atlanta Hawks","Boston Celtics","Brooklyn Nets","Charlotte Hornets","Chicago Bulls","Cleveland Cavaliers","Detroit Pistons","Indiana Pacers","Miami Heat","Milwaukee Bucks","New York Knicks","Orlando Magic","Philadelphia 76ers","Toronto Raptors","Washington Wizards"]);
+      const NBA_WEST = new Set(["Dallas Mavericks","Denver Nuggets","Golden State Warriors","Houston Rockets","LA Clippers","Los Angeles Lakers","Memphis Grizzlies","Minnesota Timberwolves","New Orleans Pelicans","Oklahoma City Thunder","Phoenix Suns","Portland Trail Blazers","Sacramento Kings","San Antonio Spurs","Utah Jazz"]);
+      result = result.filter((am) => {
+        if (am.sport !== "nba") return true;
+        const conf = nbaConference === "est" ? NBA_EAST : NBA_WEST;
+        return conf.has(am.home_team || "") || conf.has(am.away_team || "");
       });
     }
 
@@ -462,7 +474,6 @@ export default function Scanner() {
     if (preset === "48h") { setDateFrom(from); setDateTo(add(2)); return; }
     if (preset === "72h") { setDateFrom(from); setDateTo(add(3)); return; }
     if (preset === "week") { setDateFrom(from); setDateTo(add(7)); return; }
-    if (preset === "month") { setDateFrom(from); setDateTo(add(30)); return; }
   }
 
   /* ── AI match -> TicketLeg conversion ── */
@@ -703,14 +714,14 @@ export default function Scanner() {
             <div data-tour="sport-toggle">
               <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Sport</label>
               <div className="flex gap-1">
-                {(["football", "tennis"] as const).map((s) => (
+                {(["football", "tennis", "nba", "rugby"] as const).map((s) => (
                   <button key={s} onClick={() => toggleSport(s)}
                     className={`px-3 py-[5px] rounded-full text-[11.5px] font-semibold transition-all ${
                       sports.has(s)
                         ? "bg-[#3b5bdb] text-white shadow-sm"
                         : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
                     }`}>
-                    {s === "football" ? "⚽ Football" : "🎾 Tennis"}
+                    {s === "football" ? "⚽ Football" : s === "tennis" ? "🎾 Tennis" : s === "nba" ? "🏀 NBA" : "🏉 Rugby"}
                   </button>
                 ))}
               </div>
@@ -736,14 +747,14 @@ export default function Scanner() {
                 <Calendar size={9} className="inline mr-0.5" />Periode
               </label>
               <div className="flex gap-1">
-                {(["today", "48h", "72h", "week", "month"] as const).map((p) => (
+                {(["today", "48h", "72h", "week"] as const).map((p) => (
                   <button key={p} onClick={() => applyDatePreset(p)}
                     className={`px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${
                       datePreset === p
                         ? "bg-[#3b5bdb] text-white shadow-sm"
                         : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
                     }`}>
-                    {p === "today" ? "Auj." : p === "week" ? "7j" : p === "month" ? "1m" : p}
+                    {p === "today" ? "Auj." : p === "week" ? "7j" : p}
                   </button>
                 ))}
               </div>
@@ -758,7 +769,10 @@ export default function Scanner() {
               </div>
               <div>
                 <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Au</label>
-                <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setDatePreset(""); }}
+                <input type="date" value={dateTo}
+                  min={dateFrom}
+                  max={(() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); })()}
+                  onChange={(e) => { setDateTo(e.target.value); setDatePreset(""); }}
                   className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg px-2 py-[5px] text-[11px] text-[#111318]" />
               </div>
             </div>
@@ -919,6 +933,33 @@ export default function Scanner() {
             </div>
           )}
 
+
+          {/* NBA filter bar */}
+          {sports.has("nba") && (
+            <div className="flex items-center gap-3 flex-wrap mt-1">
+              <div className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px]">
+                <span className="text-[12px]">🏀</span>
+                <span className="text-[12px] font-semibold text-[#111318]">Conference</span>
+              </div>
+              <div className="flex items-center gap-1">
+                {(["all", "est", "ouest"] as const).map((c) => (
+                  <button key={c} onClick={() => setNbaConference(c)}
+                    className={`text-[11px] font-semibold px-2.5 py-[5px] rounded-full transition-all ${nbaConference === c ? "bg-[#f97316] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+                    {c === "all" ? "Toutes" : c === "est" ? "Est" : "Ouest"}
+                  </button>
+                ))}
+              </div>
+              <div className="h-5 w-px bg-[#e3e6eb]" />
+              <button data-tour="value-toggle" onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
+                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+                <TrendingUp size={10} /> Value bets
+              </button>
+              <button onClick={() => setHideInTicket(!hideInTicket)}
+                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${hideInTicket ? "bg-[#3b5bdb] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+                <Shield size={10} /> Masquer en ticket
+              </button>
+            </div>
+          )}
 
           {/* Leagues dropdown panel */}
           {/* Leagues dropdown panel (football) */}

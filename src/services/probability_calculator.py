@@ -109,21 +109,39 @@ def _remove_overround(h: float, d: float, a: float) -> tuple[float, float, float
     return h / total, d / total, a / total
 
 
-def _absence_penalty(absences: list[str], key_player_goals_per_match: float = 0.0) -> float:
-    """Penalty for key absences, weighted by player importance.
+def _absence_penalty(
+    absences: list[str],
+    key_player_goals_per_match: float = 0.0,
+    absent_positions: list[str] | None = None,
+) -> float:
+    """Penalty for key absences, weighted by player importance and position.
 
-    - Top scorer absent (>0.4 goals/match): -0.06
-    - Regular player absent: -0.02
-    Max 3 players counted.
+    Position-based penalties (per absent player):
+    - Goalkeeper: -0.10 (critical, no backup in quality)
+    - Attacker: -0.07
+    - Midfielder: -0.05
+    - Defender: -0.03
+    - Unknown: -0.02
+    Max 3 players counted. Extra boost if top scorer absent (>0.4 goals/match).
     """
     if not absences:
         return 0.0
     count = min(len(absences), 3)
-    base = count * 0.02
-    # Boost if the top scorer is among absentees
-    if key_player_goals_per_match >= 0.4:
-        base += 0.04
-    return min(base, 0.10)
+    if absent_positions:
+        pos_penalties = {
+            "Goalkeeper": 0.10, "Attacker": 0.07,
+            "Midfielder": 0.05, "Defender": 0.03,
+        }
+        base = sum(
+            pos_penalties.get(pos, 0.02)
+            for pos in absent_positions[:count]
+        )
+    else:
+        base = count * 0.02
+        # Boost if the top scorer is among absentees
+        if key_player_goals_per_match >= 0.4:
+            base += 0.04
+    return min(base, 0.12)
 
 
 def _h2h_adjustment(h2h_summary: str | None, h2h_details: list[dict] | None, home_team_id: int | None = None) -> float:
@@ -232,6 +250,8 @@ def calculate_football(
     key_absences_away: list[str] | None = None,
     home_top_scorer_gpm: float = 0.0,         # goals/match of top absent home player
     away_top_scorer_gpm: float = 0.0,
+    absent_positions_home: list[str] | None = None,  # positions of absent home players
+    absent_positions_away: list[str] | None = None,  # positions of absent away players
     lineup_confirmed: bool = False,
     # Goals averages (from API-Football team stats)
     home_goals_scored_avg: float | None = None,
@@ -329,10 +349,10 @@ def calculate_football(
     if h2h_details:
         data_points += 1  # structured H2H = extra point
 
-    # --- Absence penalty (weighted by player importance) ---
+    # --- Absence penalty (weighted by position when available) ---
     lineup_mult = 1.5 if lineup_confirmed else 1.0
-    abs_pen_home = _absence_penalty(key_absences_home, home_top_scorer_gpm) * lineup_mult
-    abs_pen_away = _absence_penalty(key_absences_away, away_top_scorer_gpm) * lineup_mult
+    abs_pen_home = _absence_penalty(key_absences_home, home_top_scorer_gpm, absent_positions_home) * lineup_mult
+    abs_pen_away = _absence_penalty(key_absences_away, away_top_scorer_gpm, absent_positions_away) * lineup_mult
     if key_absences_home or key_absences_away:
         data_points += 1
     if lineup_confirmed:
@@ -647,4 +667,220 @@ def calculate_tennis(
         used_position=ranking_p1 is not None,
         used_h2h=bool(h2h_summary),
         used_absences=bool(absences_p1 or absences_p2),
+    )
+
+
+# ---------------------------------------------------------------------------
+# NBA probability calculator (rule-based baseline)
+# ---------------------------------------------------------------------------
+
+NBA_MAX_POINTS = 6
+
+
+def calculate_nba(
+    odds_home: float,
+    odds_away: float,
+    odds_over: float | None = None,
+    odds_under: float | None = None,
+    total_line: float | None = None,
+    home_win_rate: float | None = None,
+    away_win_rate: float | None = None,
+    home_pt_diff: float | None = None,
+    away_pt_diff: float | None = None,
+    home_b2b: bool = False,
+    away_b2b: bool = False,
+) -> MatchProbabilityResult:
+    """Estimate fair probabilities and edges for an NBA game (rule-based baseline).
+
+    Used as a fallback when the ML model is unavailable.
+    """
+    if odds_home <= 0 or odds_away <= 0:
+        return MatchProbabilityResult(
+            home_prob=0.5, draw_prob=0.0, away_prob=0.5,
+            edges={"Home": 0.0, "Away": 0.0},
+            data_quality="red", data_score=0.0,
+        )
+
+    raw_h = 1 / odds_home
+    raw_a = 1 / odds_away
+    fair_h, _, fair_a = _remove_overround(raw_h, 0.0, raw_a)
+    data_points = 2
+
+    # Adjust for win rate
+    adj = 0.0
+    if home_win_rate is not None and away_win_rate is not None:
+        adj += (home_win_rate - away_win_rate) * 0.05
+        data_points += 1
+
+    # Adjust for point differential
+    if home_pt_diff is not None and away_pt_diff is not None:
+        pt_diff = home_pt_diff - away_pt_diff
+        adj += max(-0.05, min(0.05, pt_diff / 200))
+        data_points += 1
+
+    # Back-to-back penalty
+    if home_b2b:
+        adj -= 0.03
+    if away_b2b:
+        adj += 0.03
+
+    est_h = min(0.90, max(0.10, fair_h + adj))
+    est_a = 1.0 - est_h
+
+    edge_h = round(est_h - 1.0 / odds_home, 4)
+    edge_a = round(est_a - 1.0 / odds_away, 4)
+
+    edges: dict[str, float] = {}
+    if edge_h > 0:
+        edges["Home"] = edge_h
+    if edge_a > 0:
+        edges["Away"] = edge_a
+
+    # Over/under edges
+    if odds_over and odds_under and total_line:
+        data_points += 1
+        # Assume 50/50 baseline for totals unless ML adjusts
+        edge_over = round(0.5 - 1.0 / odds_over, 4)
+        edge_under = round(0.5 - 1.0 / odds_under, 4)
+        if edge_over > 0.01:
+            edges["Over"] = edge_over
+        if edge_under > 0.01:
+            edges["Under"] = edge_under
+
+    data_score = data_points / NBA_MAX_POINTS
+    if data_score >= 0.75:
+        quality: Literal["green", "yellow", "red"] = "green"
+    elif data_score >= 0.4:
+        quality = "yellow"
+    else:
+        quality = "red"
+
+    return MatchProbabilityResult(
+        home_prob=round(est_h, 4),
+        draw_prob=0.0,
+        away_prob=round(est_a, 4),
+        edges=edges,
+        data_quality=quality,
+        data_score=round(data_score, 3),
+        data_points_used=data_points,
+        data_points_max=NBA_MAX_POINTS,
+        used_odds=True,
+        used_form=home_win_rate is not None,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Rugby probability calculator (rule-based baseline)
+# ---------------------------------------------------------------------------
+
+RUGBY_MAX_POINTS = 7
+# Draw probability base: rugby draws are rare (~6%)
+_RUGBY_DRAW_PROB = 0.06
+
+
+def calculate_rugby(
+    odds_home: float,
+    odds_draw: float | None,
+    odds_away: float,
+    odds_over: float | None = None,
+    odds_under: float | None = None,
+    total_line: float | None = None,
+    home_win_rate: float | None = None,
+    away_win_rate: float | None = None,
+    home_pt_diff: float | None = None,
+    away_pt_diff: float | None = None,
+    home_elo: float | None = None,
+    away_elo: float | None = None,
+) -> MatchProbabilityResult:
+    """Estimate fair probabilities and edges for a rugby match (1X2, rule-based).
+
+    Used as a fallback when the ML model is unavailable.
+    Rugby has draws: ~6% of matches end level.
+    """
+    if odds_home <= 0 or odds_away <= 0:
+        return MatchProbabilityResult(
+            home_prob=0.47, draw_prob=_RUGBY_DRAW_PROB, away_prob=0.47,
+            edges={"H": 0.0, "D": 0.0, "A": 0.0},
+            data_quality="red", data_score=0.0,
+        )
+
+    raw_h = 1 / odds_home
+    raw_d = (1 / odds_draw) if (odds_draw and odds_draw > 1.0) else _RUGBY_DRAW_PROB
+    raw_a = 1 / odds_away
+    fair_h, fair_d, fair_a = _remove_overround(raw_h, raw_d, raw_a)
+    data_points = 3  # H/D/A odds
+
+    # Adjust for form (win rate)
+    adj = 0.0
+    if home_win_rate is not None and away_win_rate is not None:
+        adj += (home_win_rate - away_win_rate) * 0.06
+        data_points += 1
+
+    # Adjust for point differential
+    if home_pt_diff is not None and away_pt_diff is not None:
+        pt_diff = home_pt_diff - away_pt_diff
+        # Rugby scores are high (~50 pts/match) — normalize accordingly
+        adj += max(-0.06, min(0.06, pt_diff / 150))
+        data_points += 1
+
+    # ELO-based adjustment
+    if home_elo is not None and away_elo is not None:
+        elo_diff = home_elo - away_elo
+        elo_adj = max(-0.04, min(0.04, elo_diff / 800))
+        adj += elo_adj
+        data_points += 1
+
+    est_h = min(0.88, max(0.08, fair_h + adj))
+    # Preserve draw probability anchored to base
+    est_d = min(0.15, max(0.03, fair_d))
+    # Remainder to away
+    rem = 1.0 - est_h - est_d
+    est_a = min(0.88, max(0.05, rem))
+    # Renormalize
+    total = est_h + est_d + est_a
+    est_h = round(est_h / total, 4)
+    est_d = round(est_d / total, 4)
+    est_a = round(1.0 - est_h - est_d, 4)
+
+    edges: dict[str, float] = {}
+    edge_h = round(est_h - 1.0 / odds_home, 4)
+    edge_a = round(est_a - 1.0 / odds_away, 4)
+    edge_d = round(est_d - (1.0 / odds_draw if odds_draw and odds_draw > 1.0 else 0.0), 4)
+
+    if edge_h > 0:
+        edges["H"] = edge_h
+    if edge_d > 0 and odds_draw and odds_draw > 1.0:
+        edges["D"] = edge_d
+    if edge_a > 0:
+        edges["A"] = edge_a
+
+    # Over/under (assume 50/50 baseline)
+    if odds_over and odds_under and total_line:
+        data_points += 1
+        edge_over = round(0.5 - 1.0 / odds_over, 4)
+        edge_under = round(0.5 - 1.0 / odds_under, 4)
+        if edge_over > 0.01:
+            edges["Over"] = edge_over
+        if edge_under > 0.01:
+            edges["Under"] = edge_under
+
+    data_score = data_points / RUGBY_MAX_POINTS
+    if data_score >= 0.75:
+        quality: Literal["green", "yellow", "red"] = "green"
+    elif data_score >= 0.4:
+        quality = "yellow"
+    else:
+        quality = "red"
+
+    return MatchProbabilityResult(
+        home_prob=est_h,
+        draw_prob=est_d,
+        away_prob=est_a,
+        edges=edges,
+        data_quality=quality,
+        data_score=round(data_score, 3),
+        data_points_used=data_points,
+        data_points_max=RUGBY_MAX_POINTS,
+        used_odds=True,
+        used_form=home_win_rate is not None,
     )

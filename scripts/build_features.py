@@ -64,10 +64,32 @@ def main():
                    "h2h_home_win_rate", "home_position", "implied_home"]
     print(features_df.iloc[100][[c for c in sample_cols if c in features_df.columns]].to_string())
 
-    # Remove xG features (100% NaN - no data available)
+    # Analyse xG feature availability
     xg_cols = [c for c in features_df.columns if "xg" in c]
-    features_df = features_df.drop(columns=xg_cols)
-    print(f"\nDropped xG features (no data): {xg_cols}")
+    xg_coverage = {}
+    for col in xg_cols:
+        non_nan = features_df[col].notna().sum()
+        pct = non_nan / len(features_df) * 100
+        xg_coverage[col] = pct
+
+    print(f"\nxG feature coverage:")
+    all_nan_xg = []
+    has_data_xg = []
+    for col, pct in xg_coverage.items():
+        status = "OK" if pct > 1 else "NO DATA"
+        print(f"  {col}: {pct:.1f}% non-NaN [{status}]")
+        if pct < 0.5:
+            all_nan_xg.append(col)
+        else:
+            has_data_xg.append(col)
+
+    if all_nan_xg:
+        features_df = features_df.drop(columns=all_nan_xg)
+        print(f"\nDropped xG features with no data (100% NaN): {all_nan_xg}")
+        print("To enable real xG: run 'uv run python scripts/enrich_xg.py' first.")
+
+    if has_data_xg:
+        print(f"\nReal xG features available: {has_data_xg}")
 
     # Save
     import os

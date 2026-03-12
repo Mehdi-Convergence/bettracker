@@ -62,7 +62,7 @@ def _save_odds_snapshots(all_matches: list, sport: str) -> None:
             if not isinstance(odds_data, dict):
                 odds_data = {}
 
-            if sport == "football":
+            if sport in ("football", "rugby"):
                 market = odds_data.get("1x2", {})
                 odds_h = _extract_best_odd(market, "H")
                 odds_d = _extract_best_odd(market, "D")
@@ -360,7 +360,9 @@ async def run_football_scan(league_list: list[str] | None = None):
             ML_WEIGHT = 0.45
             if _v6 is not None:
                 try:
-                    from src.ml.football_model import MODEL_FEATURES
+                    from src.ml.football_model import MODEL_FEATURES_NO_XG
+                    # Use active_features from loaded model (includes xG if trained with it)
+                    active_feats = getattr(_v6, "active_features", MODEL_FEATURES_NO_XG)
                     live_feats = build_live_features(
                         stats_h=stats_h, stats_a=stats_a,
                         home_rank=home_rank, away_rank=away_rank,
@@ -372,7 +374,7 @@ async def run_football_scan(league_list: list[str] | None = None):
                         key_player_absent_home=key_absent_home,
                         key_player_absent_away=key_absent_away,
                     )
-                    X = np.array([[live_feats.get(feat, 0.0) for feat in MODEL_FEATURES]])
+                    X = np.array([[live_feats.get(feat, 0.0) for feat in active_feats]])
                     X = np.nan_to_num(X, nan=0.0)
                     ml_p = _v6.predict_proba(X)[0]
                     ph = ML_WEIGHT * float(ml_p[0]) + (1 - ML_WEIGHT) * calc.home_prob
@@ -941,6 +943,199 @@ async def run_nba_scan():
 
 
 # ---------------------------------------------------------------------------
+# Rugby scan
+# ---------------------------------------------------------------------------
+
+RUGBY_SCAN_INTERVAL = 60 * 60  # 1h
+
+
+def _load_rugby_model():
+    """Load rugby ML model + team stats snapshot. Returns (model, snapshot) or (None, None)."""
+    try:
+        from src.ml.rugby_model import RugbyModel
+        model_dir = Path("models/rugby")
+        if not (model_dir / "model.joblib").exists():
+            return None, None
+        model = RugbyModel.load(model_dir)
+        import json
+        with open(model_dir / "team_stats.json") as f:
+            snapshot = json.load(f)
+        return model, snapshot
+    except Exception as e:
+        logger.warning("Rugby model not available: %s", e)
+        return None, None
+
+
+async def run_rugby_scan():
+    """Run rugby scan — fetch upcoming matches with odds and compute ML edges."""
+    from src.data.rugby_client import RugbyClient
+    from src.services.probability_calculator import calculate_rugby
+    from src.api.schemas import AIScanMatch
+
+    t0 = time.time()
+    client = RugbyClient()
+
+    rugby_ml_model, rugby_snapshot = _load_rugby_model()
+    if rugby_ml_model:
+        from src.features.rugby_features import RUGBY_FEATURE_COLUMNS, build_rugby_live_features as _rugby_feats
+        _rugby_medians = np.array(rugby_snapshot.get("col_medians", [np.nan] * len(RUGBY_FEATURE_COLUMNS)))
+        logger.info("Rugby ML model loaded (%d feature columns)", len(RUGBY_FEATURE_COLUMNS))
+    else:
+        logger.info("Rugby ML model not available — using rule-based only")
+
+    loop = asyncio.get_event_loop()
+    try:
+        raw_games = await loop.run_in_executor(None, lambda: client.get_matches(timeframe="48h"))
+    except Exception as exc:
+        logger.error("Rugby scan failed: %s", exc)
+        return
+
+    matches: list[AIScanMatch] = []
+    teams_data = rugby_snapshot.get("teams", {}) if rugby_snapshot else {}
+
+    for g in raw_games:
+        try:
+            home = g["home_team"]
+            away = g["away_team"]
+            odds_home = float(g.get("odds_home") or 0)
+            odds_draw = g.get("odds_draw")
+            odds_away = float(g.get("odds_away") or 0)
+            odds_over = g.get("odds_over")
+            odds_under = g.get("odds_under")
+            total_line = g.get("total_line")
+            league = g.get("league", "Rugby Union")
+
+            if odds_home <= 1.0 or odds_away <= 1.0:
+                continue
+
+            h_stats = teams_data.get(home, {})
+            a_stats = teams_data.get(away, {})
+
+            # Rule-based baseline (1X2 with draw)
+            calc = calculate_rugby(
+                odds_home=odds_home,
+                odds_draw=odds_draw,
+                odds_away=odds_away,
+                odds_over=odds_over,
+                odds_under=odds_under,
+                total_line=total_line,
+                home_win_rate=h_stats.get("win_rate_10"),
+                away_win_rate=a_stats.get("win_rate_10"),
+                home_pt_diff=h_stats.get("pt_diff_10"),
+                away_pt_diff=a_stats.get("pt_diff_10"),
+            )
+
+            _rugby_ml_used = False
+            if rugby_ml_model and rugby_snapshot:
+                try:
+                    feat_dict = _rugby_feats(
+                        home_team=home,
+                        away_team=away,
+                        odds_home=odds_home,
+                        odds_draw=float(odds_draw) if odds_draw else None,
+                        odds_away=odds_away,
+                        odds_over=odds_over,
+                        odds_under=odds_under,
+                        total_line=total_line,
+                        team_snapshot=rugby_snapshot,
+                    )
+                    feat_array = np.array([[feat_dict.get(col, np.nan) for col in RUGBY_FEATURE_COLUMNS]])
+                    for col_idx in range(feat_array.shape[1]):
+                        if np.isnan(feat_array[0, col_idx]):
+                            feat_array[0, col_idx] = _rugby_medians[col_idx] if not np.isnan(_rugby_medians[col_idx]) else 0.0
+                    ml_prob_home = float(rugby_ml_model.predict_proba(feat_array)[0])
+                    # Rugby has draws — redistribute non-home probability proportionally
+                    _draw_base = 0.06
+                    ml_prob_not_home = 1.0 - ml_prob_home
+                    ml_prob_draw = _draw_base * ml_prob_not_home
+                    ml_prob_away = ml_prob_not_home - ml_prob_draw
+                    # Blend 65% ML + 35% rule-based (less data than NBA → less ML weight)
+                    rule_h = calc.home_prob or 0.47
+                    rule_d = calc.draw_prob or _draw_base
+                    rule_a = calc.away_prob or 0.47
+                    blend_h = round(0.65 * ml_prob_home + 0.35 * rule_h, 4)
+                    blend_d = round(0.65 * ml_prob_draw + 0.35 * rule_d, 4)
+                    blend_a = round(1.0 - blend_h - blend_d, 4)
+                    blend_a = max(0.05, blend_a)
+                    edges_blended: dict = {}
+                    if odds_home > 1.0:
+                        edges_blended["H"] = round(blend_h - 1.0 / odds_home, 4)
+                    if odds_draw and float(odds_draw) > 1.0:
+                        edges_blended["D"] = round(blend_d - 1.0 / float(odds_draw), 4)
+                    if odds_away > 1.0:
+                        edges_blended["A"] = round(blend_a - 1.0 / odds_away, 4)
+                    # Keep only positive edges
+                    edges_blended = {k: v for k, v in edges_blended.items() if v > 0}
+                    from dataclasses import replace as _replace
+                    calc = _replace(calc, home_prob=blend_h, draw_prob=blend_d, away_prob=blend_a, edges=edges_blended)
+                    _rugby_ml_used = True
+                except Exception as ml_exc:
+                    logger.debug("Rugby ML prediction failed: %s", ml_exc)
+
+            odds = {
+                "1x2": {
+                    "H": odds_home,
+                    "A": odds_away,
+                },
+            }
+            if odds_draw and float(odds_draw) > 1.0:
+                odds["1x2"]["D"] = float(odds_draw)
+            if odds_over:
+                odds["over_under"] = {"Over": odds_over, "Under": odds_under}
+
+            matches.append(AIScanMatch(
+                sport="rugby",
+                home_team=home,
+                away_team=away,
+                player1=None,
+                player2=None,
+                league=league,
+                date=g.get("date", ""),
+                odds=odds,
+                model_prob_home=calc.home_prob,
+                model_prob_draw=calc.draw_prob,
+                model_prob_away=calc.away_prob,
+                edges=calc.edges,
+                data_quality=calc.data_quality,
+                data_score=calc.data_score,
+                rugby_ml_used=_rugby_ml_used,
+                home_win_rate_10=h_stats.get("win_rate_10"),
+                away_win_rate_10=a_stats.get("win_rate_10"),
+                home_pt_diff_10=h_stats.get("pt_diff_10"),
+                away_pt_diff_10=a_stats.get("pt_diff_10"),
+                home_pts_avg_10=h_stats.get("pts_avg_10"),
+                away_pts_avg_10=a_stats.get("pts_avg_10"),
+                home_pts_allowed_10=h_stats.get("pts_allowed_10"),
+                away_pts_allowed_10=a_stats.get("pts_allowed_10"),
+                home_tries_avg_10=h_stats.get("tries_avg_10"),
+                away_tries_avg_10=a_stats.get("tries_avg_10"),
+                home_penalties_avg_10=h_stats.get("penalties_avg_10"),
+                away_penalties_avg_10=a_stats.get("penalties_avg_10"),
+                home_streak=h_stats.get("streak"),
+                away_streak=a_stats.get("streak"),
+                odds_over=odds_over,
+                odds_under=odds_under,
+                total_line=total_line,
+            ))
+        except Exception:
+            continue
+
+    duration = time.time() - t0
+
+    # Persist odds snapshots (rugby has draws, use football-style H/D/A)
+    _save_odds_snapshots(matches, "rugby")
+
+    cache_payload = {
+        "_cached_at": time.time(),
+        "duration": duration,
+        "matches": [m.model_dump() for m in matches],
+    }
+    cache_set("scan:rugby:all", cache_payload, ttl=SCAN_CACHE_TTL + 300)
+    cache_set("scan:meta:last_rugby", time.time(), ttl=86400)
+    logger.info("Rugby scan completed: %d matches in %.1fs", len(matches), duration)
+
+
+# ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
 
@@ -954,6 +1149,8 @@ async def main():
     await run_tennis_scan()
     logger.info("Running initial NBA scan...")
     await run_nba_scan()
+    logger.info("Running initial rugby scan...")
+    await run_rugby_scan()
 
     # Schedule recurring scans
     async def _football_loop():
@@ -980,8 +1177,16 @@ async def main():
             except Exception as exc:
                 logger.error("NBA scan error: %s", exc)
 
-    logger.info("Worker running — football/tennis/nba every %ds", FOOTBALL_SCAN_INTERVAL)
-    await asyncio.gather(_football_loop(), _tennis_loop(), _nba_loop())
+    async def _rugby_loop():
+        while True:
+            await asyncio.sleep(RUGBY_SCAN_INTERVAL)
+            try:
+                await run_rugby_scan()
+            except Exception as exc:
+                logger.error("Rugby scan error: %s", exc)
+
+    logger.info("Worker running — football/tennis/nba/rugby every %ds", FOOTBALL_SCAN_INTERVAL)
+    await asyncio.gather(_football_loop(), _tennis_loop(), _nba_loop(), _rugby_loop())
 
 
 if __name__ == "__main__":

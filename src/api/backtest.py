@@ -32,6 +32,10 @@ def run_backtest(request: BacktestRequest):
 
     if sport == "tennis":
         result = _run_tennis_backtest(request)
+    elif sport == "nba":
+        result = _run_nba_backtest(request)
+    elif sport == "rugby":
+        result = _run_rugby_backtest(request)
     else:
         result = _run_football_backtest(request)
 
@@ -152,6 +156,112 @@ def _run_tennis_backtest(request: BacktestRequest) -> dict:
     } for r in rows])
 
     engine = TennisBacktestEngine(
+        staking_strategy=request.staking_strategy,
+        flat_stake_amount=request.flat_stake_amount,
+        pct_bankroll=request.pct_bankroll,
+        kelly_fraction=request.kelly_fraction,
+        max_stake_pct=request.max_stake_pct,
+        initial_bankroll=request.initial_bankroll,
+        min_edge=request.min_edge,
+        min_model_prob=request.min_model_prob,
+        max_odds=request.max_odds,
+        min_odds=request.min_odds,
+        stop_loss_daily_pct=request.stop_loss_daily_pct,
+        stop_loss_total_pct=request.stop_loss_total_pct,
+    )
+    return engine.run(df)
+
+
+def _run_nba_backtest(request: BacktestRequest) -> dict:
+    import pandas as pd
+    from src.database import SessionLocal
+    from src.models.nba_game import NBAGame
+    from src.backtest.nba_engine import NBABacktestEngine
+
+    db = SessionLocal()
+    rows = db.query(NBAGame).filter(NBAGame.home_score.isnot(None)).all()
+    db.close()
+
+    if not rows:
+        raise HTTPException(status_code=503, detail="Aucune donnee NBA. Lancez la collecte NBA d'abord.")
+
+    df = pd.DataFrame([{
+        "id": g.id,
+        "game_id": g.game_id,
+        "game_date": g.game_date,
+        "season": g.season,
+        "season_type": g.season_type,
+        "home_team": g.home_team,
+        "away_team": g.away_team,
+        "home_score": g.home_score,
+        "away_score": g.away_score,
+        "home_off_rating": g.home_off_rating,
+        "home_def_rating": g.home_def_rating,
+        "home_pace": g.home_pace,
+        "away_off_rating": g.away_off_rating,
+        "away_def_rating": g.away_def_rating,
+        "away_pace": g.away_pace,
+        "odds_home": g.odds_home,
+        "odds_away": g.odds_away,
+        "odds_over": g.odds_over,
+        "odds_under": g.odds_under,
+        "total_line": g.total_line,
+    } for g in rows])
+
+    engine = NBABacktestEngine(
+        staking_strategy=request.staking_strategy,
+        flat_stake_amount=request.flat_stake_amount,
+        pct_bankroll=request.pct_bankroll,
+        kelly_fraction=request.kelly_fraction,
+        max_stake_pct=request.max_stake_pct,
+        initial_bankroll=request.initial_bankroll,
+        min_edge=request.min_edge,
+        min_model_prob=request.min_model_prob,
+        max_odds=request.max_odds,
+        min_odds=request.min_odds,
+        stop_loss_daily_pct=request.stop_loss_daily_pct,
+        stop_loss_total_pct=request.stop_loss_total_pct,
+    )
+    return engine.run(df)
+
+
+def _run_rugby_backtest(request: BacktestRequest) -> dict:
+    import pandas as pd
+    from src.database import SessionLocal
+    from src.models.rugby_match import RugbyMatch
+    from src.backtest.rugby_engine import RugbyBacktestEngine
+
+    db = SessionLocal()
+    rows = db.query(RugbyMatch).filter(RugbyMatch.home_score.isnot(None)).all()
+    db.close()
+
+    if not rows:
+        raise HTTPException(status_code=503, detail="Aucune donnee rugby. Lancez la collecte rugby d'abord.")
+
+    df = pd.DataFrame([{
+        "id": r.id,
+        "match_date": r.match_date,
+        "season": r.season,
+        "league": r.league,
+        "home_team": r.home_team,
+        "away_team": r.away_team,
+        "home_score": r.home_score,
+        "away_score": r.away_score,
+        "home_tries": r.home_tries,
+        "away_tries": r.away_tries,
+        "home_conversions": r.home_conversions,
+        "away_conversions": r.away_conversions,
+        "home_penalties": r.home_penalties,
+        "away_penalties": r.away_penalties,
+        "home_drop_goals": r.home_drop_goals,
+        "away_drop_goals": r.away_drop_goals,
+        "odds_home": r.odds_home,
+        "odds_draw": r.odds_draw,
+        "odds_away": r.odds_away,
+        "total_line": r.total_line,
+    } for r in rows])
+
+    engine = RugbyBacktestEngine(
         staking_strategy=request.staking_strategy,
         flat_stake_amount=request.flat_stake_amount,
         pct_bankroll=request.pct_bankroll,

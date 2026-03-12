@@ -8,7 +8,7 @@ from rich.console import Console
 
 from src.config import settings
 from src.ml.combo_engine import ComboEngine, ComboLeg
-from src.ml.football_model import FootballModel, MODEL_FEATURES, LABEL_MAP
+from src.ml.football_model import FootballModel, MODEL_FEATURES, MODEL_FEATURES_NO_XG, LABEL_MAP
 
 console = Console()
 
@@ -116,6 +116,9 @@ class BacktestEngine:
         bets = []
         model = FootballModel()
 
+        # Detect active features based on xG availability in the dataset
+        active_features = FootballModel.select_features(features_df)
+
         for test_season in test_seasons:
             train_seasons = [s for s in all_seasons if s < test_season]
             if len(train_seasons) < 2:
@@ -125,14 +128,14 @@ class BacktestEngine:
             train_df = features_df[features_df["season"].isin(train_seasons)]
             test_df = features_df[features_df["season"] == test_season].sort_values("date")
 
-            X_train_full = train_df[MODEL_FEATURES].values
+            X_train_full = train_df[active_features].values
             y_train_full = train_df["ftr"].map(LABEL_MAP).values
 
             console.print(f"\n[bold]Backtest season: {test_season}[/bold]")
             console.print(f"  Train: {len(X_train_full)} -> Test: {len(test_df)}")
 
             model.train(X_train_full, y_train_full)
-            X_test = test_df[MODEL_FEATURES].values
+            X_test = test_df[active_features].values
             probas = model.predict_proba(X_test)
 
             if self.combo_mode:

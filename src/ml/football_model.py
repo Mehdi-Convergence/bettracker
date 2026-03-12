@@ -20,8 +20,16 @@ console = Console()
 LABEL_MAP = {"H": 0, "D": 1, "A": 2}
 REVERSE_MAP = {0: "H", 1: "D", 2: "A"}
 
-# Drop xG features (not available). Keep implied odds (carry injury/news info).
-MODEL_FEATURES = [f for f in FEATURE_COLUMNS if "xg" not in f]
+# xG features — included when real FBref data is available (after enrich_xg.py).
+# Falls back to excluding them if still NaN-only (pre-enrichment).
+# The model training pipeline detects availability at runtime.
+MODEL_FEATURES = list(FEATURE_COLUMNS)
+
+# xG features that require FBref enrichment
+XG_FEATURES = [f for f in FEATURE_COLUMNS if "xg" in f]
+
+# Legacy mode: features without xG (used when xG data unavailable)
+MODEL_FEATURES_NO_XG = [f for f in FEATURE_COLUMNS if "xg" not in f]
 
 # Ensemble weight: XGBoost vs LightGBM (sum must = 1.0)
 XGB_WEIGHT = 0.80
@@ -109,12 +117,41 @@ class FootballModel:
         """Return raw (uncalibrated) ensemble probabilities."""
         return self._ensemble_proba(X)
 
+    @staticmethod
+    def select_features(df: pd.DataFrame) -> list[str]:
+        """Select active feature set based on xG data availability.
+
+        Returns MODEL_FEATURES (with xG) if at least 10% of rows have real xG data,
+        otherwise returns MODEL_FEATURES_NO_XG (legacy, no xG).
+        This allows seamless transition before/after FBref enrichment.
+        """
+        # Check xG coverage in the dataset
+        xg_coverage = 0.0
+        if "home_xg_avg_5" in df.columns:
+            xg_coverage = df["home_xg_avg_5"].notna().mean()
+
+        if xg_coverage >= 0.10:
+            console.print(
+                f"[green]xG features active[/green] "
+                f"(coverage: {xg_coverage:.1%} of rows)"
+            )
+            return [f for f in MODEL_FEATURES if f in df.columns]
+        else:
+            console.print(
+                f"[yellow]xG features excluded[/yellow] "
+                f"(coverage: {xg_coverage:.1%} — run enrich_xg.py to enable)"
+            )
+            return [f for f in MODEL_FEATURES_NO_XG if f in df.columns]
+
     def walk_forward_train(self, df: pd.DataFrame) -> dict:
         """Full walk-forward training with per-fold metrics."""
         splitter = WalkForwardSplitter(min_train_seasons=2)
         fold_results = []
 
-        X = df[MODEL_FEATURES].values
+        active_features = self.select_features(df)
+        # Store on instance so save() can persist the feature list
+        self.active_features = active_features
+        X = df[active_features].values
         y = df["ftr"].map(LABEL_MAP).values
 
         for train_idx, test_idx, train_seasons, test_season in splitter.split(df):
@@ -179,19 +216,26 @@ class FootballModel:
         return avg
 
     def save(self, path: Path, metadata: dict):
-        """Save model and metadata."""
+        """Save model, feature list and metadata.
+
+        The active_features list is stored in model.joblib so the inference
+        pipeline always uses the exact feature set the model was trained on.
+        """
         path.mkdir(parents=True, exist_ok=True)
         joblib.dump({
             "base_model": self.base_model,
             "lgb_model": self.lgb_model,
             "calibrators": self.calibrators,
+            "active_features": getattr(self, "active_features", MODEL_FEATURES_NO_XG),
         }, path / "model.joblib")
         with open(path / "metadata.json", "w") as f:
             json.dump(metadata, f, indent=2, default=str)
 
     def load(self, path: Path):
-        """Load saved model."""
+        """Load saved model and feature list."""
         data = joblib.load(path / "model.joblib")
         self.base_model = data["base_model"]
         self.lgb_model = data.get("lgb_model", self.lgb_model)
         self.calibrators = data["calibrators"]
+        # Restore active features (falls back to no-xG list for old models)
+        self.active_features = data.get("active_features", MODEL_FEATURES_NO_XG)

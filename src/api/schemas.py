@@ -621,6 +621,12 @@ class AIScanMatch(BaseModel):
     total_line: float | None = None
     h2h_surface: str | None = None
     h2h_last3: list[str] = []
+    # Rugby fields
+    rugby_ml_used: bool = False
+    home_tries_avg_10: float | None = None
+    away_tries_avg_10: float | None = None
+    home_penalties_avg_10: float | None = None
+    away_penalties_avg_10: float | None = None
     # Lineup
     fixture_id: int | None = None
     lineup_status: str = "unavailable"     # "presumed" | "confirmed" | "unavailable"

@@ -91,6 +91,26 @@ async def ai_scan(
                 logger.error("Inline tennis scan failed: %s", exc)
         return _read_tennis_scan()
 
+    if sport == "nba":
+        cached_nba = cache_get("scan:nba:all")
+        if cached_nba is None and force:
+            try:
+                from src.workers.scan_worker import run_nba_scan
+                await run_nba_scan()
+            except Exception as exc:
+                logger.error("Inline NBA scan failed: %s", exc)
+        return _read_nba_scan()
+
+    if sport == "rugby":
+        cached_rugby = cache_get("scan:rugby:all")
+        if cached_rugby is None and force:
+            try:
+                from src.workers.scan_worker import run_rugby_scan
+                await run_rugby_scan()
+            except Exception as exc:
+                logger.error("Inline rugby scan failed: %s", exc)
+        return _read_rugby_scan()
+
     # --- Football: read from cache ---
     # Build the same cache key the worker uses (no league filter = "all" key)
     scan_key = hashlib.md5(f"football__{timeframe}".encode()).hexdigest()[:12]
@@ -141,6 +161,44 @@ def _read_tennis_scan() -> AIScanResponse:
     return AIScanResponse(
         matches=[AIScanMatch(**m) for m in raw],
         sport="tennis",
+        source="odds_api",
+        cached=True,
+        cached_at=datetime.fromtimestamp(cached["_cached_at"]).isoformat(),
+        research_duration_seconds=cached.get("duration", 0.0),
+    )
+
+
+def _read_nba_scan() -> AIScanResponse:
+    """Read pre-computed NBA scan from cache."""
+    cached = cache_get("scan:nba:all")
+    if cached is None:
+        return AIScanResponse(
+            matches=[], sport="nba", source="odds_api",
+            cached=False, cached_at=None, research_duration_seconds=0.0,
+        )
+    raw = cached.get("matches", [])
+    return AIScanResponse(
+        matches=[AIScanMatch(**m) for m in raw],
+        sport="nba",
+        source="odds_api",
+        cached=True,
+        cached_at=datetime.fromtimestamp(cached["_cached_at"]).isoformat(),
+        research_duration_seconds=cached.get("duration", 0.0),
+    )
+
+
+def _read_rugby_scan() -> AIScanResponse:
+    """Read pre-computed rugby scan from cache."""
+    cached = cache_get("scan:rugby:all")
+    if cached is None:
+        return AIScanResponse(
+            matches=[], sport="rugby", source="odds_api",
+            cached=False, cached_at=None, research_duration_seconds=0.0,
+        )
+    raw = cached.get("matches", [])
+    return AIScanResponse(
+        matches=[AIScanMatch(**m) for m in raw],
+        sport="rugby",
         source="odds_api",
         cached=True,
         cached_at=datetime.fromtimestamp(cached["_cached_at"]).isoformat(),

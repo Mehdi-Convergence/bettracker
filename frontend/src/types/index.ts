@@ -490,6 +490,12 @@ export interface AIScanMatch {
   total_line: number | null;
   h2h_surface: string | null;
   h2h_last3: string[];
+  // Rugby fields
+  rugby_ml_used: boolean;
+  home_tries_avg_10: number | null;
+  away_tries_avg_10: number | null;
+  home_penalties_avg_10: number | null;
+  away_penalties_avg_10: number | null;
   // Lineup
   fixture_id: number | null;
   lineup_status: "presumed" | "confirmed" | "unavailable";
