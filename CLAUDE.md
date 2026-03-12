@@ -69,3 +69,39 @@ Sports betting value bet detection platform. Full-stack: Python 3.12 + FastAPI b
 - **Pinnacle odds** are the reference (sharpest market)
 - **Communicate in French** with the user
 - **Never code without asking** — confirm approach before implementing
+
+## Agents
+
+Multi-agent system in `.claude/agents/`. Use `@orchestrateur` as the main entry point.
+
+### Available agents
+| Agent | Role | Model |
+|-------|------|-------|
+| `@orchestrateur` | CTO virtuel — planifie, delegue, rapporte | opus |
+| `@codeur` | Ecrit le code backend + frontend | sonnet |
+| `@testeur` | Genere et execute les tests | sonnet |
+| `@gardien` | Review qualite, securite, conformite (lecture seule) | opus |
+| `@migrateur` | Migrations Alembic, coherence ORM/DB | sonnet |
+| `@deployeur` | Deploy VPS + verification post-deploy (lecture seule) | sonnet |
+| `@moniteur` | Sante production (lecture seule) | haiku |
+| `@ameliorateur` | Propose ameliorations, detecte dette technique (lecture seule) | opus |
+| `@documenteur` | Maintient CLAUDE.md, MEMORY.md, doc projet a jour | sonnet |
+| `@evolueur` | Ameliore les prompts des agents apres chaque workflow | opus |
+
+### Workflow
+```
+User → @orchestrateur → plan → validation → @codeur → @testeur → @gardien
+→ "ok commit" → commit → "ok push" → push → @deployeur → @moniteur
+→ @documenteur (met a jour la doc) → @evolueur (ameliore les agents)
+```
+
+### Agent rules
+- `@codeur` : ne commit jamais, ne push jamais
+- `@gardien` : lecture seule, ne modifie jamais de fichiers
+- `@testeur` : n'ecrit que dans `tests/` et `frontend/src/__tests__/`
+- `@deployeur` : commandes deploy uniquement, ne modifie pas le code
+- `@moniteur` : lecture seule, commandes SSH de diagnostic
+- `@ameliorateur` : lecture seule, produit des rapports uniquement
+- `@migrateur` : n'ecrit que dans `alembic/versions/` et `src/models/`
+- `@documenteur` : n'ecrit que dans `CLAUDE.md`, `memory/`, `docs/`
+- `@evolueur` : n'ecrit que dans `.claude/agents/` et `memory/`
