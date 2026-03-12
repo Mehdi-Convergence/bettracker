@@ -27,6 +27,7 @@ import { GREEN, RED, AMBER, STATUS_CFG, outcomeLabel, outcomeBadgeVariant } from
 import { useTour } from "@/hooks/useTour";
 import SpotlightTour from "@/components/SpotlightTour";
 import { campaignDetailTour } from "@/tours/index";
+import CampaignClosureModal from "@/components/CampaignClosureModal";
 
 // ── Design tokens ──
 const ACCENT = "#3b5bdb";
@@ -61,6 +62,8 @@ export default function CampaignDetail() {
   const [ticketSourceFilter, setTicketSourceFilter] = useState<string>("all");
   const [showParams, setShowParams] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showClosureModal, setShowClosureModal] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
 
   const campaign = detail?.campaign;
   const stats = detail?.stats;
@@ -149,6 +152,24 @@ export default function CampaignDetail() {
       setDetail(d);
     } catch { setError("Impossible de modifier le statut."); }
     setShowMenu(false);
+  }
+
+  function handleArchive() {
+    setShowMenu(false);
+    setShowClosureModal(true);
+  }
+
+  async function confirmArchive() {
+    setIsClosing(true);
+    try {
+      await updateCampaign(Number(campaignId), { status: "archived" });
+      navigate("/campaign");
+    } catch {
+      setError("Impossible de clôturer la campagne.");
+    } finally {
+      setIsClosing(false);
+      setShowClosureModal(false);
+    }
   }
 
   // ── Computed ──
@@ -305,7 +326,7 @@ export default function CampaignDetail() {
                 <div className="absolute right-0 top-10 w-44 bg-white rounded-lg border border-[#e3e6eb] py-1 z-50"
                   style={{ boxShadow: "0 4px 16px rgba(16,24,40,.1)" }}>
                   <MenuBtn icon={<Copy size={14} />} label="Dupliquer" onClick={() => setShowMenu(false)} />
-                  <MenuBtn icon={<Archive size={14} />} label="Archiver" onClick={() => setShowMenu(false)} />
+                  <MenuBtn icon={<Archive size={14} />} label="Archiver" onClick={handleArchive} />
                   <div className="border-t border-[#e3e6eb] my-1" />
                   <MenuBtn icon={<Trash2 size={14} />} label="Supprimer" onClick={() => setShowMenu(false)} danger />
                 </div>
@@ -588,6 +609,17 @@ export default function CampaignDetail() {
       )}
 
       {showTour && <SpotlightTour steps={campaignDetailTour} onComplete={completeTour} />}
+
+      {showClosureModal && detail && (
+        <CampaignClosureModal
+          open={showClosureModal}
+          onClose={() => setShowClosureModal(false)}
+          onConfirm={confirmArchive}
+          isClosing={isClosing}
+          campaignName={detail.campaign.name}
+          stats={detail.stats}
+        />
+      )}
     </div>
   );
 }
