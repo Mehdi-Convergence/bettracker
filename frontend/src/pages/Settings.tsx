@@ -16,7 +16,13 @@ import {
   CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { changePassword, getUserStats, deleteAccount as apiDeleteAccount } from "@/services/api";
+import {
+  changePassword,
+  getUserStats,
+  deleteAccount as apiDeleteAccount,
+  createCheckoutSession,
+  createBillingPortalSession,
+} from "@/services/api";
 import { Toggle } from "@/components/ui";
 import type { UserStats } from "@/types";
 import { useTour } from "@/hooks/useTour";
@@ -143,6 +149,10 @@ export default function Settings() {
   // Save feedback
   const [saved, setSaved] = useState(false);
 
+  // Billing
+  const [billingLoading, setBillingLoading] = useState<string | null>(null);
+  const [billingError, setBillingError] = useState("");
+
   useEffect(() => {
     getUserStats().then(setStats).catch(() => {});
   }, []);
@@ -199,6 +209,30 @@ export default function Settings() {
       navigate("/login");
     } catch {
       setDeleteLoading(false);
+    }
+  };
+
+  const handleUpgrade = async (tier: "pro" | "premium") => {
+    setBillingError("");
+    setBillingLoading(tier);
+    try {
+      const { url } = await createCheckoutSession(tier);
+      window.location.href = url;
+    } catch (err: unknown) {
+      setBillingError(err instanceof Error ? err.message : "Erreur Stripe");
+      setBillingLoading(null);
+    }
+  };
+
+  const handleManageBilling = async () => {
+    setBillingError("");
+    setBillingLoading("portal");
+    try {
+      const { url } = await createBillingPortalSession();
+      window.location.href = url;
+    } catch (err: unknown) {
+      setBillingError(err instanceof Error ? err.message : "Erreur Stripe");
+      setBillingLoading(null);
     }
   };
 
@@ -605,25 +639,61 @@ export default function Settings() {
                         ))}
                       </ul>
                       <button
-                        className="w-full mt-3.5 py-2.5 rounded-[7px] text-[12px] font-semibold cursor-pointer transition-all"
+                        disabled={isCurrent || billingLoading !== null}
+                        onClick={() => {
+                          if (!isCurrent && (plan.id === "pro" || plan.id === "premium")) {
+                            handleUpgrade(plan.id as "pro" | "premium");
+                          }
+                        }}
+                        className="w-full mt-3.5 py-2.5 rounded-[7px] text-[12px] font-semibold transition-all"
                         style={{
+                          cursor: isCurrent || billingLoading !== null ? "default" : "pointer",
+                          opacity: billingLoading === plan.id ? 0.7 : 1,
                           border: isCurrent ? "none" : isElite ? "none" : `1.5px solid ${C.border}`,
                           background: isCurrent ? C.accent : isElite ? "#7c3aed" : C.white,
                           color: isCurrent || isElite ? "#fff" : C.muted,
                         }}
                       >
-                        {isCurrent ? "Plan actuel" : isElite ? "Passer à Elite →" : "Rétrograder"}
+                        {billingLoading === plan.id
+                          ? "Redirection..."
+                          : isCurrent
+                            ? "Plan actuel"
+                            : isElite
+                              ? "Passer à Elite →"
+                              : plan.id === "pro"
+                                ? "Passer à Pro →"
+                                : "Rétrograder"}
                       </button>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Stripe note */}
+              {/* Erreur billing */}
+              {billingError && (
+                <div className="mt-3 px-3.5 py-2.5 rounded-lg bg-[rgba(240,68,56,0.07)] border border-[rgba(240,68,56,0.15)] text-[12px] text-[#f04438]">
+                  {billingError}
+                </div>
+              )}
+
+              {/* Gestion abonnement Stripe */}
               <div className="flex items-center gap-2.5 px-3.5 py-3 mt-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg text-[12px] text-[#8a919e]">
                 <CreditCard size={14} className="text-[#8a919e] shrink-0" />
-                Renouvellement le <strong className="text-[#111318] mx-1">1 avril 2026</strong> · CB ••••4242 ·
-                <button className="bg-transparent border-none cursor-pointer text-[#3b5bdb] font-medium p-0 text-[12px]">Gérer via Stripe →</button>
+                {user?.tier !== "free" ? (
+                  <>
+                    Abonnement actif ·
+                    <button
+                      onClick={handleManageBilling}
+                      disabled={billingLoading !== null}
+                      className="bg-transparent border-none cursor-pointer text-[#3b5bdb] font-medium p-0 text-[12px] ml-1"
+                      style={{ opacity: billingLoading === "portal" ? 0.7 : 1 }}
+                    >
+                      {billingLoading === "portal" ? "Redirection..." : "Gérer via Stripe →"}
+                    </button>
+                  </>
+                ) : (
+                  <span>Paiement sécurisé via Stripe</span>
+                )}
               </div>
             </div>
           )}

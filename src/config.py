@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = "contact@bettracker.fr"
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # Stripe
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_PUBLISHABLE_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRO_PRICE_ID: str = ""
+    STRIPE_PREMIUM_PRICE_ID: str = ""
+
     # Auth / JWT (no default — MUST be set via env or .env)
     JWT_SECRET_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"

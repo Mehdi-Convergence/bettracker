@@ -333,3 +333,17 @@ export function sendFeedback(message: string) {
     body: JSON.stringify({ message }),
   });
 }
+
+// Stripe
+export function createCheckoutSession(tier: "pro" | "premium") {
+  return request<{ url: string }>("/stripe/checkout", {
+    method: "POST",
+    body: JSON.stringify({ tier }),
+  });
+}
+
+export function createBillingPortalSession() {
+  return request<{ url: string }>("/stripe/portal", {
+    method: "POST",
+  });
+}
