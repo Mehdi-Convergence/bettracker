@@ -5,7 +5,6 @@ Markets: h2h (moneyline), totals (over/under)
 """
 
 import logging
-import time
 from datetime import datetime, timezone
 
 import httpx

@@ -694,50 +694,6 @@ function IADataTab({ am, home, away }: { am: AIScanMatch; home: string; away: st
   );
 }
 
-// ─── Joueurs Tab ──────────────────────────────────────────────────────────────
-
-function JoueursTab({ am, home, away }: { am: AIScanMatch; home: string; away: string }) {
-  const homePlayers = am.key_players_home ?? [];
-  const awayPlayers = am.key_players_away ?? [];
-
-  if (homePlayers.length === 0 && awayPlayers.length === 0) {
-    return <p className="text-sm text-slate-400">Aucune donnee joueur disponible.</p>;
-  }
-
-  return (
-    <div className="grid grid-cols-2 gap-4">
-      {[{ label: home, players: homePlayers, color: "text-blue-600" }, { label: away, players: awayPlayers, color: "text-red-600" }].map(({ label, players, color }) => (
-        <div key={label}>
-          <div className={`text-xs font-semibold mb-2 truncate ${color}`}>{label}</div>
-          {players.length === 0 ? (
-            <p className="text-xs text-slate-300">Aucune donnee</p>
-          ) : (
-            <div className="space-y-1.5">
-              {players.map((p, i) => (
-                <div key={i} className={`px-2 py-1.5 rounded-lg border text-[11px] ${p.is_absent ? "bg-red-50 border-red-100" : "bg-white border-slate-100"}`}>
-                  <div className="flex items-center justify-between gap-1">
-                    <span className={`font-medium truncate ${p.is_absent ? "text-red-700 line-through" : "text-slate-800"}`}>{p.name}</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {p.position && <span className="text-[9px] text-slate-400 uppercase">{p.position.slice(0, 3)}</span>}
-                      {p.is_absent && <span className="text-[9px] bg-red-500 text-white px-1 py-0.5 rounded font-bold">ABSENT</span>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
-                    {p.goals > 0 && <span className="text-emerald-600 font-medium">{p.goals} buts</span>}
-                    {p.assists > 0 && <span className="text-blue-500">{p.assists} PD</span>}
-                    {p.rating > 0 && <span className="text-amber-500">★ {p.rating.toFixed(1)}</span>}
-                    {p.goals_per_match > 0 && <span className="text-slate-400">{p.goals_per_match.toFixed(2)}/m</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ─── Tennis Analyse Tab ──────────────────────────────────────────────────────
 
 function TennisAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away: string }) {

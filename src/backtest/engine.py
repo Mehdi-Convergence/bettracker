@@ -8,7 +8,7 @@ from rich.console import Console
 
 from src.config import settings
 from src.ml.combo_engine import ComboEngine, ComboLeg
-from src.ml.football_model import FootballModel, MODEL_FEATURES, MODEL_FEATURES_NO_XG, LABEL_MAP
+from src.ml.football_model import FootballModel, LABEL_MAP
 
 console = Console()
 

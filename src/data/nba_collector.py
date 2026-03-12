@@ -11,7 +11,7 @@ import logging
 import time
 from datetime import date
 
-from nba_api.stats.endpoints import leaguegamefinder, boxscoresummaryv2
+from nba_api.stats.endpoints import leaguegamefinder
 from nba_api.stats.static import teams as nba_teams_static
 
 from src.database import SessionLocal

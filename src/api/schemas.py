@@ -554,10 +554,10 @@ class AIScanMatch(BaseModel):
     away_xg_avg: float | None = None
     home_clean_sheets: int | None = None
     away_clean_sheets: int | None = None
-    home_btts_pct: int | None = None
-    away_btts_pct: int | None = None
-    home_over25_pct: int | None = None
-    away_over25_pct: int | None = None
+    home_btts_pct: float | None = None
+    away_btts_pct: float | None = None
+    home_over25_pct: float | None = None
+    away_over25_pct: float | None = None
     home_corners_avg: float | None = None
     away_corners_avg: float | None = None
     home_cards_avg: float | None = None
