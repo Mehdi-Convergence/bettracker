@@ -1,24 +1,29 @@
-{$DOMAIN} {
+betracker.fr {
     # Backend API
     handle /api/* {
-        reverse_proxy backend:8000
+        reverse_proxy localhost:8000
     }
 
     handle /health* {
-        reverse_proxy backend:8000
+        reverse_proxy localhost:8000
     }
 
     handle /docs* {
-        reverse_proxy backend:8000
+        reverse_proxy localhost:8000
     }
 
     handle /openapi.json {
-        reverse_proxy backend:8000
+        reverse_proxy localhost:8000
     }
 
-    # Frontend (SPA)
+    # Frontend SPA — fichiers statiques servis directement
     handle {
-        reverse_proxy frontend:80
+        root * /opt/bettracker/frontend/dist
+        try_files {path} /index.html
+        file_server
+
+        @assets path /assets/*
+        header @assets Cache-Control "public, max-age=31536000, immutable"
     }
 
     # Compression
@@ -35,7 +40,7 @@
 
     # Logs
     log {
-        output file /data/access.log {
+        output file /var/log/caddy/access.log {
             roll_size 10mb
             roll_keep 5
         }

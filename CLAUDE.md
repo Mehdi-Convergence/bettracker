@@ -18,8 +18,11 @@ Sports betting value bet detection platform. Full-stack: Python 3.12 + FastAPI b
 - Type check: `cd frontend && npx tsc --noEmit`
 - Lint: `cd frontend && npm run lint`
 
-### Docker
-- Full stack: `docker-compose up --build`
+### Production (VPS OVH)
+- Services systemd: `bettracker-api`, `bettracker-worker`
+- Reverse proxy: Caddy 2 (natif, SSL auto Let's Encrypt)
+- DB: PostgreSQL 16 (natif), Cache: Redis 7 (natif)
+- Deploy: `git push origin main` (GitHub Actions: rsync + uv sync + npm build + systemctl restart)
 
 ## Architecture
 

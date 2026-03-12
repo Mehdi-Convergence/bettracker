@@ -26,7 +26,17 @@ Tu es le DEPLOYEUR du projet BetTracker. Tu geres le deploiement et verifies que
 | OS | Ubuntu 24.04 LTS |
 | SSH key | ~/.ssh/bettracker_vps |
 | App path | /opt/bettracker |
-| Domaine | betracker.fr (SSL auto via Caddy) |
+| Domaine | betracker.fr (SSL auto via Caddy natif) |
+
+# Stack production (sans Docker)
+
+| Service | Gestion | Commande status |
+|---------|---------|-----------------|
+| API (FastAPI) | systemd | `systemctl status bettracker-api` |
+| Worker (scan) | systemd | `systemctl status bettracker-worker` |
+| Caddy (reverse proxy + SSL) | systemd | `systemctl status caddy` |
+| PostgreSQL 16 | systemd | `systemctl status postgresql` |
+| Redis 7 | systemd | `systemctl status redis-server` |
 
 # Connexion SSH
 
@@ -63,13 +73,17 @@ rsync -avz --delete \
   -e "ssh -i ~/.ssh/bettracker_vps" \
   . ubuntu@54.37.231.149:/opt/bettracker/
 
-# Rebuild et restart
+# Installer les deps + build frontend
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
-  "cd /opt/bettracker && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build"
+  "cd /opt/bettracker && uv sync --frozen --no-dev && cd frontend && npm ci && npm run build"
 
 # Migrations
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
-  "cd /opt/bettracker && docker compose exec -T backend uv run alembic upgrade head"
+  "cd /opt/bettracker && uv run alembic upgrade head"
+
+# Restart des services
+ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
+  "sudo systemctl restart bettracker-api && sudo systemctl restart bettracker-worker"
 ```
 
 # Checklist post-deploy
@@ -84,16 +98,16 @@ ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
 
 # 2. Tous les services UP
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
-  "cd /opt/bettracker && docker compose ps"
-# Attendu : backend, worker, frontend, postgres, redis, caddy tous "Up"
+  "systemctl is-active bettracker-api bettracker-worker caddy postgresql redis-server"
+# Attendu : tous "active"
 
 # 3. Pas d'erreurs dans les logs backend
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
-  "cd /opt/bettracker && docker compose logs --tail=30 backend"
+  "journalctl -u bettracker-api --since '5 min ago' --no-pager"
 
 # 4. Worker tourne et scan OK
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
-  "cd /opt/bettracker && docker compose logs --tail=30 worker"
+  "journalctl -u bettracker-worker --since '5 min ago' --no-pager"
 
 # 5. Frontend accessible
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
@@ -102,7 +116,7 @@ ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
 
 # 6. Migrations appliquees
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
-  "cd /opt/bettracker && docker compose exec -T backend uv run alembic current"
+  "cd /opt/bettracker && uv run alembic current"
 ```
 
 # Rollback (en cas de probleme)
@@ -112,13 +126,30 @@ ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
 
 # Option 1 : Rollback migration
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
-  "cd /opt/bettracker && docker compose exec -T backend uv run alembic downgrade -1"
+  "cd /opt/bettracker && uv run alembic downgrade -1"
 
 # Option 2 : Redeploy version precedente
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
   "cd /opt/bettracker && git log --oneline -5"
 # Identifier le commit safe, puis :
-# git checkout {commit} && docker compose up -d --build
+# git checkout {commit} && sudo systemctl restart bettracker-api bettracker-worker
+```
+
+# Logs
+
+```bash
+# Logs API en temps reel
+ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
+  "journalctl -u bettracker-api -f"
+
+# Logs worker en temps reel
+ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
+  "journalctl -u bettracker-worker -f"
+
+# Logs Caddy
+ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
+  "journalctl -u caddy -f"
+# Ou : /var/log/caddy/access.log
 ```
 
 # Format de rapport
@@ -139,7 +170,7 @@ ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
 | Check | Status |
 |-------|--------|
 | Health API | OK/KO |
-| Services Docker | OK/KO |
+| Services systemd | OK/KO |
 | Logs backend | OK/KO |
 | Worker scan | OK/KO |
 | Frontend HTTPS | OK/KO |

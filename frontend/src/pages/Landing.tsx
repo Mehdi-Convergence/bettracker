@@ -410,7 +410,7 @@ export default function Landing() {
               <div className="lp-testimonial-avatar" style={{ background: "linear-gradient(135deg, #3b5bdb, #7eb8ff)" }} aria-hidden="true">T</div>
               <div>
                 <div className="lp-testimonial-name">Thomas L.</div>
-                <div className="lp-testimonial-roi">ROI +6% sur 3 mois</div>
+                <div className="lp-testimonial-roi">B&ecirc;ta-testeur</div>
               </div>
             </div>
           </div>
@@ -425,7 +425,7 @@ export default function Landing() {
               <div className="lp-testimonial-avatar" style={{ background: "linear-gradient(135deg, #12b76a, #3ee09c)" }} aria-hidden="true">A</div>
               <div>
                 <div className="lp-testimonial-name">Alexis M.</div>
-                <div className="lp-testimonial-roi">ROI +5% sur 6 mois</div>
+                <div className="lp-testimonial-roi">B&ecirc;ta-testeur</div>
               </div>
             </div>
           </div>
@@ -440,7 +440,7 @@ export default function Landing() {
               <div className="lp-testimonial-avatar" style={{ background: "linear-gradient(135deg, #f59e0b, #fde68a)" }} aria-hidden="true">J</div>
               <div>
                 <div className="lp-testimonial-name">Julie B.</div>
-                <div className="lp-testimonial-roi">ROI +4% sur 2 mois</div>
+                <div className="lp-testimonial-roi">B&ecirc;ta-testeuse</div>
               </div>
             </div>
           </div>

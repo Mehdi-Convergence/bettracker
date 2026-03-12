@@ -23,12 +23,12 @@ Tu es le MONITEUR du projet BetTracker. Tu surveilles la production et rapportes
 
 # Checks a effectuer
 
-## 1. Services Docker
+## 1. Services systemd
 ```bash
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
-  "cd /opt/bettracker && docker compose ps --format 'table {{.Name}}\t{{.Status}}'"
+  "systemctl is-active bettracker-api bettracker-worker caddy postgresql redis-server"
 ```
-Attendu : backend, worker, frontend, postgres, redis, caddy tous "Up"
+Attendu : tous "active"
 
 ## 2. Health API
 ```bash
@@ -47,20 +47,20 @@ Attendu : 200
 ## 4. Erreurs recentes (backend)
 ```bash
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
-  "cd /opt/bettracker && docker compose logs --tail=100 backend 2>&1 | grep -ci 'error\|exception\|traceback'"
+  "journalctl -u bettracker-api --since '1 hour ago' --no-pager 2>&1 | grep -ci 'error\|exception\|traceback'"
 ```
 Attendu : 0 ou tres peu
 
 ## 5. Erreurs recentes (worker)
 ```bash
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
-  "cd /opt/bettracker && docker compose logs --tail=100 worker 2>&1 | grep -ci 'error\|exception\|traceback'"
+  "journalctl -u bettracker-worker --since '1 hour ago' --no-pager 2>&1 | grep -ci 'error\|exception\|traceback'"
 ```
 
 ## 6. Dernier scan reussi
 ```bash
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
-  "cd /opt/bettracker && docker compose logs --tail=50 worker 2>&1 | grep -i 'scan complete\|scan done\|fixtures found'"
+  "journalctl -u bettracker-worker --since '1 hour ago' --no-pager 2>&1 | grep -i 'scan complete\|scan done\|fixtures found'"
 ```
 
 ## 7. Espace disque
@@ -78,14 +78,14 @@ Seuil : alerte si < 200MB disponible
 ## 9. PostgreSQL
 ```bash
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
-  "cd /opt/bettracker && docker compose exec -T postgres pg_isready -U bettracker"
+  "pg_isready -U bettracker"
 ```
 Attendu : "accepting connections"
 
 ## 10. Redis
 ```bash
 ssh -i ~/.ssh/bettracker_vps ubuntu@54.37.231.149 \
-  "cd /opt/bettracker && docker compose exec -T redis redis-cli ping"
+  "redis-cli ping"
 ```
 Attendu : "PONG"
 
@@ -110,8 +110,8 @@ Attendu : "PONG"
 | RAM libre| {X}MB  | > 200MB |
 
 ### Erreurs recentes
-- Backend : {N} erreurs dans les 100 derniers logs
-- Worker : {N} erreurs dans les 100 derniers logs
+- Backend : {N} erreurs dans la derniere heure
+- Worker : {N} erreurs dans la derniere heure
 
 ### Dernier scan
 - {type} : {timestamp}
