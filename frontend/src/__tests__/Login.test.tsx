@@ -75,7 +75,7 @@ describe('Login page — formulaire connexion', () => {
     fireEvent.click(screen.getByRole('button', { name: /Se connecter/ }))
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('test@test.com', 'password123')
-      expect(mockNavigate).toHaveBeenCalledWith('/')
+      expect(mockNavigate).toHaveBeenCalledWith('/dashboard')
     })
   })
 
@@ -120,7 +120,7 @@ describe('Login page — formulaire inscription', () => {
     fireEvent.click(screen.getByRole('button', { name: /Créer mon compte/ }))
     await waitFor(() => {
       expect(mockRegister).toHaveBeenCalledWith('new@test.com', 'password123', 'TestUser')
-      expect(mockNavigate).toHaveBeenCalledWith('/')
+      expect(mockNavigate).toHaveBeenCalledWith('/dashboard')
     })
   })
 })
