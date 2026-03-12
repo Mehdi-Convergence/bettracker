@@ -159,6 +159,9 @@ export interface PortfolioStats {
   prev_win_rate: number | null;
   prev_total_bets: number | null;
   sport_breakdown: SportBreakdown[] | null;
+  bookmaker_breakdown: { bookmaker: string; total_bets: number; won: number; lost: number; roi_pct: number; total_pnl: number }[];
+  league_breakdown: { league: string; total_bets: number; won: number; lost: number; roi_pct: number; total_pnl: number }[];
+  market_breakdown: { market: string; total_bets: number; won: number; lost: number; roi_pct: number }[];
 }
 
 export interface PortfolioHistoryPoint {
@@ -429,6 +432,8 @@ export interface AIScanMatch {
   away_corners_avg: number | null;
   home_cards_avg: number | null;
   away_cards_avg: number | null;
+  home_red_cards_pg: number | null;
+  away_red_cards_pg: number | null;
   home_possession_avg: number | null;
   away_possession_avg: number | null;
   home_shots_pg: number | null;
@@ -439,6 +444,10 @@ export interface AIScanMatch {
   away_current_streak: string | null;
   home_top_scorer: string | null;
   away_top_scorer: string | null;
+  btts_model_prob: number | null;
+  over25_model_prob: number | null;
+  btts_edge: number | null;
+  over25_edge: number | null;
   // Tennis specific
   surface: string | null;
   round: string | null;
@@ -458,18 +467,39 @@ export interface AIScanMatch {
   p2_aces_avg: number | null;
   p1_rest_days: number | null;
   p2_rest_days: number | null;
+  // Historical serve stats from Tennis Abstract (rolling avg 5 matches)
+  p1_serve_stats: Record<string, number> | null;
+  p2_serve_stats: Record<string, number> | null;
+  tennis_ml_used: boolean;
+  // NBA fields
+  nba_ml_used: boolean;
+  home_win_rate_10: number | null;
+  away_win_rate_10: number | null;
+  home_pt_diff_10: number | null;
+  away_pt_diff_10: number | null;
+  home_pts_avg_10: number | null;
+  away_pts_avg_10: number | null;
+  home_pts_allowed_10: number | null;
+  away_pts_allowed_10: number | null;
+  home_b2b: boolean;
+  away_b2b: boolean;
+  home_streak: number | null;
+  away_streak: number | null;
+  odds_over: number | null;
+  odds_under: number | null;
+  total_line: number | null;
   h2h_surface: string | null;
   h2h_last3: string[];
   // Lineup
   fixture_id: number | null;
   lineup_status: "presumed" | "confirmed" | "unavailable";
-  lineup_home: { name: string; pos: string; number: number | null }[];
-  lineup_away: { name: string; pos: string; number: number | null }[];
+  lineup_home: { name: string; pos: string; number: number | null; goals?: number; assists?: number; rating?: number; games?: number; is_absent?: boolean }[];
+  lineup_away: { name: string; pos: string; number: number | null; goals?: number; assists?: number; rating?: number; games?: number; is_absent?: boolean }[];
   // H2H structured
   h2h_details: { date: string; home_name: string; away_name: string; score_h: number | null; score_a: number | null; winner_id: number | null }[];
   // Key players
-  key_players_home: { name: string; goals: number; assists: number; goals_per_match: number; rating: number; is_absent: boolean }[];
-  key_players_away: { name: string; goals: number; assists: number; goals_per_match: number; rating: number; is_absent: boolean }[];
+  key_players_home: { name: string; goals: number; assists: number; goals_per_match: number; rating: number; is_absent: boolean; position?: string }[];
+  key_players_away: { name: string; goals: number; assists: number; goals_per_match: number; rating: number; is_absent: boolean; position?: string }[];
   // Computed by probability_calculator
   model_prob_home: number | null;
   model_prob_draw: number | null;

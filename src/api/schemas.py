@@ -354,6 +354,9 @@ class PortfolioStatsResponse(BaseModel):
     prev_win_rate: float | None = None
     prev_total_bets: int | None = None
     sport_breakdown: list[dict] | None = None  # [{sport, won, lost, pnl, staked, roi_pct}]
+    bookmaker_breakdown: list[dict] = []  # [{bookmaker, total_bets, won, lost, roi_pct, total_pnl}]
+    league_breakdown: list[dict] = []  # [{league, total_bets, won, lost, roi_pct, total_pnl}]
+    market_breakdown: list[dict] = []  # [{market, total_bets, won, lost, roi_pct}]
 
 
 class PortfolioHistoryPoint(BaseModel):
@@ -559,6 +562,8 @@ class AIScanMatch(BaseModel):
     away_corners_avg: float | None = None
     home_cards_avg: float | None = None
     away_cards_avg: float | None = None
+    home_red_cards_pg: float | None = None
+    away_red_cards_pg: float | None = None
     home_possession_avg: int | None = None
     away_possession_avg: int | None = None
     home_shots_pg: float | None = None
@@ -569,6 +574,11 @@ class AIScanMatch(BaseModel):
     away_current_streak: str | None = None
     home_top_scorer: str | None = None
     away_top_scorer: str | None = None
+    # BTTS and Over2.5 model probabilities + edges
+    btts_model_prob: float | None = None
+    over25_model_prob: float | None = None
+    btts_edge: float | None = None
+    over25_edge: float | None = None
     # Tennis specific
     surface: str | None = None
     round: str | None = None
@@ -588,12 +598,33 @@ class AIScanMatch(BaseModel):
     p2_aces_avg: float | None = None
     p1_rest_days: int | None = None
     p2_rest_days: int | None = None
+    # Historical service stats from Tennis Abstract (rolling avg 5 matches)
+    p1_serve_stats: dict | None = None  # {ace_rate, df_rate, 1st_serve_in, 1st_serve_won, 2nd_serve_won, bp_save}
+    p2_serve_stats: dict | None = None
+    tennis_ml_used: bool = False
+    # NBA fields
+    nba_ml_used: bool = False
+    home_win_rate_10: float | None = None
+    away_win_rate_10: float | None = None
+    home_pt_diff_10: float | None = None
+    away_pt_diff_10: float | None = None
+    home_pts_avg_10: float | None = None
+    away_pts_avg_10: float | None = None
+    home_pts_allowed_10: float | None = None
+    away_pts_allowed_10: float | None = None
+    home_b2b: bool = False
+    away_b2b: bool = False
+    home_streak: int | None = None
+    away_streak: int | None = None
+    odds_over: float | None = None
+    odds_under: float | None = None
+    total_line: float | None = None
     h2h_surface: str | None = None
     h2h_last3: list[str] = []
     # Lineup
     fixture_id: int | None = None
     lineup_status: str = "unavailable"     # "presumed" | "confirmed" | "unavailable"
-    lineup_home: list[dict] = []           # [{name, pos, number}]
+    lineup_home: list[dict] = []           # [{name, pos, number, goals, assists, rating, games, is_absent}]
     lineup_away: list[dict] = []
     # H2H structured
     h2h_details: list[dict] = []           # [{date, home_name, away_name, score_h, score_a, winner_id}]

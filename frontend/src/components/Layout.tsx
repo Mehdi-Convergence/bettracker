@@ -17,6 +17,7 @@ import {
   Send,
   X,
   Menu,
+  BarChart2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { BreadcrumbProvider, useBreadcrumb } from "@/contexts/BreadcrumbContext";
@@ -54,6 +55,7 @@ const NAV_SECTIONS = [
   {
     label: "Suivi",
     items: [
+      { to: "/analytics", label: "Analytique", icon: BarChart2 },
       { to: "/backtest", label: "Backtest", icon: FlaskConical },
     ],
   },
@@ -69,6 +71,7 @@ const TIER_CONFIG: Record<string, { label: string; color: string }> = {
 const PAGE_NAMES: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/scanner": "Scan matchs",
+  "/analytics": "Analytique",
   "/backtest": "Backtest",
   "/campaign": "Campagnes",
   "/portfolio": "Portfolio",

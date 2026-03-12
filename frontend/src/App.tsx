@@ -18,6 +18,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const Parametres = lazy(() => import("./pages/Parametres"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Analytics = lazy(() => import("./pages/Analytics"));
 const MentionsLegales = lazy(() => import("./pages/MentionsLegales"));
 const CGU = lazy(() => import("./pages/CGU"));
 const ConfidentialitePolicy = lazy(() => import("./pages/ConfidentialitePolicy"));
@@ -75,6 +76,7 @@ export default function App() {
               <Route path="ai-analyst" element={<AIAnalyste />} />
               <Route path="settings" element={<Settings />} />
               <Route path="parametres" element={<Parametres />} />
+              <Route path="analytics" element={<Analytics />} />
             </Route>
           </Routes>
         </Suspense>

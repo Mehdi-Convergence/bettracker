@@ -277,6 +277,86 @@ def get_portfolio_stats(
             "roi_pct": s_roi,
         })
 
+    # Bookmaker breakdown
+    bk_map: dict[str, dict] = defaultdict(lambda: {"won": 0, "lost": 0, "pnl": 0.0, "staked": 0.0})
+    for b in settled:
+        bk = b.bookmaker or "Inconnu"
+        bk_map[bk]["staked"] += b.stake
+        bk_map[bk]["pnl"] += b.profit_loss or 0
+        if b.result == "won":
+            bk_map[bk]["won"] += 1
+        else:
+            bk_map[bk]["lost"] += 1
+
+    bookmaker_breakdown = []
+    for bk_name, bk_data in bk_map.items():
+        total = bk_data["won"] + bk_data["lost"]
+        bk_roi = round((bk_data["pnl"] / bk_data["staked"] * 100), 2) if bk_data["staked"] > 0 else 0.0
+        bookmaker_breakdown.append({
+            "bookmaker": bk_name,
+            "total_bets": total,
+            "won": bk_data["won"],
+            "lost": bk_data["lost"],
+            "roi_pct": bk_roi,
+            "total_pnl": round(bk_data["pnl"], 2),
+        })
+    bookmaker_breakdown.sort(key=lambda x: x["total_bets"], reverse=True)
+
+    # League breakdown (top 10)
+    lg_map: dict[str, dict] = defaultdict(lambda: {"won": 0, "lost": 0, "pnl": 0.0, "staked": 0.0})
+    for b in settled:
+        lg = b.league or "Inconnue"
+        lg_map[lg]["staked"] += b.stake
+        lg_map[lg]["pnl"] += b.profit_loss or 0
+        if b.result == "won":
+            lg_map[lg]["won"] += 1
+        else:
+            lg_map[lg]["lost"] += 1
+
+    league_breakdown = []
+    for lg_name, lg_data in lg_map.items():
+        total = lg_data["won"] + lg_data["lost"]
+        lg_roi = round((lg_data["pnl"] / lg_data["staked"] * 100), 2) if lg_data["staked"] > 0 else 0.0
+        league_breakdown.append({
+            "league": lg_name,
+            "total_bets": total,
+            "won": lg_data["won"],
+            "lost": lg_data["lost"],
+            "roi_pct": lg_roi,
+            "total_pnl": round(lg_data["pnl"], 2),
+        })
+    league_breakdown.sort(key=lambda x: x["total_bets"], reverse=True)
+    league_breakdown = league_breakdown[:10]
+
+    # Market breakdown
+    def _normalize_market(outcome: str | None) -> str:
+        if outcome in ("H", "D", "A"):
+            return "1x2"
+        return outcome or "Inconnu"
+
+    mk_map: dict[str, dict] = defaultdict(lambda: {"won": 0, "lost": 0, "pnl": 0.0, "staked": 0.0})
+    for b in settled:
+        mk = _normalize_market(b.outcome_bet)
+        mk_map[mk]["staked"] += b.stake
+        mk_map[mk]["pnl"] += b.profit_loss or 0
+        if b.result == "won":
+            mk_map[mk]["won"] += 1
+        else:
+            mk_map[mk]["lost"] += 1
+
+    market_breakdown = []
+    for mk_name, mk_data in mk_map.items():
+        total = mk_data["won"] + mk_data["lost"]
+        mk_roi = round((mk_data["pnl"] / mk_data["staked"] * 100), 2) if mk_data["staked"] > 0 else 0.0
+        market_breakdown.append({
+            "market": mk_name,
+            "total_bets": total,
+            "won": mk_data["won"],
+            "lost": mk_data["lost"],
+            "roi_pct": mk_roi,
+        })
+    market_breakdown.sort(key=lambda x: x["total_bets"], reverse=True)
+
     return PortfolioStatsResponse(
         total_bets=len(bets),
         pending_bets=pending,
@@ -293,6 +373,9 @@ def get_portfolio_stats(
         prev_win_rate=prev_win_rate,
         prev_total_bets=prev_total_bets,
         sport_breakdown=sport_breakdown,
+        bookmaker_breakdown=bookmaker_breakdown,
+        league_breakdown=league_breakdown,
+        market_breakdown=market_breakdown,
     )
 
 
