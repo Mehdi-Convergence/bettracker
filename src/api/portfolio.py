@@ -426,6 +426,65 @@ def get_portfolio_history(
     return points
 
 
+@router.get("/portfolio/bets/{bet_id}/odds-history")
+def get_bet_odds_history(
+    bet_id: int,
+    user: User = Depends(require_tier("pro")),
+    db: Session = Depends(get_db),
+):
+    """Return odds evolution snapshots for the match linked to a bet."""
+    bet = db.query(Bet).filter(Bet.id == bet_id, Bet.user_id == user.id).first()
+    if not bet:
+        raise HTTPException(status_code=404, detail="Pari non trouve")
+
+    from src.models.odds_snapshot import OddsSnapshot
+
+    snaps = (
+        db.query(OddsSnapshot)
+        .filter(
+            OddsSnapshot.sport == bet.sport,
+            OddsSnapshot.home_team == bet.home_team,
+            OddsSnapshot.away_team == bet.away_team,
+            OddsSnapshot.match_date >= bet.match_date - timedelta(days=2),
+            OddsSnapshot.match_date <= bet.match_date + timedelta(days=2),
+        )
+        .order_by(OddsSnapshot.snapshot_time)
+        .all()
+    )
+
+    # Select the relevant odds column based on outcome_bet
+    result = []
+    for s in snaps:
+        if bet.outcome_bet == "H":
+            odds = s.odds_home
+        elif bet.outcome_bet == "A":
+            odds = s.odds_away
+        else:
+            odds = s.odds_draw
+        if odds and odds > 1.0:
+            result.append({
+                "time": s.snapshot_time.isoformat(),
+                "odds": round(odds, 3),
+            })
+
+    # Anchor point: bet placement
+    points: list[dict] = [{"time": bet.created_at.isoformat(), "odds": bet.odds_at_bet, "event": "bet"}]
+    points += result
+    # Closing odds if available
+    if bet.odds_at_close and bet.odds_at_close > 1.0:
+        points.append({"time": bet.match_date.isoformat(), "odds": bet.odds_at_close, "event": "close"})
+
+    # Deduplicate and sort chronologically
+    seen: set = set()
+    deduped = []
+    for p in sorted(points, key=lambda x: x["time"]):
+        if p["time"] not in seen:
+            seen.add(p["time"])
+            deduped.append(p)
+
+    return deduped
+
+
 @router.delete("/portfolio/bets/{bet_id}", status_code=204)
 def delete_bet(
     bet_id: int,

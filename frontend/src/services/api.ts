@@ -347,3 +347,10 @@ export function createBillingPortalSession() {
     method: "POST",
   });
 }
+
+// Odds history
+export function getBetOddsHistory(betId: number) {
+  return request<{ time: string; odds: number; event?: string }[]>(
+    `/portfolio/bets/${betId}/odds-history`
+  );
+}

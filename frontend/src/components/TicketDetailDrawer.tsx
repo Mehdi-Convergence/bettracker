@@ -1,9 +1,13 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   X, ChevronLeft, ChevronRight, CheckCircle2, Activity,
-  BarChart3, Flag, Share2,
+  BarChart3, Flag, Share2, TrendingUp,
 } from "lucide-react";
-import { updateBetNote } from "@/services/api";
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip as ReTooltip,
+  ResponsiveContainer, ReferenceDot,
+} from "recharts";
+import { updateBetNote, getBetOddsHistory } from "@/services/api";
 import { LEAGUE_INFO } from "@/types";
 import type { Bet } from "@/types";
 import { outcomeLabel } from "@/utils/campaign";
@@ -85,10 +89,20 @@ export default function TicketDetailDrawer({
   const [noteSaving, setNoteSaving] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [oddsHistory, setOddsHistory] = useState<{ time: string; odds: number; event?: string }[]>([]);
 
   // Sync note with bet
   useEffect(() => {
     if (bet) setNoteValue(bet.note || "");
+  }, [bet?.id]);
+
+  // Load odds history when bet changes
+  useEffect(() => {
+    if (!bet) return;
+    setOddsHistory([]);
+    getBetOddsHistory(bet.id)
+      .then((data) => setOddsHistory(data))
+      .catch(() => setOddsHistory([]));
   }, [bet?.id]);
 
   // Auto-save note (debounced 800ms)
@@ -297,7 +311,15 @@ export default function TicketDetailDrawer({
             </div>
           )}
 
-          {/* BLOC 4 — Origine & contexte */}
+          {/* BLOC 4 — Evolution de la cote (snapshots horaires) */}
+          {oddsHistory.length >= 2 && (
+            <div className="px-4 py-3.5 border-b border-[#e3e6eb]">
+              <BlocTitle icon={<TrendingUp size={12} />} label="Evolution de la cote" />
+              <OddsHistoryChart history={oddsHistory} />
+            </div>
+          )}
+
+          {/* BLOC 5 — Origine & contexte */}
           <div className="px-4 py-3.5">
             <BlocTitle icon={<Flag size={12} />} label="Origine & contexte" />
             <DataRow
@@ -413,6 +435,128 @@ function DataRow({ label, value, valueColor }: { label: string; value: string; v
     </div>
   );
 }
+
+// ══════════════════════════════════════════════
+// ODDS HISTORY CHART
+// ══════════════════════════════════════════════
+
+interface OddsPoint {
+  time: string;
+  odds: number;
+  event?: string;
+}
+
+function formatSnapshotTime(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+    return `${dd}/${mm} ${hh}:${min}`;
+  } catch {
+    return iso;
+  }
+}
+
+function OddsHistoryChart({ history }: { history: OddsPoint[] }) {
+  const data = history.map((p) => ({
+    label: formatSnapshotTime(p.time),
+    odds: p.odds,
+    event: p.event,
+  }));
+
+  const allOdds = data.map((d) => d.odds);
+  const minOdds = Math.min(...allOdds);
+  const maxOdds = Math.max(...allOdds);
+  const pad = Math.max((maxOdds - minOdds) * 0.15, 0.05);
+  const domain: [number, number] = [
+    Math.max(1.0, parseFloat((minOdds - pad).toFixed(2))),
+    parseFloat((maxOdds + pad).toFixed(2)),
+  ];
+
+  const betPoint = data.find((d) => d.event === "bet");
+  const closePoint = data.find((d) => d.event === "close");
+
+  return (
+    <div>
+      <ResponsiveContainer width="100%" height={120}>
+        <LineChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+          <XAxis
+            dataKey="label"
+            tick={{ fontSize: 9, fill: "#8a919e", fontFamily: "var(--font-mono)" }}
+            tickLine={false}
+            axisLine={false}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            domain={domain}
+            tick={{ fontSize: 9, fill: "#8a919e", fontFamily: "var(--font-mono)" }}
+            tickLine={false}
+            axisLine={false}
+            tickCount={4}
+            tickFormatter={(v: number) => v.toFixed(2)}
+          />
+          <ReTooltip
+            contentStyle={{
+              background: "#fff",
+              border: "1px solid #e3e6eb",
+              borderRadius: 6,
+              fontSize: 11,
+              fontFamily: "var(--font-mono)",
+              padding: "4px 8px",
+            }}
+            formatter={(value: number) => [value.toFixed(3), "Cote"]}
+            labelStyle={{ color: "#8a919e", fontSize: 10 }}
+          />
+          <Line
+            type="monotone"
+            dataKey="odds"
+            stroke="#3b5bdb"
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 3, fill: "#3b5bdb" }}
+          />
+          {betPoint && (
+            <ReferenceDot
+              x={betPoint.label}
+              y={betPoint.odds}
+              r={5}
+              fill="#12b76a"
+              stroke="white"
+              strokeWidth={2}
+            />
+          )}
+          {closePoint && (
+            <ReferenceDot
+              x={closePoint.label}
+              y={closePoint.odds}
+              r={5}
+              fill="#7c3aed"
+              stroke="white"
+              strokeWidth={2}
+            />
+          )}
+        </LineChart>
+      </ResponsiveContainer>
+      <div className="flex gap-3 mt-1">
+        {betPoint && (
+          <div className="flex items-center gap-[5px] text-[10px] text-[#8a919e]">
+            <span className="w-[7px] h-[7px] rounded-full bg-[#12b76a]" />
+            Placement · {betPoint.odds.toFixed(2)}
+          </div>
+        )}
+        {closePoint && (
+          <div className="flex items-center gap-[5px] text-[10px] text-[#8a919e]">
+            <span className="w-[7px] h-[7px] rounded-full bg-[#7c3aed]" />
+            Fermeture · {closePoint.odds.toFixed(2)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 function CoteChart({ generation, placement, closing, isResolved }: {
   generation: number | null;
