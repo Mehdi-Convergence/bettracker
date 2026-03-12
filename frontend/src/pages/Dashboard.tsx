@@ -21,8 +21,9 @@ import {
   getPortfolioHistory,
   getPortfolioBets,
   getDashboardSummary,
+  getPreferences,
 } from "@/services/api";
-import type { PortfolioStats, Bet, DashboardSummary, SportBreakdown } from "@/types";
+import type { PortfolioStats, Bet, DashboardSummary, SportBreakdown, UserPreferences } from "@/types";
 
 /* ── helpers ── */
 const PERIODS = [
@@ -102,6 +103,7 @@ export default function Dashboard() {
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [recentBets, setRecentBets] = useState<Bet[]>([]);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [prefs, setPrefs] = useState<UserPreferences | null>(null);
   const [loading, setLoading] = useState(true);
 
   const { fromDate, toDate } = useMemo(() => {
@@ -118,11 +120,13 @@ export default function Dashboard() {
       getPortfolioHistory(fromDate, toDate).catch(() => []),
       getPortfolioBets().catch(() => []),
       getDashboardSummary().catch(() => null),
-    ]).then(([s, h, bets, sum]) => {
+      getPreferences().catch(() => null),
+    ]).then(([s, h, bets, sum, p]) => {
       setStats(s as PortfolioStats | null);
       setHistory((h as HistoryPoint[]) || []);
       setRecentBets(((bets as Bet[]) || []).slice(0, 20));
       setSummary(sum as DashboardSummary | null);
+      setPrefs(p as UserPreferences | null);
       setLoading(false);
     });
   }, [fromDate, toDate]);
@@ -187,6 +191,15 @@ export default function Dashboard() {
           </div>
           <Link to="/campaign" className="px-3 py-[6px] rounded-lg bg-[#3b5bdb] text-white text-[11.5px] font-semibold no-underline whitespace-nowrap transition-all hover:bg-[#2f4ac7]">Campagnes →</Link>
         </div>
+      )}
+
+      {/* ── BANKROLL WIDGET ── */}
+      {prefs && (
+        <BankrollWidget
+          initialBankroll={prefs.initial_bankroll}
+          totalPnl={stats?.total_pnl ?? null}
+          pendingBets={stats?.pending_bets ?? null}
+        />
       )}
 
       {/* ── KPIs ── */}
@@ -309,6 +322,71 @@ export default function Dashboard() {
 /* ══════════════════════════════════════════════
    SUB-COMPONENTS
    ══════════════════════════════════════════════ */
+
+/* ── Bankroll Widget ── */
+function BankrollWidget({
+  initialBankroll,
+  totalPnl,
+  pendingBets,
+}: {
+  initialBankroll: number;
+  totalPnl: number | null;
+  pendingBets: number | null;
+}) {
+  const pnl = totalPnl ?? 0;
+  const currentBankroll = initialBankroll + pnl;
+  const pnlPositive = pnl >= 0;
+
+  return (
+    <div
+      className="rounded-xl border border-[#e3e6eb] px-4 py-3 shadow-[0_1px_3px_rgba(16,24,40,0.06)]"
+      style={{ background: "linear-gradient(90deg, #f8f9fb 0%, #ffffff 100%)" }}
+    >
+      <div className="grid grid-cols-3 divide-x divide-[#e3e6eb]">
+        {/* Bankroll initiale */}
+        <div className="flex flex-col gap-0.5 pr-4">
+          <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide">Bankroll initiale</span>
+          <span className="text-[20px] font-extrabold tracking-tight text-[#111318] leading-none">
+            {initialBankroll.toLocaleString("fr-FR")}€
+          </span>
+          <span className="text-[10px] text-[#b0b7c3]">mise de départ</span>
+        </div>
+
+        {/* Solde actuel */}
+        <div className="flex flex-col gap-0.5 px-4">
+          <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide">Solde actuel</span>
+          <span
+            className="text-[20px] font-extrabold tracking-tight leading-none"
+            style={{ color: pnlPositive ? "#12b76a" : "#f04438" }}
+          >
+            {currentBankroll.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+          </span>
+          <span className="text-[10px] text-[#b0b7c3]">
+            {pendingBets !== null && pendingBets > 0
+              ? `${pendingBets} pari${pendingBets > 1 ? "s" : ""} en cours`
+              : "aucun pari en cours"}
+          </span>
+        </div>
+
+        {/* Variation P&L */}
+        <div className="flex flex-col gap-0.5 pl-4">
+          <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide">Variation P&L</span>
+          <span
+            className="text-[20px] font-extrabold tracking-tight leading-none"
+            style={{ color: pnlPositive ? "#12b76a" : "#f04438" }}
+          >
+            {pnlPositive ? "+" : ""}{pnl.toFixed(2)}€
+          </span>
+          <span className="text-[10px] text-[#b0b7c3]">
+            {initialBankroll > 0
+              ? `${pnlPositive ? "+" : ""}${((pnl / initialBankroll) * 100).toFixed(1)}% vs initial`
+              : "—"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function KPICard({ label, value, valueColor, icon, iconBg, iconColor, delta, deltaUp, dataTour }: {
   label: string; value: string; valueColor?: string; icon: React.ReactNode; iconBg: string; iconColor: string; delta?: string; deltaUp?: boolean; dataTour?: string;
