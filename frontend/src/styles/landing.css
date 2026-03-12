@@ -801,6 +801,133 @@
 
 /* ── (stats bar removed) ── */
 
+/* ── BACKGROUND EFFECTS (seamless section flow) ── */
+.landing-page {
+  position: relative;
+}
+
+/* Mesh gradient layer behind all content */
+.landing-page::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 800px 600px at 20% 15%, rgba(59, 91, 219, 0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 600px 500px at 80% 35%, rgba(124, 58, 237, 0.05) 0%, transparent 70%),
+    radial-gradient(ellipse 700px 500px at 10% 55%, rgba(18, 183, 106, 0.04) 0%, transparent 70%),
+    radial-gradient(ellipse 800px 600px at 75% 70%, rgba(59, 91, 219, 0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 500px 400px at 50% 90%, rgba(124, 58, 237, 0.04) 0%, transparent 70%);
+  z-index: 0;
+}
+
+/* All direct children above the mesh */
+.landing-page > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Section-specific ambient glows */
+.landing-page .lp-section.lp-glow-features,
+.landing-page .lp-section.lp-glow-testimonials,
+.landing-page .lp-section.lp-glow-pricing,
+.landing-page .lp-section.lp-glow-faq {
+  overflow: hidden;
+}
+
+.landing-page .lp-section.lp-glow-features {
+  position: relative;
+}
+.landing-page .lp-section.lp-glow-features::before {
+  content: "";
+  position: absolute;
+  top: -80px;
+  right: -200px;
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(circle, rgba(59, 91, 219, 0.08) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+.landing-page .lp-section.lp-glow-features::after {
+  content: "";
+  position: absolute;
+  bottom: -100px;
+  left: -150px;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(18, 183, 106, 0.05) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.landing-page .lp-section.lp-glow-testimonials {
+  position: relative;
+}
+.landing-page .lp-section.lp-glow-testimonials::before {
+  content: "";
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 900px;
+  height: 500px;
+  background: radial-gradient(ellipse, rgba(124, 58, 237, 0.06) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.landing-page .lp-section.lp-glow-pricing {
+  position: relative;
+}
+.landing-page .lp-section.lp-glow-pricing::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(59, 91, 219, 0.07) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+.landing-page .lp-section.lp-glow-pricing::after {
+  content: "";
+  position: absolute;
+  bottom: -50px;
+  right: -100px;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.04) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.landing-page .lp-section.lp-glow-faq {
+  position: relative;
+}
+.landing-page .lp-section.lp-glow-faq::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -200px;
+  transform: translateY(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(18, 183, 106, 0.05) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Ensure section content stays above ambient effects */
+.landing-page .lp-section > * {
+  position: relative;
+  z-index: 1;
+}
+
 /* ── SECTIONS generiques ── */
 .landing-page .lp-section {
   padding: 96px 48px;
@@ -809,8 +936,7 @@
 .landing-page .lp-section-light,
 .landing-page .lp-section-white,
 .landing-page .lp-section-dark {
-  background: var(--bg-dark);
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  background: transparent;
 }
 
 .landing-page .lp-section-label {
@@ -1412,7 +1538,6 @@
 /* ── CTA FINAL ── */
 .landing-page .lp-final-cta {
   background: var(--bg-dark);
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
   padding: 96px 48px;
   text-align: center;
   position: relative;
@@ -1502,7 +1627,6 @@
 /* ── FOOTER ── */
 .landing-page .lp-footer {
   background: var(--bg-dark);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
   padding: 64px 48px 40px;
 }
 
@@ -1551,7 +1675,6 @@
   max-width: 1100px;
   margin: 0 auto;
   padding-top: 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   align-items: center;
   justify-content: space-between;

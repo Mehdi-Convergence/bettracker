@@ -289,7 +289,7 @@ export default function Landing() {
       </section>
 
       {/* ── FONCTIONNALITES ── */}
-      <section className="lp-section lp-section-dark" id="features">
+      <section className="lp-section lp-section-dark lp-glow-features" id="features">
         <div className="lp-section-header">
           <span className="lp-section-label">Fonctionnalit&eacute;s</span>
           <h2 className="lp-section-title">Chaque fonctionnalit&eacute;, un avantage concret</h2>
@@ -392,7 +392,7 @@ export default function Landing() {
       </section>
 
       {/* ── TEMOIGNAGES ── */}
-      <section className="lp-section lp-section-dark" id="temoignages">
+      <section className="lp-section lp-section-dark lp-glow-testimonials" id="temoignages">
         <div className="lp-section-header">
           <span className="lp-section-label">T&eacute;moignages</span>
           <h2 className="lp-section-title">Ce que disent nos parieurs</h2>
@@ -448,7 +448,7 @@ export default function Landing() {
       </section>
 
       {/* ── TARIFS ── */}
-      <section className="lp-section lp-section-dark" id="tarifs">
+      <section className="lp-section lp-section-dark lp-glow-pricing" id="tarifs">
         <div className="lp-section-header">
           <span className="lp-section-label">Tarifs</span>
           <h2 className="lp-section-title">Simple et transparent</h2>
@@ -642,7 +642,7 @@ export default function Landing() {
       </section>
 
       {/* ── FAQ ── */}
-      <section className="lp-section lp-section-dark" id="faq">
+      <section className="lp-section lp-section-dark lp-glow-faq" id="faq">
         <div className="lp-section-header">
           <span className="lp-section-label">FAQ</span>
           <h2 className="lp-section-title">Questions fr&eacute;quentes</h2>
@@ -723,56 +723,12 @@ export default function Landing() {
 
       {/* ── FOOTER ── */}
       <footer className="lp-footer">
-        <div className="lp-footer-grid">
-          <div>
-            <a href="#" className="lp-navbar-logo" style={{ marginBottom: "12px", display: "inline-flex" }}>
-              <div className="lp-navbar-logo-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="15" height="15" aria-hidden="true">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                </svg>
-              </div>
-              <span className="lp-navbar-logo-text">Bet<span>Tracker</span></span>
-            </a>
-            <p className="lp-footer-brand-desc">
-              D&eacute;tectez les value bets en temps r&eacute;el avec un mod&egrave;le ML entra&icirc;n&eacute; sur 7 ans de donn&eacute;es.
-              Pilotez vos campagnes avec edge et discipline.
-            </p>
-          </div>
-
-          <div>
-            <div className="lp-footer-col-title">Produit</div>
-            <div className="lp-footer-links">
-              <a href="#features">Fonctionnalit&eacute;s</a>
-              <a href="#tarifs">Tarifs</a>
-              <a href="#temoignages">T&eacute;moignages</a>
-              <a href="#faq">FAQ</a>
-            </div>
-          </div>
-
-          <div>
-            <div className="lp-footer-col-title">Tarifs</div>
-            <div className="lp-footer-links">
-              <a href="#tarifs">Plan Free</a>
-              <a href="#tarifs">Plan Pro &mdash; 29&nbsp;EUR/mois</a>
-              <a href="#tarifs">Plan Elite &mdash; 69&nbsp;EUR/mois</a>
-            </div>
-          </div>
-
-          <div>
-            <div className="lp-footer-col-title">L&eacute;gal</div>
-            <div className="lp-footer-links">
-              <Link to="/mentions-legales">Mentions l&eacute;gales</Link>
-              <Link to="/cgu">CGU</Link>
-              <Link to="/confidentialite">Politique de confidentialit&eacute;</Link>
-            </div>
-          </div>
-        </div>
-
         <div className="lp-footer-bottom">
           <span className="lp-footer-copy">
             &copy; {new Date().getFullYear()} BetTracker. Tous droits r&eacute;serv&eacute;s. Jouer comporte des risques &mdash; 18+.
           </span>
           <div className="lp-footer-legal">
+            <Link to="/mentions-legales">Mentions l&eacute;gales</Link>
             <Link to="/cgu">CGU</Link>
             <Link to="/confidentialite">Confidentialit&eacute;</Link>
           </div>
