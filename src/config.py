@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     STRIPE_PRO_PRICE_ID: str = ""
     STRIPE_PREMIUM_PRICE_ID: str = ""
 
+    # AI Analyste (Groq — free tier)
+    GROQ_API_KEY: str = ""
+    AI_FREE_DAILY_LIMIT: int = 10
+    AI_PRO_DAILY_LIMIT: int = 50
+    AI_PREMIUM_DAILY_LIMIT: int = 200
+
     # Auth / JWT (no default — MUST be set via env or .env)
     JWT_SECRET_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"

@@ -11,9 +11,11 @@ from src.models.user_preferences import UserPreferences
 from src.models.campaign_version import CampaignVersion
 from src.models.saved_backtest import SavedBacktest
 from src.models.odds_snapshot import OddsSnapshot
+from src.models.ai_conversation import AIConversation, AIMessage
 
 __all__ = [
     "Base", "FootballMatch", "TennisMatch", "NBAGame", "RugbyMatch",
     "Bet", "Campaign", "User", "PasswordResetToken", "UserPreferences",
     "CampaignVersion", "SavedBacktest", "OddsSnapshot",
+    "AIConversation", "AIMessage",
 ]

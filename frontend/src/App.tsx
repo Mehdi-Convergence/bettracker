@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { PreferencesProvider } from "./contexts/PreferencesContext";
 import Layout from "./components/Layout";
 import Landing from "./pages/Landing";
 
@@ -56,6 +57,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <PreferencesProvider>
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<LandingRoute><Landing /></LandingRoute>} />
@@ -80,6 +82,7 @@ export default function App() {
             </Route>
           </Routes>
         </Suspense>
+        </PreferencesProvider>
       </AuthProvider>
     </BrowserRouter>
   );

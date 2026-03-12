@@ -574,3 +574,26 @@ export interface AIResearchResponse {
   cached_at: string | null;
   research_duration_seconds: number;
 }
+
+// --- AI Analyste types ---
+
+export interface AIConversation {
+  id: number;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+}
+
+export interface AIMessageData {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export interface AIRateLimit {
+  used: number;
+  limit: number;
+  remaining: number;
+}

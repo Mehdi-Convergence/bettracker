@@ -23,6 +23,9 @@ import TicketDetailDrawer from "@/components/TicketDetailDrawer";
 import { useTour } from "@/hooks/useTour";
 import SpotlightTour from "@/components/SpotlightTour";
 import { portfolioTour } from "@/tours/index";
+import { usePreferences } from "@/contexts/PreferencesContext";
+import { getCurrencySymbol } from "@/utils/currency";
+import { formatOdds } from "@/utils/odds";
 
 // ══════════════════════════════════════════════
 // DESIGN TOKENS
@@ -111,6 +114,7 @@ function ClvBadge({ clv }: { clv: number | null }) {
 // ══════════════════════════════════════════════
 export default function Portfolio() {
   const { showTour, completeTour } = useTour("portfolio");
+  const { prefs } = usePreferences();
 
   // ── Data state ──
   const [stats, setStats] = useState<PortfolioStats | null>(null);
@@ -120,6 +124,20 @@ export default function Portfolio() {
 
   // ── View state ──
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
+
+  // Initialise la vue depuis les preferences utilisateur
+  useEffect(() => {
+    const map: Record<string, ViewMode> = {
+      kanban: "kanban",
+      list: "list",
+      campaign: "camp",
+    };
+    const pref = prefs.default_tickets_view;
+    if (pref && map[pref]) {
+      setViewMode(map[pref]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefs.default_tickets_view]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sportFilter, setSportFilter] = useState("all");

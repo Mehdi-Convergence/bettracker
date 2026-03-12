@@ -354,3 +354,104 @@ export function getBetOddsHistory(betId: number) {
     `/portfolio/bets/${betId}/odds-history`
   );
 }
+
+// AI Analyste
+export async function* aiChatStream(
+  message: string,
+  conversationId?: number | null,
+): AsyncGenerator<{ type: "token" | "done" | "error"; text?: string; conversationId?: number; usage?: Record<string, number>; message?: string }> {
+  const token = localStorage.getItem("access_token");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const body = JSON.stringify({
+    message,
+    conversation_id: conversationId ?? null,
+  });
+
+  const res = await fetch(`${BASE}/ai/chat`, { method: "POST", headers, body });
+
+  if (res.status === 401) {
+    const refreshed = await tryRefreshToken();
+    if (!refreshed) {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      window.location.href = "/login";
+      return;
+    }
+    // Retry with new token
+    const newToken = localStorage.getItem("access_token");
+    headers["Authorization"] = `Bearer ${newToken}`;
+    const res2 = await fetch(`${BASE}/ai/chat`, { method: "POST", headers, body });
+    if (!res2.ok) {
+      const err = await res2.json().catch(() => ({ detail: res2.statusText }));
+      yield { type: "error", message: typeof err.detail === "string" ? err.detail : res2.statusText };
+      return;
+    }
+    const convId = parseInt(res2.headers.get("X-Conversation-Id") || "0");
+    const reader = res2.body?.getReader();
+    if (!reader) return;
+    yield* readSSEStream(reader, convId);
+    return;
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    yield { type: "error", message: typeof err.detail === "string" ? err.detail : res.statusText };
+    return;
+  }
+
+  const convId = parseInt(res.headers.get("X-Conversation-Id") || "0");
+  const reader = res.body?.getReader();
+  if (!reader) return;
+  yield* readSSEStream(reader, convId);
+}
+
+async function* readSSEStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  conversationId: number,
+): AsyncGenerator<{ type: "token" | "done" | "error"; text?: string; conversationId?: number; usage?: Record<string, number>; message?: string }> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      try {
+        const data = JSON.parse(line.slice(6));
+        if (data.type === "token") {
+          yield { type: "token", text: data.text, conversationId };
+        } else if (data.type === "done") {
+          yield { type: "done", conversationId, usage: data.usage };
+        } else if (data.type === "error") {
+          yield { type: "error", message: data.message, conversationId };
+        }
+      } catch {
+        // skip malformed lines
+      }
+    }
+  }
+}
+
+export function getAIConversations() {
+  return request<import("../types").AIConversation[]>("/ai/conversations");
+}
+
+export function getAIConversationMessages(conversationId: number) {
+  return request<import("../types").AIMessageData[]>(`/ai/conversations/${conversationId}/messages`);
+}
+
+export function deleteAIConversation(conversationId: number) {
+  return request<{ ok: boolean }>(`/ai/conversations/${conversationId}`, { method: "DELETE" });
+}
+
+export function getAIRateLimit() {
+  return request<import("../types").AIRateLimit>("/ai/rate-limit");
+}
