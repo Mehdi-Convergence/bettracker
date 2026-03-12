@@ -60,6 +60,29 @@ class TennisMatch(Base, TimestampMixin):
     avg_odds_winner: Mapped[Optional[float]]
     avg_odds_loser: Mapped[Optional[float]]
 
+    # Service stats (from Tennis Abstract — enriched by scripts/enrich_tennis_abstract.py)
+    w_ace: Mapped[Optional[int]]
+    w_df: Mapped[Optional[int]]
+    w_svpt: Mapped[Optional[int]]
+    w_1stIn: Mapped[Optional[int]]
+    w_1stWon: Mapped[Optional[int]]
+    w_2ndWon: Mapped[Optional[int]]
+    w_SvGms: Mapped[Optional[int]]
+    w_bpSaved: Mapped[Optional[int]]
+    w_bpFaced: Mapped[Optional[int]]
+    l_ace: Mapped[Optional[int]]
+    l_df: Mapped[Optional[int]]
+    l_svpt: Mapped[Optional[int]]
+    l_1stIn: Mapped[Optional[int]]
+    l_1stWon: Mapped[Optional[int]]
+    l_2ndWon: Mapped[Optional[int]]
+    l_SvGms: Mapped[Optional[int]]
+    l_bpSaved: Mapped[Optional[int]]
+    l_bpFaced: Mapped[Optional[int]]
+    minutes: Mapped[Optional[int]]
+    abstract_winner_id: Mapped[Optional[int]]
+    abstract_loser_id: Mapped[Optional[int]]
+
     __table_args__ = (
         Index("idx_tennis_date", "date"),
         Index("idx_tennis_year_tournament", "year", "tournament"),

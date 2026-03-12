@@ -98,7 +98,10 @@ class SofascoreClient:
                 sofa_ev = self._fuzzy_find(p1, p2, sofa_index)
 
             if not sofa_ev:
-                logger.debug("No Sofascore match for %s vs %s", p1, p2)
+                logger.info(
+                    "Sofascore: no match found for '%s' vs '%s' (normalized: '%s' | '%s')",
+                    p1, p2, _normalize(p1), _normalize(p2),
+                )
                 continue
 
             home_team = sofa_ev.get("homeTeam", {})
@@ -576,11 +579,22 @@ def _match_key(name1: str, name2: str) -> str:
 
 
 def _normalize(name: str) -> str:
-    """Normalize a player name for matching."""
+    """Normalize a player name for matching.
+
+    Handles: accents, hyphens, particles (de/van/del/von), initials.
+    """
     import unicodedata
     name = unicodedata.normalize("NFKD", name)
     name = "".join(c for c in name if not unicodedata.combining(c))
-    return name.lower().strip()
+    name = name.lower().strip()
+    # Replace hyphens with space so "alcaraz-garfia" -> "alcaraz garfia"
+    name = name.replace("-", " ").replace("_", " ")
+    # Remove single-char tokens that are just initials (e.g. "n.") — keep surnames
+    parts = [p.rstrip(".") for p in name.split() if p.rstrip(".")]
+    # Drop common particles that vary across sources
+    _PARTICLES = {"de", "van", "del", "von", "da", "di", "le", "la", "dos"}
+    parts = [p for p in parts if p not in _PARTICLES or len(parts) <= 2]
+    return " ".join(parts)
 
 
 def _names_match(name_a: str, name_b: str) -> bool:

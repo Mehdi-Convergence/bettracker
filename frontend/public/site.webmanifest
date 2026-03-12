@@ -1,0 +1,10 @@
+{
+  "name": "BetTracker",
+  "short_name": "BetTracker",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "theme_color": "#3b5bdb",
+  "background_color": "#07080c",
+  "display": "standalone"
+}

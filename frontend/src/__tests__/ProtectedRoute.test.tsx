@@ -11,7 +11,7 @@ function ProtectedRoute({ children, user, loading }: { children: React.ReactNode
 
 function PublicRoute({ children, user, loading }: { children: React.ReactNode; user: unknown; loading: boolean }) {
   if (loading) return null
-  if (user) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/dashboard" replace />
   return <>{children}</>
 }
 
@@ -70,11 +70,11 @@ describe('ProtectedRoute', () => {
 })
 
 describe('PublicRoute', () => {
-  it('redirige vers / si utilisateur déjà connecté', () => {
+  it('redirige vers /dashboard si utilisateur déjà connecté', () => {
     render(
       <MemoryRouter initialEntries={['/login']}>
         <Routes>
-          <Route path="/" element={<div>Dashboard</div>} />
+          <Route path="/dashboard" element={<div>Dashboard</div>} />
           <Route
             path="/login"
             element={
@@ -94,7 +94,7 @@ describe('PublicRoute', () => {
     render(
       <MemoryRouter initialEntries={['/login']}>
         <Routes>
-          <Route path="/" element={<div>Dashboard</div>} />
+          <Route path="/dashboard" element={<div>Dashboard</div>} />
           <Route
             path="/login"
             element={

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -38,6 +39,7 @@ TTL = {
     "squad":        24 * 3600,
     "topscorers":   24 * 3600,
     "fixture_stats":12 * 3600,
+    "player_stats": 24 * 3600,
 }
 
 # BetTracker league codes → API-Football league IDs
@@ -403,6 +405,28 @@ class ApiFootballClient:
             xg_home = round(sot_h * 0.33, 2) if sot_h else None
             xg_away = round(sot_a * 0.33, 2) if sot_a else None
 
+            # Red cards per game (total / matches played)
+            red_h_total = _int(cards_red, "home") or 0
+            red_a_total = _int(cards_red, "away") or 0
+            red_h_pg = round(red_h_total / played_h, 3) if played_h else None
+            red_a_pg = round(red_a_total / played_a, 3) if played_a else None
+
+            # Over 2.5 goals probability via Poisson
+            # lambda = avg total goals per game for this team (scored + conceded)
+            def _over25_prob(avg_goals: float) -> int | None:
+                if avg_goals <= 0:
+                    return None
+                p_le2 = sum(
+                    math.exp(-avg_goals) * avg_goals ** k / math.factorial(k)
+                    for k in range(3)
+                )
+                return round((1 - p_le2) * 100)
+
+            avg_total_h = ((gs_home + gc_home) / played_h) if played_h else 0
+            avg_total_a = ((gs_away + gc_away) / played_a) if played_a else 0
+            over25_home = _over25_prob(avg_total_h)
+            over25_away = _over25_prob(avg_total_a)
+
             return {
                 "team_id": team_id,
                 "league_id": league_id,
@@ -438,10 +462,14 @@ class ApiFootballClient:
                 "away_yellow_cards_pg": _avg(cards_yellow, "away"),
                 "home_red_cards_total": _int(cards_red, "home"),
                 "away_red_cards_total": _int(cards_red, "away"),
+                "home_red_cards_pg": red_h_pg,
+                "away_red_cards_pg": red_a_pg,
                 "home_pass_accuracy": _avg(passes_acc, "home"),
                 "away_pass_accuracy": _avg(passes_acc, "away"),
                 "home_btts_pct": btts_home,
                 "away_btts_pct": btts_away,
+                "home_over25_pct": over25_home,
+                "away_over25_pct": over25_away,
                 "home_xg_avg": xg_home,
                 "away_xg_avg": xg_away,
             }
@@ -572,6 +600,43 @@ class ApiFootballClient:
 
     # --- High-level helpers ---
 
+    async def get_team_player_stats(self, team_id: int, league_id: int) -> dict[str, dict]:
+        """Return name->stats dict for all squad players this season.
+
+        Calls /players?team=&league=&season= (page 1, covers ~20 players, cached 24h).
+        Returns {normalized_name: {goals, assists, rating, games}}.
+        """
+        raw = await _get_cached(
+            "player_stats", f"{team_id}_{league_id}",
+            "/players",
+            {"team": team_id, "league": league_id, "season": SEASON},
+        )
+        if not raw:
+            return {}
+        result: dict[str, dict] = {}
+        for entry in raw:
+            try:
+                player = entry.get("player", {})
+                stats = entry.get("statistics", [{}])[0]
+                goals_st = stats.get("goals", {})
+                games_st = stats.get("games", {})
+                name = player.get("name", "")
+                if not name:
+                    continue
+                norm = name.lower().strip()
+                played = games_st.get("appearences") or 0
+                result[norm] = {
+                    "player_id": player.get("id"),
+                    "name": name,
+                    "goals": goals_st.get("total") or 0,
+                    "assists": goals_st.get("assists") or 0,
+                    "rating": float(games_st.get("rating") or 0),
+                    "games": played,
+                }
+            except (KeyError, TypeError):
+                pass
+        return result
+
     async def get_team_key_players(
         self,
         team_id: int,
@@ -580,8 +645,14 @@ class ApiFootballClient:
         topscorers: list[dict],
         max_players: int = 5,
     ) -> list[dict]:
-        """Build key players list: top scorers of this team, with absence flag."""
+        """Build key players list: top scorers of this team, with absence flag and position."""
         team_scorers = [p for p in topscorers if p.get("team_id") == team_id][:max_players]
+        # Build pid->position map from squad (already cached from _injured_positions call)
+        try:
+            squad = await self.get_squad(team_id)
+            pid_to_pos = {p["player_id"]: p.get("position", "") for p in squad}
+        except Exception:
+            pid_to_pos = {}
         result = []
         for p in team_scorers:
             played = max(p["played"], 1)
@@ -592,6 +663,7 @@ class ApiFootballClient:
                 "goals_per_match": round(p["goals"] / played, 2),
                 "rating": p["rating"],
                 "is_absent": p["player_id"] in injured_player_ids,
+                "position": pid_to_pos.get(p["player_id"], ""),
             })
         return result
 

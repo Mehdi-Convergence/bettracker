@@ -35,7 +35,7 @@ export default function Register() {
     setLoading(true);
     try {
       await register(email, password, displayName);
-      navigate("/");
+      navigate("/dashboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'inscription");
     } finally {
@@ -53,7 +53,7 @@ export default function Register() {
 
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
           <h2 className="text-lg font-semibold text-slate-900 mb-1">Creer un compte</h2>
-          <p className="text-sm text-slate-500 mb-4">7 jours d'essai gratuit, sans carte bancaire</p>
+          <p className="text-sm text-slate-500 mb-4">3 jours d'essai gratuit, sans carte bancaire</p>
 
           {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 

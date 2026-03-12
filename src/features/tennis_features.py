@@ -232,6 +232,22 @@ class TennisFeatureBuilder:
         features["p1_surface_matches"] = len(player_surface_history[p1][surface])
         features["p2_surface_matches"] = len(player_surface_history[p2][surface])
 
+        # 16. Service stats (Tennis Abstract — rolling avg over last 5 matches)
+        for stat_w, stat_l, feat_name in [
+            ("w_ace_rate", "l_ace_rate", "ace_rate"),
+            ("w_df_rate", "l_df_rate", "df_rate"),
+            ("w_1st_in", "l_1st_in", "1st_serve_in"),
+            ("w_1st_won", "l_1st_won", "1st_serve_won"),
+            ("w_2nd_won", "l_2nd_won", "2nd_serve_won"),
+            ("w_bp_save", "l_bp_save", "bp_save"),
+        ]:
+            features[f"p1_{feat_name}"] = self._avg_serve_stat(p1, player_history[p1], 5, stat_w, stat_l)
+            features[f"p2_{feat_name}"] = self._avg_serve_stat(p2, player_history[p2], 5, stat_w, stat_l)
+        for name in ["ace_rate", "df_rate", "1st_serve_in", "1st_serve_won", "2nd_serve_won", "bp_save"]:
+            v1 = features.get(f"p1_{name}", np.nan)
+            v2 = features.get(f"p2_{name}", np.nan)
+            features[f"{name}_diff"] = v1 - v2 if not (np.isnan(v1) or np.isnan(v2)) else np.nan
+
         return features
 
     # ------------------------------------------------------------------
@@ -242,6 +258,21 @@ class TennisFeatureBuilder:
         winner = match["winner"]
         loser = match["loser"]
         surface = match.get("surface") or "Unknown"
+
+        def _serve_rate(num, denom) -> float | None:
+            n = self._to_int(match.get(num))
+            d = self._to_int(match.get(denom))
+            if n is None or d is None or d == 0:
+                return None
+            return round(n / d, 4)
+
+        # Serve stats (Tennis Abstract columns: w_ace, w_df, w_svpt, w_1stIn, w_1stWon, w_2ndWon)
+        w_svpt = self._to_int(match.get("w_svpt"))
+        l_svpt = self._to_int(match.get("l_svpt"))
+        w_1stIn = self._to_int(match.get("w_1stIn"))
+        l_1stIn = self._to_int(match.get("l_1stIn"))
+        w_2nd = (w_svpt - w_1stIn) if (w_svpt and w_1stIn) else None
+        l_2nd = (l_svpt - l_1stIn) if (l_svpt and l_1stIn) else None
 
         match_dict = {
             "date": match["date"],
@@ -254,6 +285,20 @@ class TennisFeatureBuilder:
             "loser_rank": self._to_int(match.get("loser_rank")),
             "winner_elo_pre": self.elo_global.get_rating(winner),
             "loser_elo_pre": self.elo_global.get_rating(loser),
+            # Service stats — winner perspective
+            "w_ace_rate": _serve_rate("w_ace", "w_svpt"),
+            "w_df_rate": _serve_rate("w_df", "w_svpt"),
+            "w_1st_in": _serve_rate("w_1stIn", "w_svpt"),
+            "w_1st_won": _serve_rate("w_1stWon", "w_1stIn"),
+            "w_2nd_won": round(self._to_int(match.get("w_2ndWon")) / w_2nd, 4) if (self._to_int(match.get("w_2ndWon")) is not None and w_2nd and w_2nd > 0) else None,
+            "w_bp_save": _serve_rate("w_bpSaved", "w_bpFaced"),
+            # Service stats — loser perspective
+            "l_ace_rate": _serve_rate("l_ace", "l_svpt"),
+            "l_df_rate": _serve_rate("l_df", "l_svpt"),
+            "l_1st_in": _serve_rate("l_1stIn", "l_svpt"),
+            "l_1st_won": _serve_rate("l_1stWon", "l_1stIn"),
+            "l_2nd_won": round(self._to_int(match.get("l_2ndWon")) / l_2nd, 4) if (self._to_int(match.get("l_2ndWon")) is not None and l_2nd and l_2nd > 0) else None,
+            "l_bp_save": _serve_rate("l_bpSaved", "l_bpFaced"),
         }
 
         player_history[winner].append(match_dict)
@@ -274,6 +319,19 @@ class TennisFeatureBuilder:
         if surface not in self.elo_surface:
             self.elo_surface[surface] = EloRatingSystem(k_factor=32, home_advantage=0)
         return self.elo_surface[surface]
+
+    def _avg_serve_stat(self, player: str, history: list[dict], n: int, stat_winner: str, stat_loser: str) -> float:
+        """Average a service stat (winner or loser perspective) over last N matches."""
+        recent = history[-n:]
+        vals = []
+        for m in recent:
+            if m["winner"] == player:
+                v = m.get(stat_winner)
+            else:
+                v = m.get(stat_loser)
+            if v is not None:
+                vals.append(v)
+        return float(np.mean(vals)) if vals else np.nan
 
     def _win_rate(self, player: str, history: list[dict], n: int) -> float:
         recent = history[-n:]
@@ -375,6 +433,260 @@ class TennisFeatureBuilder:
         except (ValueError, TypeError):
             return None
 
+    # ------------------------------------------------------------------
+    # Production snapshot export + live feature builder
+    # ------------------------------------------------------------------
+
+    def get_player_snapshot(
+        self,
+        player_history: dict,
+        player_surface_history: dict,
+    ) -> dict:
+        """Export current player stats for live prediction.
+
+        Returns a dict with ELO ratings and per-player stats that can be
+        serialized to JSON and loaded at prediction time.
+        """
+        snapshot: dict = {
+            "elo_global": dict(self.elo_global.ratings),
+            "elo_surface": {s: dict(elo_sys.ratings) for s, elo_sys in self.elo_surface.items()},
+            "players": {},
+        }
+
+        all_players = set(player_history.keys())
+        for player in all_players:
+            history = player_history[player]
+            if len(history) < _MIN_HISTORY:
+                continue
+
+            stats: dict = {}
+            for n in [5, 10, 20]:
+                stats[f"win_rate_{n}"] = self._win_rate(player, history, n)
+            stats["streak"] = self._streak(player, history, 10)
+            stats["sets_won_avg"] = self._avg_sets_won(player, history, 10)
+            stats["sets_lost_avg"] = self._avg_sets_lost(player, history, 10)
+            s_won = stats["sets_won_avg"]
+            s_lost = stats["sets_lost_avg"]
+            if not (np.isnan(s_won) or np.isnan(s_lost)):
+                stats["set_dominance"] = float(s_won / max(0.01, s_won + s_lost))
+            else:
+                stats["set_dominance"] = float("nan")
+            stats["elo_change_5"] = self._elo_change(player, history, 5)
+
+            # Service stats from Tennis Abstract (avg last 5)
+            for stat_w, stat_l, key in [
+                ("w_ace_rate", "l_ace_rate", "ace_rate"),
+                ("w_df_rate", "l_df_rate", "df_rate"),
+                ("w_1st_in", "l_1st_in", "1st_serve_in"),
+                ("w_1st_won", "l_1st_won", "1st_serve_won"),
+                ("w_2nd_won", "l_2nd_won", "2nd_serve_won"),
+                ("w_bp_save", "l_bp_save", "bp_save"),
+            ]:
+                stats[key] = self._avg_serve_stat(player, history, 5, stat_w, stat_l)
+
+            surf_stats: dict = {}
+            for surface, surf_hist in player_surface_history[player].items():
+                if len(surf_hist) < 3:
+                    continue
+                surf_stats[surface] = {
+                    "win_rate_10": self._win_rate(player, surf_hist, 10),
+                    "surface_matches": len(surf_hist),
+                }
+            stats["surface"] = surf_stats
+
+            # Convert NaN to None for JSON serialization
+            serializable = {}
+            for k, v in stats.items():
+                if k == "surface":
+                    serializable[k] = {}
+                    for surf, sv in v.items():
+                        serializable[k][surf] = {
+                            sk: (None if isinstance(sv2, float) and np.isnan(sv2) else sv2)
+                            for sk, sv2 in sv.items()
+                        }
+                else:
+                    serializable[k] = None if isinstance(v, float) and np.isnan(v) else v
+            snapshot["players"][player] = serializable
+
+        return snapshot
+
+    def build_live_feature_vector(
+        self,  # unused — kept for API compatibility
+        p1: str,
+        p2: str,
+        surface: str,
+        odds_p1: float,
+        odds_p2: float,
+        ranking_p1: int | None,
+        ranking_p2: int | None,
+        rest_days_p1: int | None,
+        rest_days_p2: int | None,
+        series: str | None,
+        player_snapshot: dict,
+    ) -> dict:
+        """Build a feature vector for a live match using saved player stats.
+
+        Returns a dict with all TENNIS_FEATURE_COLUMNS keys (NaN for missing data).
+        The caller must convert to a numpy array in TENNIS_FEATURE_COLUMNS order.
+        """
+        players = player_snapshot.get("players", {})
+        elo_g = player_snapshot.get("elo_global", {})
+        elo_s_map = player_snapshot.get("elo_surface", {})
+        elo_surf = elo_s_map.get(surface, {})
+
+        def _get(name: str) -> dict:
+            return players.get(name) or players.get(_normalize_player_name(name)) or {}
+
+        def _elo(name: str, elo_dict: dict) -> float:
+            v = elo_dict.get(name) or elo_dict.get(_normalize_player_name(name))
+            return float(v) if v is not None else _INITIAL_ELO
+
+        p1_stats = _get(p1)
+        p2_stats = _get(p2)
+
+        f: dict = {}
+
+        # ELO (global)
+        f["p1_elo"] = _elo(p1, elo_g)
+        f["p2_elo"] = _elo(p2, elo_g)
+        f["elo_diff"] = f["p1_elo"] - f["p2_elo"]
+
+        # ELO surface
+        f["p1_elo_surface"] = _elo(p1, elo_surf)
+        f["p2_elo_surface"] = _elo(p2, elo_surf)
+        f["elo_surface_diff"] = f["p1_elo_surface"] - f["p2_elo_surface"]
+
+        # Rankings
+        f["p1_rank"] = float(ranking_p1) if ranking_p1 else np.nan
+        f["p2_rank"] = float(ranking_p2) if ranking_p2 else np.nan
+        if ranking_p1 and ranking_p2 and ranking_p1 > 0 and ranking_p2 > 0:
+            f["rank_diff"] = float(ranking_p1 - ranking_p2)
+            f["rank_ratio"] = float(ranking_p1 / ranking_p2)
+        else:
+            f["rank_diff"] = np.nan
+            f["rank_ratio"] = np.nan
+
+        # Win rates from snapshot
+        for n in [5, 10, 20]:
+            v1 = p1_stats.get(f"win_rate_{n}")
+            v2 = p2_stats.get(f"win_rate_{n}")
+            f[f"p1_win_rate_{n}"] = float(v1) if v1 is not None else np.nan
+            f[f"p2_win_rate_{n}"] = float(v2) if v2 is not None else np.nan
+
+        # Surface win rate from snapshot
+        p1_surf = p1_stats.get("surface", {}).get(surface, {})
+        p2_surf = p2_stats.get("surface", {}).get(surface, {})
+        v1_surf = p1_surf.get("win_rate_10")
+        v2_surf = p2_surf.get("win_rate_10")
+        f["p1_surface_win_rate"] = float(v1_surf) if v1_surf is not None else np.nan
+        f["p2_surface_win_rate"] = float(v2_surf) if v2_surf is not None else np.nan
+        if not (np.isnan(f["p1_surface_win_rate"]) or np.isnan(f["p2_surface_win_rate"])):
+            f["surface_win_rate_diff"] = f["p1_surface_win_rate"] - f["p2_surface_win_rate"]
+        else:
+            f["surface_win_rate_diff"] = np.nan
+
+        # H2H — not available from live data
+        f["p1_h2h_win_rate"] = np.nan
+        f["h2h_count"] = np.nan
+        f["p1_h2h_surface_win_rate"] = np.nan
+        f["h2h_surface_count"] = np.nan
+
+        # Rest days
+        f["p1_rest_days"] = float(rest_days_p1) if rest_days_p1 is not None else np.nan
+        f["p2_rest_days"] = float(rest_days_p2) if rest_days_p2 is not None else np.nan
+        r1 = rest_days_p1 or 7
+        r2 = rest_days_p2 or 7
+        f["rest_diff"] = float(r1 - r2)
+
+        # Streak, sets, dominance, elo_change from snapshot
+        v_streak1 = p1_stats.get("streak")
+        v_streak2 = p2_stats.get("streak")
+        f["p1_streak"] = float(v_streak1) if v_streak1 is not None else np.nan
+        f["p2_streak"] = float(v_streak2) if v_streak2 is not None else np.nan
+
+        for key in ["sets_won_avg", "sets_lost_avg", "set_dominance", "elo_change_5"]:
+            v1 = p1_stats.get(key)
+            v2 = p2_stats.get(key)
+            col1 = f"p1_{key}" if key != "elo_change_5" else "p1_elo_change_5"
+            col2 = f"p2_{key}" if key != "elo_change_5" else "p2_elo_change_5"
+            f[col1] = float(v1) if v1 is not None else np.nan
+            f[col2] = float(v2) if v2 is not None else np.nan
+
+        # Surface matches from snapshot
+        f["p1_surface_matches"] = float(p1_surf.get("surface_matches", 0) or 0)
+        f["p2_surface_matches"] = float(p2_surf.get("surface_matches", 0) or 0)
+
+        # Series level
+        f["series_level"] = float(_series_level(series))
+
+        # Implied probabilities from odds
+        if odds_p1 > 1.0 and odds_p2 > 1.0:
+            total_imp = 1 / odds_p1 + 1 / odds_p2
+            f["implied_p1"] = (1 / odds_p1) / total_imp
+            f["implied_p2"] = (1 / odds_p2) / total_imp
+            f["bookmaker_vig"] = total_imp - 1.0
+        else:
+            f["implied_p1"] = np.nan
+            f["implied_p2"] = np.nan
+            f["bookmaker_vig"] = np.nan
+
+        # Service stats from snapshot
+        for stat_key in ["ace_rate", "df_rate", "1st_serve_in", "1st_serve_won", "2nd_serve_won", "bp_save"]:
+            v1 = p1_stats.get(stat_key)
+            v2 = p2_stats.get(stat_key)
+            f[f"p1_{stat_key}"] = float(v1) if v1 is not None else np.nan
+            f[f"p2_{stat_key}"] = float(v2) if v2 is not None else np.nan
+            if v1 is not None and v2 is not None:
+                f[f"{stat_key}_diff"] = float(v1) - float(v2)
+            else:
+                f[f"{stat_key}_diff"] = np.nan
+
+        return f
+
+
+def build_tennis_live_features(
+    p1: str,
+    p2: str,
+    surface: str,
+    odds_p1: float,
+    odds_p2: float,
+    ranking_p1: int | None,
+    ranking_p2: int | None,
+    rest_days_p1: int | None,
+    rest_days_p2: int | None,
+    series: str | None,
+    player_snapshot: dict,
+) -> dict:
+    """Standalone wrapper around TennisFeatureBuilder.build_live_feature_vector."""
+    dummy = object.__new__(TennisFeatureBuilder)
+    return dummy.build_live_feature_vector(
+        p1=p1, p2=p2, surface=surface,
+        odds_p1=odds_p1, odds_p2=odds_p2,
+        ranking_p1=ranking_p1, ranking_p2=ranking_p2,
+        rest_days_p1=rest_days_p1, rest_days_p2=rest_days_p2,
+        series=series, player_snapshot=player_snapshot,
+    )
+
+
+def _normalize_player_name(name: str) -> str:
+    """Attempt to normalize player name for lookup.
+
+    Sofascore: "Novak Djokovic" → try "Djokovic N."
+    Also handles already-normalized names like "Djokovic N."
+    """
+    if not name:
+        return name
+    parts = name.strip().split()
+    if len(parts) == 1:
+        return name
+    # Already in "Surname I." format
+    if len(parts) == 2 and len(parts[1]) <= 2 and parts[1].endswith("."):
+        return name
+    # Convert "First Last" → "Last F."
+    first = parts[0]
+    last = parts[-1]
+    return f"{last} {first[0]}."
+
 
 def _series_level(series: str | None) -> int:
     if not series:
@@ -411,4 +723,11 @@ TENNIS_FEATURE_COLUMNS = [
     "implied_p1", "implied_p2", "bookmaker_vig",
     "p1_elo_change_5", "p2_elo_change_5",
     "p1_surface_matches", "p2_surface_matches",
+    # Service stats (Tennis Abstract — available for ~64% of matches)
+    "p1_ace_rate", "p2_ace_rate", "ace_rate_diff",
+    "p1_df_rate", "p2_df_rate", "df_rate_diff",
+    "p1_1st_serve_in", "p2_1st_serve_in", "1st_serve_in_diff",
+    "p1_1st_serve_won", "p2_1st_serve_won", "1st_serve_won_diff",
+    "p1_2nd_serve_won", "p2_2nd_serve_won", "2nd_serve_won_diff",
+    "p1_bp_save", "p2_bp_save", "bp_save_diff",
 ]

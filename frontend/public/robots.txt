@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /scanner
+Disallow: /backtest
+Disallow: /campaign
+Disallow: /portfolio
+Disallow: /ai-analyst
+Disallow: /settings
+Disallow: /parametres
+Disallow: /api/
+
+Sitemap: https://betracker.fr/sitemap.xml
