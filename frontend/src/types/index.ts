@@ -278,6 +278,7 @@ export interface TicketLeg {
   model_prob: number;
   bookmaker: string;
   all_odds: Record<string, number>;
+  sport?: string;
 }
 
 export interface Ticket {
@@ -371,6 +372,7 @@ export interface CampaignRecommendation {
   best_odds: number;
   bookmaker: string;
   suggested_stake: number;
+  sport?: string;
 }
 
 export interface CampaignRecommendationsResponse {

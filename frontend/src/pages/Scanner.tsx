@@ -490,12 +490,20 @@ export default function Scanner() {
     if (!best) return null;
     const [bkName, odds] = best;
 
+    const modelProbs: Record<string, number | null> = {
+      H: am.model_prob_home, D: am.model_prob_draw, A: am.model_prob_away,
+      P1: am.model_prob_home, P2: am.model_prob_away,
+    };
+    const mlProb = modelProbs[outcome] ?? null;
+
     return {
       id: `${home}_${away}_${outcome}`,
       home_team: home, away_team: away,
       league: am.league, date: am.date, outcome,
-      odds, model_prob: odds > 0 ? 1 / odds : 0,
+      odds,
+      model_prob: mlProb != null ? mlProb : (odds > 0 ? 1 / odds : 0),
       bookmaker: bkName, all_odds: allBks,
+      sport: am.sport,
     };
   }
 
@@ -533,7 +541,7 @@ export default function Scanner() {
     const vb: ValueBet = {
       home_team: leg.home_team, away_team: leg.away_team,
       league: leg.league, date: leg.date, outcome,
-      model_prob: leg.model_prob, implied_prob: leg.model_prob,
+      model_prob: leg.model_prob, implied_prob: leg.odds > 0 ? 1 / leg.odds : 0,
       edge: am.edges?.[outcome] ?? 0, best_odds: leg.odds, bookmaker: leg.bookmaker,
     };
     e.dataTransfer.setData("application/json", JSON.stringify(vb));

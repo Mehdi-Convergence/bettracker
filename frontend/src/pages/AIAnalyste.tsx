@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import DOMPurify from "dompurify";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   MessageCircle,
   Send,
@@ -192,6 +193,11 @@ function EmbedChartCard() {
    ═══════════════════════════════════════════════════════ */
 
 export default function AIAnalyste() {
+  const { user } = useAuth();
+  const userInitials = useMemo(() => {
+    if (!user?.display_name) return "U";
+    return user.display_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  }, [user?.display_name]);
   const [messages, setMessages] = useState(MOCK_MESSAGES);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -288,7 +294,7 @@ export default function AIAnalyste() {
                   </div>
                 ) : (
                   <div className="w-[30px] h-[30px] rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold text-white" style={{ background: "linear-gradient(135deg,#4f8cff,#a78bfa)" }}>
-                    MB
+                    {userInitials}
                   </div>
                 )}
 

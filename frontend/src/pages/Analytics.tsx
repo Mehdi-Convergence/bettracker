@@ -229,8 +229,11 @@ export default function Analytics() {
                   />
                   <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => `${v}€`} width={48} />
                   <Tooltip
-                    formatter={(value: number) => [`${value.toFixed(2)}€`, "P&L cumulatif"]}
-                    labelFormatter={fmtDate}
+                    formatter={(value: number | undefined) => {
+                      if (value == null) return ["", "P&L cumulatif"];
+                      return [`${value.toFixed(2)}€`, "P&L cumulatif"];
+                    }}
+                    labelFormatter={(d: unknown) => fmtDate(String(d))}
                     contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
                   />
                   <Line
@@ -261,13 +264,13 @@ export default function Analytics() {
                   <XAxis type="number" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => `${v}%`} />
                   <YAxis dataKey="label" type="category" tick={{ fontSize: 12, fill: "#475569" }} width={80} />
                   <Tooltip
-                    formatter={(value: number, _name: string, entry: { payload: typeof sportRows[0] }) => [
-                      `${value.toFixed(2)}% (${entry.payload.total_bets} paris)`,
-                      "ROI",
-                    ]}
+                    formatter={(value: number | undefined, _name: string | undefined, entry: { payload?: typeof sportRows[0] }) => {
+                      if (value == null) return ["", "ROI"];
+                      return [`${value.toFixed(2)}% (${entry.payload?.total_bets ?? 0} paris)`, "ROI"];
+                    }}
                     contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
                   />
-                  <Bar dataKey="roi_pct" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 11, formatter: (v: number) => `${v.toFixed(1)}%` }}>
+                  <Bar dataKey="roi_pct" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 11, formatter: (v: unknown) => typeof v === "number" ? `${v.toFixed(1)}%` : "" }}>
                     {sportRows.map((entry, index) => (
                       <Cell key={index} fill={entry.roi_pct >= 0 ? "#10b981" : "#ef4444"} />
                     ))}
@@ -298,10 +301,10 @@ export default function Analytics() {
                   <XAxis dataKey="market" tick={{ fontSize: 12, fill: "#475569" }} />
                   <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => `${v}%`} />
                   <Tooltip
-                    formatter={(value: number, _name: string, entry: { payload: typeof marketChartData[0] }) => [
-                      `${value.toFixed(2)}% (${entry.payload.total_bets} paris)`,
-                      "ROI",
-                    ]}
+                    formatter={(value: number | undefined, _name: string | undefined, entry: { payload?: typeof marketChartData[0] }) => {
+                      if (value == null) return ["", "ROI"];
+                      return [`${value.toFixed(2)}% (${entry.payload?.total_bets ?? 0} paris)`, "ROI"];
+                    }}
                     contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
                   />
                   <Bar dataKey="roi_pct" radius={[4, 4, 0, 0]}>

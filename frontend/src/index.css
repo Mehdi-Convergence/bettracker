@@ -6,12 +6,65 @@
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
+:root {
+  --bg-primary: #f4f5f7;
+  --bg-card: #ffffff;
+  --text-primary: #111318;
+  --text-secondary: #3c4149;
+  --text-muted: #8a919e;
+  --border-color: #e3e6eb;
+}
+
+.dark {
+  --bg-primary: #0f172a;
+  --bg-card: #1e293b;
+  --text-primary: #e2e8f0;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+  --border-color: #334155;
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: #f4f5f7;
-  color: #111318;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   font-family: var(--font-sans);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* Override Tailwind hardcoded colors en mode dark */
+.dark .bg-white {
+  background-color: var(--bg-card) !important;
+}
+
+.dark .bg-\[\#ffffff\] {
+  background-color: var(--bg-card) !important;
+}
+
+.dark .bg-\[\#f4f5f7\] {
+  background-color: var(--bg-primary) !important;
+}
+
+.dark .text-\[\#111318\] {
+  color: var(--text-primary) !important;
+}
+
+.dark .text-\[\#3c4149\] {
+  color: var(--text-secondary) !important;
+}
+
+.dark .text-\[\#8a919e\] {
+  color: var(--text-muted) !important;
+}
+
+.dark .border-\[\#e3e6eb\] {
+  border-color: var(--border-color) !important;
+}
+
+.dark .border-\[\#cdd1d9\] {
+  border-color: var(--border-color) !important;
 }
 
 @keyframes slide-in-right {

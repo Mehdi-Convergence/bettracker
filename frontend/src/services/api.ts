@@ -279,6 +279,10 @@ export function deleteAccount() {
   return request<{ message: string }>("/auth/me", { method: "DELETE" });
 }
 
+export function logoutAll() {
+  return request<{ message: string }>("/auth/logout-all", { method: "POST" });
+}
+
 // User preferences
 export function getPreferences() {
   return request<import("../types").UserPreferences>("/settings/preferences");

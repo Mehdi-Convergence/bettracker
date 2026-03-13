@@ -506,7 +506,10 @@ function OddsHistoryChart({ history }: { history: OddsPoint[] }) {
               fontFamily: "var(--font-mono)",
               padding: "4px 8px",
             }}
-            formatter={(value: number) => [value.toFixed(3), "Cote"]}
+            formatter={(value: number | undefined) => {
+              if (value == null) return ["", "Cote"];
+              return [value.toFixed(3), "Cote"];
+            }}
             labelStyle={{ color: "#8a919e", fontSize: 10 }}
           />
           <Line

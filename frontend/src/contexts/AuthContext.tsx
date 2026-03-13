@@ -21,7 +21,7 @@ interface AuthState {
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateProfile: (data: { display_name?: string; email?: string }) => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -121,7 +121,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await login(email, password);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      const token = localStorage.getItem("access_token");
+      if (token) await apiPost("/auth/logout-all", {}, token);
+    } catch {
+      // Logout local meme si l'API echoue
+    }
     clearAuth();
   };
 

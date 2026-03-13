@@ -105,6 +105,7 @@ export default function CampaignDetail() {
       const bet = await acceptCampaignRecommendation(campaignId, {
         home_team: reco.home_team, away_team: reco.away_team, league: reco.league,
         match_date: reco.date, outcome: reco.outcome, odds: reco.best_odds, stake: reco.suggested_stake,
+        sport: reco.sport,
       });
       setBets((prev) => [bet, ...prev]);
       if (recos) setRecos({ ...recos, recommendations: recos.recommendations.filter((_, i) => i !== idx) });

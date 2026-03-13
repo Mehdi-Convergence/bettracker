@@ -134,7 +134,7 @@ export default function Landing() {
             </div>
 
             <p className="lp-hero-caption lp-fade-up lp-fade-up-delay-3">
-              3 jours gratuits &middot; Aucune carte bancaire
+              7 jours gratuits &middot; Aucune carte bancaire
             </p>
           </div>
 
@@ -453,7 +453,7 @@ export default function Landing() {
         <div className="lp-section-header">
           <span className="lp-section-label">Tarifs</span>
           <h2 className="lp-section-title">Simple. Transparent.<br />Sans surprise.</h2>
-          <p className="lp-section-desc">3 jours d&rsquo;acc&egrave;s complet. Aucune carte bancaire requise.</p>
+          <p className="lp-section-desc">7 jours d&rsquo;acc&egrave;s complet. Aucune carte bancaire requise.</p>
           <div className="lp-billing-pill">
             <button
               type="button"
@@ -481,14 +481,14 @@ export default function Landing() {
                 <span className="lp-plan-currency">&euro;</span>
                 <span className="lp-plan-amount">0</span>
               </div>
-              <div className="lp-plan-period">pendant 3 jours</div>
+              <div className="lp-plan-period">pendant 7 jours</div>
               <div className="lp-plan-annual-note">&nbsp;</div>
             </div>
             <div className="lp-plan-desc">
-              Acc&egrave;s &agrave; toutes les fonctionnalit&eacute;s pendant 3 jours. Aucune carte bancaire requise.
+              Acc&egrave;s &agrave; toutes les fonctionnalit&eacute;s pendant 7 jours. Aucune carte bancaire requise.
             </div>
             <Link to="/login" className="lp-plan-cta cta-free">Commencer gratuitement</Link>
-            <div className="lp-plan-features-label">Inclus pendant 3 jours</div>
+            <div className="lp-plan-features-label">Inclus pendant 7 jours</div>
             <ul className="lp-plan-features">
               {["Scanner IA illimit\u00e9", "Portfolio", "Dashboard", "Backtest", "Campagnes", "Partage de tickets", "Export CSV"].map(f => (
                 <li className="lp-plan-feature" key={f}>
@@ -603,7 +603,7 @@ export default function Landing() {
               </tr>
               <tr>
                 <td className="col-feature">Dur&eacute;e</td>
-                <td><span className="lp-comp-note">3 jours</span></td>
+                <td><span className="lp-comp-note">7 jours</span></td>
                 <td className="lp-check-yes">Illimit&eacute;</td>
                 <td className="lp-check-gold">Illimit&eacute;</td>
               </tr>
@@ -700,7 +700,7 @@ export default function Landing() {
           {[
             {
               q: "Une carte bancaire est-elle requise pour l\u2019essai gratuit\u00a0?",
-              a: "Non. L\u2019essai de 3 jours est enti\u00e8rement gratuit et ne n\u00e9cessite aucune carte bancaire. Vous pouvez tester toutes les fonctionnalit\u00e9s sans engagement.",
+              a: "Non. L\u2019essai de 7 jours est enti\u00e8rement gratuit et ne n\u00e9cessite aucune carte bancaire. Vous pouvez tester toutes les fonctionnalit\u00e9s sans engagement.",
             },
             {
               q: "Avec quels bookmakers BetTracker est-il compatible\u00a0?",
@@ -761,7 +761,7 @@ export default function Landing() {
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
-            Commencer gratuitement &mdash; 3 jours
+            Commencer gratuitement &mdash; 7 jours
           </Link>
           <Link to="/login" className="lp-btn-cta-secondary">
             D&eacute;j&agrave; un compte&nbsp;? Se connecter

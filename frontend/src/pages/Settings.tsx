@@ -20,6 +20,7 @@ import {
   changePassword,
   getUserStats,
   deleteAccount as apiDeleteAccount,
+  logoutAll as apiLogoutAll,
   createCheckoutSession,
   createBillingPortalSession,
 } from "@/services/api";
@@ -78,35 +79,35 @@ const PLANS = [
     name: "Free",
     price: "0€",
     features: [
-      { text: "10 scans / mois", ok: true },
-      { text: "Historique 30j", ok: true },
-      { text: "Campagnes", ok: false },
-      { text: "IA Analyste", ok: false },
+      { text: "Accès complet 7 jours", ok: true },
+      { text: "Scanner IA", ok: true },
+      { text: "Portfolio & Dashboard", ok: true },
+      { text: "Campagnes illimitées", ok: false },
       { text: "Export CSV", ok: false },
     ],
   },
   {
     id: "pro",
     name: "Pro",
-    price: "19€",
+    price: "29€",
     features: [
-      { text: "Scans illimités", ok: true },
-      { text: "Historique complet", ok: true },
-      { text: "Campagnes (5)", ok: true },
-      { text: "IA Analyste", ok: true },
-      { text: "Export CSV", ok: true },
+      { text: "Scanner IA illimité", ok: true },
+      { text: "Portfolio & Dashboard", ok: true },
+      { text: "Backtest", ok: true },
+      { text: "Partage de tickets", ok: true },
+      { text: "Campagnes illimitées", ok: false },
     ],
   },
   {
     id: "premium",
     name: "Elite",
-    price: "49€",
+    price: "69€",
     features: [
       { text: "Tout de Pro", ok: true },
       { text: "Campagnes illimitées", ok: true },
-      { text: "API access", ok: true },
-      { text: "Alertes Telegram", ok: true },
-      { text: "Multi-bookmakers", ok: true },
+      { text: "IA Analyste (bientôt)", ok: true },
+      { text: "Support prioritaire", ok: true },
+      { text: "Accès nouvelles features", ok: true },
     ],
   },
 ];
@@ -137,7 +138,6 @@ export default function Settings() {
   const [pwdErr, setPwdErr] = useState("");
   const [pwdLoading, setPwdLoading] = useState(false);
   const [showPwd, setShowPwd] = useState<Record<string, boolean>>({});
-  const [loginAlerts, setLoginAlerts] = useState(true);
 
   // User stats
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -233,6 +233,39 @@ export default function Settings() {
     } catch (err: unknown) {
       setBillingError(err instanceof Error ? err.message : "Erreur Stripe");
       setBillingLoading(null);
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const data = await getUserStats();
+      const json = JSON.stringify({ user: { email: user?.email, display_name: user?.display_name, tier: user?.tier }, stats: data }, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "bettracker-export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silencieux
+    }
+  };
+
+  const handleResetStats = async () => {
+    if (!window.confirm("Remettre le ROI et l'historique à zéro ? Cette action est irréversible.")) return;
+    // Route non disponible — informer l'utilisateur
+    alert("La réinitialisation des statistiques n'est pas encore disponible.");
+  };
+
+  const handleRevokeAll = async () => {
+    if (!window.confirm("Révoquer toutes les sessions actives ? Vous serez déconnecté.")) return;
+    try {
+      await apiLogoutAll();
+      logout();
+      navigate("/login");
+    } catch {
+      // silencieux
     }
   };
 
@@ -355,23 +388,17 @@ export default function Settings() {
                 <div className="px-3 py-2 rounded-lg text-[12px] font-medium" style={{ background: C.redBg, color: C.red }}>{profileErr}</div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <label className={labelCls}>Pseudo public</label>
-                  <div className="relative">
-                    <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b0b7c3] pointer-events-none" />
-                    <input
-                      type="text"
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                      className={inputWithIconCls}
-                      maxLength={100}
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className={labelCls}>Prénom (optionnel)</label>
-                  <input type="text" className={inputCls} placeholder="Votre prénom" />
+              <div className="flex flex-col gap-1.5">
+                <label className={labelCls}>Pseudo public</label>
+                <div className="relative">
+                  <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b0b7c3] pointer-events-none" />
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className={inputWithIconCls}
+                    maxLength={100}
+                  />
                 </div>
               </div>
 
@@ -445,12 +472,6 @@ export default function Settings() {
             <form onSubmit={handlePwdSubmit} className="p-5 space-y-3.5">
               <div className={sectionTitleCls}>
                 <Lock size={13} /> Mot de passe
-                <span
-                  className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold"
-                  style={{ background: C.amberBg, color: C.amber }}
-                >
-                  Modifié il y a 3 mois
-                </span>
               </div>
 
               {pwdMsg && (
@@ -538,13 +559,16 @@ export default function Settings() {
                       <div className="text-[13.5px] font-medium text-[#111318]">Alertes de connexion suspecte</div>
                       <div className="text-[12px] text-[#8a919e] mt-0.5">Email si connexion depuis un nouvel appareil</div>
                     </div>
-                    <Toggle checked={loginAlerts} onChange={setLoginAlerts} />
+                    <div className="flex items-center gap-2">
+                      <Toggle checked={false} onChange={() => {}} disabled />
+                      <span className="text-[11px] text-[#8a919e] whitespace-nowrap">Bientot disponible</span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 py-3">
                     <div className="flex-1">
                       <div className="text-[13.5px] font-medium text-[#111318]">Sessions actives</div>
                       <div className="text-[12px] text-[#8a919e] mt-0.5">
-                        1 appareil.<button className="bg-transparent border-none cursor-pointer text-[#3b5bdb] font-medium p-0 text-[12px]">Tout révoquer</button>
+                        1 appareil.<button type="button" onClick={handleRevokeAll} className="bg-transparent border-none cursor-pointer text-[#3b5bdb] font-medium p-0 text-[12px]">Tout révoquer</button>
                       </div>
                     </div>
                     <span
@@ -710,7 +734,11 @@ export default function Settings() {
                   <div className="text-[13.5px] font-semibold text-[#111318]">Exporter mes données</div>
                   <div className="text-[12px] text-[#8a919e] mt-0.5">Téléchargez tickets, historique et campagnes au format JSON.</div>
                 </div>
-                <button className="px-4 py-2 rounded-lg border border-[#e3e6eb] bg-transparent text-[#8a919e] text-[12px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] hover:bg-[#f4f5f7] transition-all whitespace-nowrap flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleExport}
+                  className="px-4 py-2 rounded-lg border border-[#e3e6eb] bg-transparent text-[#8a919e] text-[12px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] hover:bg-[#f4f5f7] transition-all whitespace-nowrap flex items-center gap-1.5"
+                >
                   <Download size={12} /> Exporter .json
                 </button>
               </div>
@@ -721,6 +749,8 @@ export default function Settings() {
                   <div className="text-[12px] text-[#8a919e] mt-0.5">Remet le ROI et l'historique à zéro. Irréversible.</div>
                 </div>
                 <button
+                  type="button"
+                  onClick={handleResetStats}
                   className="px-4 py-2 rounded-lg border bg-transparent text-[12px] font-semibold cursor-pointer transition-all whitespace-nowrap hover:bg-[#f04438] hover:text-white hover:border-[#f04438]"
                   style={{ borderColor: "rgba(240,68,56,0.25)", color: C.red }}
                 >

@@ -24,8 +24,6 @@ import { useTour } from "@/hooks/useTour";
 import SpotlightTour from "@/components/SpotlightTour";
 import { portfolioTour } from "@/tours/index";
 import { usePreferences } from "@/contexts/PreferencesContext";
-import { getCurrencySymbol } from "@/utils/currency";
-import { formatOdds } from "@/utils/odds";
 
 // ══════════════════════════════════════════════
 // DESIGN TOKENS
@@ -459,6 +457,7 @@ export default function Portfolio() {
         league: reco.league, match_date: reco.date,
         outcome: reco.outcome, odds: reco.best_odds,
         stake: reco.suggested_stake, bookmaker: reco.bookmaker,
+        sport: reco.sport,
       });
       loadAll();
     } catch { /* ignore */ }
@@ -520,15 +519,17 @@ export default function Portfolio() {
         <div data-tour="kpis" className="grid grid-cols-4 lg:grid-cols-8 gap-2.5" style={{ animation: "fu .3s ease both", animationDelay: ".03s" }}>
           <KpiCard label="ROI global" value={`${stats.roi_pct >= 0 ? "+" : ""}${stats.roi_pct.toFixed(1)}%`}
             color={stats.roi_pct >= 0 ? C.green : C.red} sub="30 derniers jours" />
-          <KpiCard label="ROI campagnes"
-            value={(() => {
-              const cb = bets.filter((b) => b.campaign_id && (b.result === "won" || b.result === "lost"));
-              const stk = cb.reduce((s, b) => s + b.stake, 0);
-              const pnl = cb.reduce((s, b) => s + (b.profit_loss ?? 0), 0);
-              const roi = stk > 0 ? (pnl / stk * 100) : 0;
-              return `${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`;
-            })()}
-            color={C.green} sub="algo + manuel" />
+          {(() => {
+            const cb = bets.filter((b) => b.campaign_id && (b.result === "won" || b.result === "lost"));
+            const stk = cb.reduce((s, b) => s + b.stake, 0);
+            const pnl = cb.reduce((s, b) => s + (b.profit_loss ?? 0), 0);
+            const roiCamp = stk > 0 ? (pnl / stk * 100) : 0;
+            return (
+              <KpiCard label="ROI campagnes"
+                value={`${roiCamp >= 0 ? "+" : ""}${roiCamp.toFixed(1)}%`}
+                color={roiCamp >= 0 ? C.green : C.red} sub="algo + manuel" />
+            );
+          })()}
           <KpiCard label="ROI hors camp."
             value={(() => {
               const hc = bets.filter((b) => !b.campaign_id && (b.result === "won" || b.result === "lost"));
@@ -538,14 +539,17 @@ export default function Portfolio() {
               return `${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`;
             })()}
             color={C.amber} sub="Scanner" />
-          <KpiCard label="CLV moyen"
-            value={(() => {
-              const withClv = bets.filter((b) => b.clv != null);
-              if (withClv.length === 0) return "—";
-              const avg = withClv.reduce((s, b) => s + (b.clv ?? 0), 0) / withClv.length;
-              return `${avg >= 0 ? "+" : ""}${(avg * 100).toFixed(1)}%`;
-            })()}
-            color={C.green} sub="qualité modèle" />
+          {(() => {
+            const withClv = bets.filter((b) => b.clv != null);
+            const clvMoyen = withClv.length > 0
+              ? withClv.reduce((s, b) => s + (b.clv ?? 0), 0) / withClv.length
+              : null;
+            return (
+              <KpiCard label="CLV moyen"
+                value={clvMoyen !== null ? `${clvMoyen >= 0 ? "+" : ""}${(clvMoyen * 100).toFixed(1)}%` : "—"}
+                color={clvMoyen !== null ? (clvMoyen >= 0 ? C.green : C.red) : undefined} sub="qualite modele" />
+            );
+          })()}
           <KpiCard label="En cours" value={`${stats.pending_bets}`}
             sub={`${bets.filter((b) => b.result === "pending").reduce((s, b) => s + b.stake, 0).toFixed(0)}€ en jeu`} />
           <KpiCard label="Proposés" value={`${campRecos.length}`}
