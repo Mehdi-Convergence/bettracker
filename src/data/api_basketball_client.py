@@ -10,6 +10,8 @@ Data fetched:
   - Team statistics (season: wins, losses, points avg, FG%, 3P%, FT%, rebounds, assists, turnovers)
   - Standings (conference rankings, W/L record, streaks)
   - Last games per team (form, rest days, back-to-back detection)
+    -> get_last_games() uses ESPN public API as fallback (free, no auth)
+       because API-Sports `last` param is blocked on free plan
 
 Cache TTLs:
   fixtures  12h | odds  2h  | standings  24h
@@ -30,6 +32,7 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 API_BASE = "https://v1.basketball.api-sports.io"
+ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
 
 # NBA league ID in API-Sports Basketball
 NBA_LEAGUE_ID = 12
@@ -43,6 +46,25 @@ TTL = {
     "team_stats": 24 * 3600,
     "last_games": 24 * 3600,
 }
+
+# ESPN team name -> ESPN team ID mapping (full names to avoid ambiguity)
+# Source: https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams
+ESPN_NBA_TEAMS: dict[str, int] = {
+    "Atlanta Hawks": 1, "Boston Celtics": 2, "Brooklyn Nets": 17,
+    "Charlotte Hornets": 30, "Chicago Bulls": 4, "Cleveland Cavaliers": 5,
+    "Dallas Mavericks": 6, "Denver Nuggets": 7, "Detroit Pistons": 8,
+    "Golden State Warriors": 9, "Houston Rockets": 10, "Indiana Pacers": 11,
+    "LA Clippers": 12, "Los Angeles Lakers": 13, "Memphis Grizzlies": 29,
+    "Miami Heat": 14, "Milwaukee Bucks": 15, "Minnesota Timberwolves": 16,
+    "New Orleans Pelicans": 3, "New York Knicks": 18, "Oklahoma City Thunder": 25,
+    "Orlando Magic": 19, "Philadelphia 76ers": 20, "Phoenix Suns": 21,
+    "Portland Trail Blazers": 22, "Sacramento Kings": 23, "San Antonio Spurs": 24,
+    "Toronto Raptors": 28, "Utah Jazz": 26, "Washington Wizards": 27,
+}
+
+# Cache for resolved ESPN team IDs (API-Sports team name -> ESPN team ID)
+# Populated lazily by _resolve_espn_team_id()
+_ESPN_TEAM_ID_CACHE: dict[str, int] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -140,6 +162,195 @@ async def _get_cached(key_type: str, key_id: str, path: str, params: dict | None
     payload = data.get("response", [])
     _cache_write(key_type, key_id, payload)
     return payload
+
+
+# ---------------------------------------------------------------------------
+# ESPN public API helpers (no auth required)
+# ---------------------------------------------------------------------------
+
+async def _resolve_espn_team_id(team_name: str) -> int | None:
+    """Resolve an ESPN team ID from a team display name.
+
+    Tries three strategies in order:
+    1. In-memory cache (_ESPN_TEAM_ID_CACHE)
+    2. Substring match against known ESPN_NBA_TEAMS abbreviations
+    3. Fetch the full ESPN teams list and fuzzy-match on displayName
+    """
+    if team_name in _ESPN_TEAM_ID_CACHE:
+        return _ESPN_TEAM_ID_CACHE[team_name]
+
+    # Strategy 2: exact or substring match against known ESPN team names
+    name_lower = team_name.lower()
+    for espn_name, espn_id in ESPN_NBA_TEAMS.items():
+        if espn_name.lower() == name_lower or espn_name.lower() in name_lower or name_lower in espn_name.lower():
+            _ESPN_TEAM_ID_CACHE[team_name] = espn_id
+            return espn_id
+
+    # Strategy 3: fetch ESPN teams list and match on displayName / shortDisplayName
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(f"{ESPN_BASE}/teams")
+        if resp.status_code != 200:
+            logger.error("ESPN teams list -> %d", resp.status_code)
+            return None
+        data = resp.json()
+        teams = data.get("sports", [{}])[0].get("leagues", [{}])[0].get("teams", [])
+        team_name_lower = team_name.lower()
+        for entry in teams:
+            t = entry.get("team", {})
+            display = t.get("displayName", "").lower()
+            short = t.get("shortDisplayName", "").lower()
+            nickname = t.get("name", "").lower()
+            location = t.get("location", "").lower()
+            espn_id = t.get("id")
+            if espn_id and any(
+                team_name_lower in s or s in team_name_lower
+                for s in [display, short, nickname, location]
+                if s
+            ):
+                _ESPN_TEAM_ID_CACHE[team_name] = int(espn_id)
+                return int(espn_id)
+    except Exception as exc:
+        logger.error("ESPN team resolution failed for %r: %s", team_name, exc)
+
+    logger.warning("Could not resolve ESPN team ID for %r", team_name)
+    return None
+
+
+def _espn_score(val) -> float | None:
+    """Extract numeric score from ESPN competitor score (can be dict or str)."""
+    if val is None:
+        return None
+    if isinstance(val, dict):
+        return _safe_float(val.get("value") or val.get("displayValue"))
+    return _safe_float(val)
+
+
+async def _fetch_espn_last_games(team_name: str, n: int = 10) -> list[dict]:
+    """Fetch last N completed games for a team via ESPN public API.
+
+    Uses cache key ab:espn_last:{team_name} with TTL 24h.
+    Returns list of dicts in the same format as get_last_games():
+      {date, opponent, is_home, won, pts_scored, pts_allowed, score}
+    """
+    cache_key = f"ab:espn_last:{team_name}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached[:n]
+
+    espn_id = await _resolve_espn_team_id(team_name)
+    if espn_id is None:
+        logger.warning("ESPN: no team ID for %r, skipping last-games fetch", team_name)
+        return []
+
+    # ESPN uses the ending year of the season as the season parameter
+    # 2025-26 season -> "2026"
+    season_year = datetime.now(timezone.utc).year
+    # If we are in Oct-Dec, the season started this year; its end year = current + 1
+    # If we are in Jan-Sep, the season started last year; its end year = current year
+    now = datetime.now(timezone.utc)
+    season_end_year = season_year if now.month >= 10 else season_year
+
+    url = f"{ESPN_BASE}/teams/{espn_id}/schedule"
+    params = {"season": str(season_end_year)}
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(url, params=params)
+        if resp.status_code != 200:
+            logger.error("ESPN schedule %s -> %d: %s", url, resp.status_code, resp.text[:200])
+            return []
+        data = resp.json()
+    except Exception as exc:
+        logger.error("ESPN schedule request failed for team %r: %s", team_name, exc)
+        return []
+
+    events = data.get("events", [])
+    games: list[dict] = []
+
+    for event in events:
+        try:
+            competitions = event.get("competitions", [])
+            if not competitions:
+                continue
+            comp = competitions[0]
+
+            # Only completed games
+            status = comp.get("status", {})
+            if not status.get("type", {}).get("completed", False):
+                continue
+
+            competitors = comp.get("competitors", [])
+            if len(competitors) < 2:
+                continue
+
+            # Find our team among competitors
+            our_comp = None
+            opp_comp = None
+            for c in competitors:
+                c_name = c.get("team", {}).get("displayName", "")
+                # Match by partial name
+                if (
+                    team_name.lower() in c_name.lower()
+                    or c_name.lower() in team_name.lower()
+                ):
+                    our_comp = c
+                else:
+                    opp_comp = c
+
+            if our_comp is None:
+                # Fallback: home team is index 0 in ESPN (home/away explicit field)
+                for c in competitors:
+                    if c.get("homeAway") == "home":
+                        our_comp = c
+                    else:
+                        opp_comp = c
+                # We cannot determine which is "our" team — skip
+                continue
+
+            if opp_comp is None:
+                # Only one competitor matched — pick the other
+                opp_comp = next(
+                    (c for c in competitors if c is not our_comp), None
+                )
+
+            if opp_comp is None:
+                continue
+
+            is_home = our_comp.get("homeAway") == "home"
+            pts_scored = _espn_score(our_comp.get("score"))
+            pts_allowed = _espn_score(opp_comp.get("score"))
+            won = our_comp.get("winner", False) is True
+
+            home_comp = next((c for c in competitors if c.get("homeAway") == "home"), competitors[0])
+            away_comp = next((c for c in competitors if c.get("homeAway") == "away"), competitors[1])
+            home_score_val = _espn_score(home_comp.get("score"))
+            away_score_val = _espn_score(away_comp.get("score"))
+            score_str = (
+                f"{int(home_score_val)}-{int(away_score_val)}"
+                if home_score_val is not None and away_score_val is not None
+                else None
+            )
+
+            games.append({
+                "date": event.get("date", ""),
+                "opponent": opp_comp.get("team", {}).get("displayName", ""),
+                "is_home": is_home,
+                "won": won,
+                "pts_scored": int(pts_scored) if pts_scored is not None else None,
+                "pts_allowed": int(pts_allowed) if pts_allowed is not None else None,
+                "score": score_str,
+            })
+        except (KeyError, TypeError, ValueError):
+            continue
+
+    # Sort by date descending (most recent first) and keep last N
+    games.sort(key=lambda g: g.get("date", ""), reverse=True)
+
+    # Cache the full list (up to season length) for 24h
+    _cache_set(cache_key, games, ttl=TTL["last_games"])
+
+    return games[:n]
 
 
 # ---------------------------------------------------------------------------
@@ -417,8 +628,17 @@ class ApiBasketballClient:
 
     # --- Last games (form + rest days) ---
 
-    async def get_last_games(self, team_id: int, n: int = 10) -> list[dict]:
+    async def get_last_games(
+        self,
+        team_id: int,
+        n: int = 10,
+        team_name: str | None = None,
+    ) -> list[dict]:
         """Return last N games for a team.
+
+        Tries API-Sports first. If the response is empty (free plan blocks
+        the `last` parameter), falls back to the ESPN public API using
+        `team_name`. The ESPN fallback requires `team_name` to be provided.
 
         Each dict: {date, opponent, is_home, won, pts_scored, pts_allowed, score}
         """
@@ -427,7 +647,15 @@ class ApiBasketballClient:
             "/games",
             {"team": team_id, "league": NBA_LEAGUE_ID, "last": n},
         )
+
         if not raw:
+            # API-Sports returned nothing (likely `last` param blocked on free plan)
+            if team_name:
+                logger.info(
+                    "API-Sports last_games empty for team_id=%d, falling back to ESPN for %r",
+                    team_id, team_name,
+                )
+                return await _fetch_espn_last_games(team_name, n)
             return []
 
         games = []

@@ -533,21 +533,78 @@ class ApiRugbyClient:
     # --- Last games (form + rest days) ---
 
     async def get_last_games(self, team_id: int, n: int = 10) -> list[dict]:
-        """Return last N games for a team.
+        """Return last N completed games for a team.
+
+        The API-Sports free plan does not support the `last` parameter.
+        Strategy: try season 2023, then 2022 as fallback. Filter completed
+        games (status FT/AOT/POST), sort by date desc, return last N.
+        Cache key: ar:last_games:{team_id}_last{n} — TTL 24h.
 
         Each dict: {date, opponent, is_home, won, drew, pts_scored, pts_allowed, score}
         Rugby includes draws, so 'won' and 'drew' are both tracked.
+        Returns [] on failure — compute_live_stats still works via standings/team_stats.
         """
-        raw = await _get_cached(
-            "last_games", f"{team_id}_last{n}",
-            "/games",
-            {"team": team_id, "last": n},
-        )
+        cache_key_id = f"{team_id}_last{n}"
+        cached = _cache_read("last_games", cache_key_id)
+        if cached is not None:
+            return cached
+
+        # Completed game statuses on API-Sports Rugby
+        finished_statuses = {"FT", "AOT", "POST", "AWN", "HWN"}
+
+        raw: list[dict] = []
+        for season in ("2023", "2022"):
+            quota = _quota_get()
+            if quota["remaining"] <= 0:
+                logger.warning(
+                    "API-Rugby quota exhausted, cannot fetch last_games for team=%d", team_id
+                )
+                break
+            data = await _get("/games", {"team": team_id, "season": season})
+            if data is None:
+                logger.warning(
+                    "API-Rugby last_games: no response for team=%d season=%s", team_id, season
+                )
+                continue
+            season_games = data.get("response", [])
+            if not season_games:
+                logger.info(
+                    "API-Rugby last_games: empty response for team=%d season=%s", team_id, season
+                )
+                continue
+            # Keep only completed games
+            completed = [
+                g for g in season_games
+                if g.get("status", {}).get("short", "") in finished_statuses
+            ]
+            if completed:
+                raw = completed
+                logger.info(
+                    "API-Rugby last_games: %d completed games found for team=%d season=%s",
+                    len(completed), team_id, season,
+                )
+                break
+            logger.info(
+                "API-Rugby last_games: no completed games for team=%d season=%s, trying next",
+                team_id, season,
+            )
+
         if not raw:
+            logger.info(
+                "API-Rugby last_games: no data found for team=%d, returning []", team_id
+            )
+            _cache_write("last_games", cache_key_id, [])
             return []
 
+        # Sort by date descending and keep last N
+        def _game_date(g: dict) -> str:
+            return g.get("date", "") or ""
+
+        raw_sorted = sorted(raw, key=_game_date, reverse=True)
+        raw_recent = raw_sorted[:n]
+
         games = []
-        for g in raw:
+        for g in raw_recent:
             try:
                 home_team = g.get("teams", {}).get("home", {})
                 away_team = g.get("teams", {}).get("away", {})
@@ -588,6 +645,8 @@ class ApiRugbyClient:
                 })
             except (KeyError, TypeError):
                 continue
+
+        _cache_write("last_games", cache_key_id, games)
         return games
 
     # --- High-level enrichment ---

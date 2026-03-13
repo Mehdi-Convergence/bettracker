@@ -921,9 +921,9 @@ async def run_nba_scan():
             h_team_stats = await bball.get_team_stats(home_id) if home_id else {}
             a_team_stats = await bball.get_team_stats(away_id) if away_id else {}
 
-            # Fetch last 10 games per team (cached 24h)
-            h_last = await bball.get_last_games(home_id) if home_id else []
-            a_last = await bball.get_last_games(away_id) if away_id else []
+            # Fetch last 10 games per team (cached 24h) — ESPN fallback if API-Sports blocks `last`
+            h_last = await bball.get_last_games(home_id, team_name=home) if home_id else []
+            a_last = await bball.get_last_games(away_id, team_name=away) if away_id else []
 
             # Compute live stats from API data
             h_standing = standings_by_id.get(home_id) or standings_by_name.get(home, {})
@@ -1423,8 +1423,8 @@ async def run_mlb_scan():
             # Fetch live stats
             h_team_stats = await bb.get_team_stats(home_id) if home_id else {}
             a_team_stats = await bb.get_team_stats(away_id) if away_id else {}
-            h_last = await bb.get_last_games(home_id) if home_id else []
-            a_last = await bb.get_last_games(away_id) if away_id else []
+            h_last = await bb.get_last_games(home_id, team_name=home) if home_id else []
+            a_last = await bb.get_last_games(away_id, team_name=away) if away_id else []
 
             h_standing = standings_by_id.get(home_id) or standings_by_name.get(home, {})
             a_standing = standings_by_id.get(away_id) or standings_by_name.get(away, {})

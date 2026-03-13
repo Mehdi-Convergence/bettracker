@@ -9,7 +9,7 @@ Data fetched:
   - Odds (h2h moneyline + totals runs from multiple bookmakers)
   - Team statistics (season: wins, losses, runs avg, batting avg, ERA, HR, hits, errors)
   - Standings (division rankings, W/L record, GB)
-  - Last games per team (form, rest days, streaks)
+  - Last games per team (form, rest days, streaks) — via statsapi fallback
 
 Cache TTLs:
   fixtures  12h | odds  2h  | standings  24h
@@ -18,11 +18,13 @@ Cache TTLs:
 from __future__ import annotations
 
 import asyncio
+import difflib
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
+import statsapi
 
 from src.cache import cache_get, cache_set as _cache_set
 from src.config import settings
@@ -52,6 +54,48 @@ TTL = {
     "last_games": 24 * 3600,
 }
 
+# ---------------------------------------------------------------------------
+# MLB Stats API team mapping (statsapi package — gratuit, sans cle)
+# Source: statsapi.get('teams', {'sportId': 1})
+# ---------------------------------------------------------------------------
+
+# MLB Stats API official team IDs
+MLB_STATS_TEAMS: dict[str, int] = {
+    "Arizona Diamondbacks": 109,
+    "Atlanta Braves": 144,
+    "Baltimore Orioles": 110,
+    "Boston Red Sox": 111,
+    "Chicago Cubs": 112,
+    "Chicago White Sox": 145,
+    "Cincinnati Reds": 113,
+    "Cleveland Guardians": 114,
+    "Colorado Rockies": 115,
+    "Detroit Tigers": 116,
+    "Houston Astros": 117,
+    "Kansas City Royals": 118,
+    "Los Angeles Angels": 108,
+    "Los Angeles Dodgers": 119,
+    "Miami Marlins": 146,
+    "Milwaukee Brewers": 158,
+    "Minnesota Twins": 142,
+    "New York Mets": 121,
+    "New York Yankees": 147,
+    "Oakland Athletics": 133,
+    "Philadelphia Phillies": 143,
+    "Pittsburgh Pirates": 134,
+    "San Diego Padres": 135,
+    "San Francisco Giants": 137,
+    "Seattle Mariners": 136,
+    "St. Louis Cardinals": 138,
+    "Tampa Bay Rays": 139,
+    "Texas Rangers": 140,
+    "Toronto Blue Jays": 141,
+    "Washington Nationals": 120,
+}
+
+# API-Sports Baseball team ID -> MLB Stats API team ID (peuple dynamiquement si besoin)
+API_SPORTS_TO_MLB: dict[int, int] = {}
+
 
 # ---------------------------------------------------------------------------
 # Cache helpers
@@ -68,6 +112,122 @@ def _cache_read(key_type: str, key_id: str) -> Any | None:
 def _cache_write(key_type: str, key_id: str, payload: Any) -> None:
     ttl = TTL.get(key_type, 3600)
     _cache_set(_cache_key(key_type, key_id), payload, ttl=ttl)
+
+
+# ---------------------------------------------------------------------------
+# statsapi fallback — derniers matchs via MLB Stats API (synchrone)
+# ---------------------------------------------------------------------------
+
+def _resolve_mlb_stats_team_id(team_name: str) -> int | None:
+    """Resout le MLB Stats API team ID a partir du nom d'equipe (fuzzy match)."""
+    if not team_name:
+        return None
+
+    # Match exact
+    if team_name in MLB_STATS_TEAMS:
+        return MLB_STATS_TEAMS[team_name]
+
+    # Match par substring (insensible a la casse)
+    lower_name = team_name.lower()
+    for canonical, tid in MLB_STATS_TEAMS.items():
+        if lower_name in canonical.lower() or canonical.lower() in lower_name:
+            return tid
+
+    # Fuzzy match via difflib
+    candidates = list(MLB_STATS_TEAMS.keys())
+    matches = difflib.get_close_matches(team_name, candidates, n=1, cutoff=0.6)
+    if matches:
+        return MLB_STATS_TEAMS[matches[0]]
+
+    return None
+
+
+def _fetch_last_games_statsapi(team_name: str, n: int = 10) -> list[dict]:
+    """Recupere les N derniers matchs termines d'une equipe via le package statsapi.
+
+    Synchrone — a appeler via asyncio.to_thread() depuis du code async.
+    Cache: cle abl:statsapi_last:{team_name}, TTL 24h.
+    Retourne le meme format que get_last_games():
+      {date, opponent, is_home, won, runs_scored, runs_allowed, score}
+    """
+    cache_key = f"abl:statsapi_last:{team_name}"
+    cached = cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    mlb_id = _resolve_mlb_stats_team_id(team_name)
+    if mlb_id is None:
+        logger.warning("statsapi: impossible de resoudre l'ID MLB pour '%s'", team_name)
+        return []
+
+    try:
+        end_date = datetime.now(timezone.utc)
+        start_date = end_date - timedelta(days=60)
+        start_str = start_date.strftime("%Y-%m-%d")
+        end_str = end_date.strftime("%Y-%m-%d")
+
+        raw_games: list[dict] = statsapi.schedule(
+            team=mlb_id,
+            start_date=start_str,
+            end_date=end_str,
+        )
+    except Exception as exc:
+        logger.error("statsapi.schedule error pour team='%s' (id=%s): %s", team_name, mlb_id, exc)
+        return []
+
+    # Filtrer les matchs termines
+    finished = [
+        g for g in raw_games
+        if "final" in (g.get("status") or "").lower()
+    ]
+
+    # Trier par date DESC et prendre les N derniers
+    finished.sort(key=lambda g: g.get("game_date", ""), reverse=True)
+    finished = finished[:n]
+
+    games: list[dict] = []
+    for g in finished:
+        try:
+            home_id: int = g.get("home_id")
+            away_id: int = g.get("away_id")
+            home_name: str = g.get("home_name", "")
+            away_name: str = g.get("away_name", "")
+            home_score = g.get("home_score")
+            away_score = g.get("away_score")
+
+            is_home = (home_id == mlb_id)
+            if is_home:
+                runs_scored = home_score
+                runs_allowed = away_score
+                opponent = away_name
+            else:
+                runs_scored = away_score
+                runs_allowed = home_score
+                opponent = home_name
+
+            won = (
+                runs_scored is not None
+                and runs_allowed is not None
+                and int(runs_scored) > int(runs_allowed)
+            )
+
+            # statsapi retourne game_date au format YYYY-MM-DD
+            game_date = g.get("game_date", "")
+
+            games.append({
+                "date": game_date,
+                "opponent": opponent,
+                "is_home": is_home,
+                "won": won,
+                "runs_scored": runs_scored,
+                "runs_allowed": runs_allowed,
+                "score": f"{home_score}-{away_score}" if home_score is not None else None,
+            })
+        except (KeyError, TypeError, ValueError):
+            continue
+
+    _cache_set(cache_key, games, ttl=TTL["last_games"])
+    return games
 
 
 # ---------------------------------------------------------------------------
@@ -435,8 +595,20 @@ class ApiBaseballClient:
 
     # --- Last games (form + rest days) ---
 
-    async def get_last_games(self, team_id: int, n: int = 10) -> list[dict]:
+    async def get_last_games(
+        self,
+        team_id: int,
+        n: int = 10,
+        team_name: str | None = None,
+    ) -> list[dict]:
         """Return last N games for a team.
+
+        Tente d'abord l'API-Sports (parametre `last`). Si le resultat est vide
+        (le free plan bloque ce parametre), bascule sur le package statsapi
+        (MLB Stats API officiel, gratuit, sans cle).
+
+        Parametre additionnel team_name : nom de l'equipe pour le fallback statsapi.
+        Si non fourni, le fallback n'est pas tente.
 
         Each dict: {date, opponent, is_home, won, runs_scored, runs_allowed, score}
         """
@@ -445,7 +617,18 @@ class ApiBaseballClient:
             "/games",
             {"team": team_id, "league": MLB_LEAGUE_ID, "last": n},
         )
+
         if not raw:
+            # Fallback statsapi si team_name disponible
+            if team_name:
+                logger.info(
+                    "get_last_games: API-Sports vide pour team_id=%d, fallback statsapi (team_name='%s')",
+                    team_id, team_name,
+                )
+                try:
+                    return await asyncio.to_thread(_fetch_last_games_statsapi, team_name, n)
+                except Exception as exc:
+                    logger.error("statsapi fallback erreur pour team='%s': %s", team_name, exc)
             return []
 
         games = []
