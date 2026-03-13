@@ -5,10 +5,10 @@ Auth: x-apisports-key header (same key as API-Football / API-Sports)
 Free tier: 100 req/day, 10 req/min
 
 Leagues tracked:
-  - Top 14         (id: 2)
-  - Premiership    (id: 3)
-  - URC            (id: 4)
-  - Champions Cup  (id: 5)
+  - Top 14         (id: 16)
+  - Premiership    (id: 13)
+  - URC            (id: 76)
+  - Champions Cup  (id: 54)
 
 Data fetched:
   - Fixtures (upcoming games with date, teams, venue, status)
@@ -38,10 +38,10 @@ logger = logging.getLogger(__name__)
 API_BASE = "https://v1.rugby.api-sports.io"
 
 RUGBY_LEAGUES: dict[str, dict] = {
-    "top_14": {"id": 2, "name": "Top 14"},
-    "premiership": {"id": 3, "name": "Premiership"},
-    "urc": {"id": 4, "name": "United Rugby Championship"},
-    "champions_cup": {"id": 5, "name": "Champions Cup"},
+    "top_14": {"id": 16, "name": "Top 14"},
+    "premiership": {"id": 13, "name": "Premiership"},
+    "urc": {"id": 76, "name": "United Rugby Championship"},
+    "champions_cup": {"id": 54, "name": "Champions Cup"},
 }
 
 RUGBY_SEASON = "2024"
@@ -191,16 +191,8 @@ class ApiRugbyClient:
                 "/games",
                 {"league": league_id, "season": RUGBY_SEASON, "date": date_str},
             )
-            if not raw and timeframe in ("48h", "72h"):
-                tomorrow = (
-                    datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)
-                ).strftime("%Y-%m-%d")
-                key_id2 = f"{league_key}_{tomorrow}"
-                raw = await _get_cached(
-                    "fixtures", key_id2,
-                    "/games",
-                    {"league": league_id, "season": RUGBY_SEASON, "date": tomorrow},
-                ) or []
+            if not raw:
+                raw = []
 
             for g in (raw or []):
                 try:

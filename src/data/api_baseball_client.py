@@ -173,17 +173,7 @@ class ApiBaseballClient:
             {"league": MLB_LEAGUE_ID, "season": MLB_SEASON, "date": date_str},
         )
         if not raw:
-            if timeframe in ("48h", "72h"):
-                tomorrow = (datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-                key_id2 = f"mlb_{tomorrow}"
-                raw2 = await _get_cached(
-                    "fixtures", key_id2,
-                    "/games",
-                    {"league": MLB_LEAGUE_ID, "season": MLB_SEASON, "date": tomorrow},
-                )
-                raw = raw2 or []
-            else:
-                return []
+            return []
 
         fixtures = []
         for g in (raw or []):

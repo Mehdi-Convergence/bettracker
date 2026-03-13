@@ -167,18 +167,7 @@ class ApiBasketballClient:
             {"league": NBA_LEAGUE_ID, "season": NBA_SEASON, "date": date_str},
         )
         if not raw:
-            # Try next day too for 48h window
-            if timeframe in ("48h", "72h"):
-                tomorrow = (datetime.strptime(date_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-                key_id2 = f"nba_{tomorrow}"
-                raw2 = await _get_cached(
-                    "fixtures", key_id2,
-                    "/games",
-                    {"league": NBA_LEAGUE_ID, "season": NBA_SEASON, "date": tomorrow},
-                )
-                raw = raw2 or []
-            else:
-                return []
+            return []
 
         fixtures = []
         for g in (raw or []):
