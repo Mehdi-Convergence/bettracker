@@ -198,21 +198,30 @@ async def run_football_scan(league_list: list[str] | None = None):
             # Parallel data fetches (including last fixture for rest_days + weather)
             from src.data.weather_client import get_match_weather
             (standings_list, h2h_raw, injuries, stats_h, stats_a, odds,
-             last_fix_home, last_fix_away, weather_data) = await asyncio.gather(
+             last_fixes_home, last_fixes_away, weather_data) = await asyncio.gather(
                 client.get_standings(league_id),
                 client.get_h2h(home_id, away_id),
                 client.get_injuries(fid),
                 client.get_team_stats(home_id, league_id),
                 client.get_team_stats(away_id, league_id),
                 client.get_odds(fid),
-                client.get_last_fixture_date(home_id),
-                client.get_last_fixture_date(away_id),
+                client.get_last_fixtures(home_id, n=5),
+                client.get_last_fixtures(away_id, n=5),
                 get_match_weather(venue_city),
             )
 
-            # Rest days calculation (0 extra cost — uses cached fixtures)
-            home_rest = int((fixture_dt - last_fix_home).days) if last_fix_home else None
-            away_rest = int((fixture_dt - last_fix_away).days) if last_fix_away else None
+            # Rest days calculation — derive from most recent fixture in the list
+            def _rest_days(fixes: list[dict], ref_dt: datetime) -> int | None:
+                if not fixes:
+                    return None
+                try:
+                    last_dt = datetime.strptime(fixes[0]["date"], "%Y-%m-%d")
+                    return int((ref_dt - last_dt).days)
+                except Exception:
+                    return None
+
+            home_rest = _rest_days(last_fixes_home, fixture_dt)
+            away_rest = _rest_days(last_fixes_away, fixture_dt)
 
             # Topscorers (per league, cached in memory)
             if league_id not in topscorers_cache:
@@ -224,6 +233,49 @@ async def run_football_scan(league_list: list[str] | None = None):
 
             form_home = client.form_to_bettracker(stats_h.get("form", ""))
             form_away = client.form_to_bettracker(stats_a.get("form", ""))
+
+            # Form detail: last 5 matches with opponent and score
+            def _build_form_detail(fixes: list[dict]) -> list[str]:
+                """Build ['W 2-0 vs Arsenal', 'L 1-3 vs Liverpool', ...] from last fixtures."""
+                parts = []
+                for fx in fixes[:5]:
+                    res = fx.get("result", "?")
+                    sf = fx.get("score_for", 0)
+                    sa = fx.get("score_against", 0)
+                    opp = fx.get("opponent", "?")
+                    parts.append(f"{res} {sf}-{sa} vs {opp}")
+                return parts
+
+            form_home_detail = _build_form_detail(last_fixes_home)
+            form_away_detail = _build_form_detail(last_fixes_away)
+
+            # Home/away specific win rates from standings
+            def _home_win_rate(standings: list[dict], team_id: int) -> str | None:
+                for s in standings:
+                    if s.get("team_id") == team_id:
+                        hw = s.get("home_wins", 0) or 0
+                        hd = s.get("home_draws", 0) or 0
+                        hl = s.get("home_losses", 0) or 0
+                        total = hw + hd + hl
+                        if total == 0:
+                            return None
+                        return f"{hw}V {hd}N {hl}D ({total} matchs domicile)"
+                return None
+
+            def _away_win_rate(standings: list[dict], team_id: int) -> str | None:
+                for s in standings:
+                    if s.get("team_id") == team_id:
+                        aw = s.get("away_wins", 0) or 0
+                        ad = s.get("away_draws", 0) or 0
+                        al = s.get("away_losses", 0) or 0
+                        total = aw + ad + al
+                        if total == 0:
+                            return None
+                        return f"{aw}V {ad}N {al}D ({total} matchs exterieur)"
+                return None
+
+            form_home_home_str = _home_win_rate(standings_list, home_id)
+            form_away_away_str = _away_win_rate(standings_list, away_id)
 
             # Injuries (with position lookup from squad for penalty weighting)
             inj_home = [i for i in injuries if i.get("team_id") == home_id]
@@ -465,7 +517,10 @@ async def run_football_scan(league_list: list[str] | None = None):
                 venue=venue_name, odds=odds,
                 weather=weather_str,
                 form_home=form_home or None, form_away=form_away or None,
-                form_home_home=None, form_away_away=None,
+                form_home_detail=form_home_detail,
+                form_away_detail=form_away_detail,
+                form_home_home=form_home_home_str,
+                form_away_away=form_away_away_str,
                 position_home=home_rank, position_away=away_rank,
                 key_absences_home=abs_home, key_absences_away=abs_away,
                 h2h_summary=client._h2h_summary(h2h_raw, home_id) if h2h_raw else None,
@@ -745,6 +800,8 @@ async def run_tennis_scan():
                 p1_rest_days=m.get("p1_rest_days"), p2_rest_days=m.get("p2_rest_days"),
                 h2h_surface=m.get("h2h_surface"), h2h_last3=m.get("h2h_last3", []) or [],
                 home_rest_days=m.get("p1_rest_days"), away_rest_days=m.get("p2_rest_days"),
+                home_bp_saved_pct=m.get("p1_bp_saved_pct"), away_bp_saved_pct=m.get("p2_bp_saved_pct"),
+                home_tb_win_pct=m.get("p1_tb_win_pct"), away_tb_win_pct=m.get("p2_tb_win_pct"),
                 model_prob_home=calc.home_prob, model_prob_away=calc.away_prob,
                 edges=calc.edges, data_quality=calc.data_quality, data_score=calc.data_score,
                 p1_serve_stats=_p1_serve_stats, p2_serve_stats=_p2_serve_stats,

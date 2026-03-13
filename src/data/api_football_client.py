@@ -270,6 +270,60 @@ class ApiFootballClient:
         except (KeyError, IndexError, TypeError):
             return None
 
+    async def get_last_fixtures(self, team_id: int, n: int = 5) -> list[dict]:
+        """Return last N played matches for a team.
+
+        Each entry: {date, opponent, score_for, score_against, result (W/D/L), is_home}.
+        Used to build form_detail strings and weighted lambda calculations.
+        """
+        raw = await _get_cached(
+            "fixtures", f"last{n}_{team_id}",
+            "/fixtures",
+            {"team": team_id, "season": SEASON, "last": n},
+        )
+        if not raw:
+            return []
+        result = []
+        for m in raw:
+            try:
+                home_id = m["teams"]["home"]["id"]
+                away_id = m["teams"]["away"]["id"]
+                is_home = (home_id == team_id)
+                opponent = m["teams"]["away"]["name"] if is_home else m["teams"]["home"]["name"]
+                score_h = m["goals"]["home"]
+                score_a = m["goals"]["away"]
+                if score_h is None or score_a is None:
+                    continue
+                score_for = score_h if is_home else score_a
+                score_against = score_a if is_home else score_h
+                home_winner = m["teams"]["home"].get("winner")
+                away_winner = m["teams"]["away"].get("winner")
+                if is_home:
+                    if home_winner:
+                        res = "W"
+                    elif away_winner:
+                        res = "L"
+                    else:
+                        res = "D"
+                else:
+                    if away_winner:
+                        res = "W"
+                    elif home_winner:
+                        res = "L"
+                    else:
+                        res = "D"
+                result.append({
+                    "date": m["fixture"]["date"][:10],
+                    "opponent": opponent,
+                    "score_for": score_for,
+                    "score_against": score_against,
+                    "result": res,
+                    "is_home": is_home,
+                })
+            except (KeyError, TypeError):
+                pass
+        return result
+
     # --- Standings ---
 
     async def get_standings(self, league_id: int) -> list[dict]:

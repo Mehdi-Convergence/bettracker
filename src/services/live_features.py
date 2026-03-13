@@ -153,11 +153,17 @@ def build_live_features(
     h_home_ppg = _ppg(stats_h.get("wins_home"), stats_h.get("draws_home"), stats_h.get("losses_home"))
     a_away_ppg = _ppg(stats_a.get("wins_away"), stats_a.get("draws_away"), stats_a.get("losses_away"))
 
-    # Goals averages (use home/away specific if available, else total)
-    hgs = stats_h.get("goals_scored_avg_home") or stats_h.get("goals_scored_avg_total") or 1.2
-    hgc = stats_h.get("goals_conceded_avg_home") or stats_h.get("goals_conceded_avg_total") or 1.2
-    ags = stats_a.get("goals_scored_avg_away") or stats_a.get("goals_scored_avg_total") or 1.2
-    agc = stats_a.get("goals_conceded_avg_away") or stats_a.get("goals_conceded_avg_total") or 1.2
+    # Goals averages — global (total season, used for lambda_5 and form windows)
+    hgs = stats_h.get("goals_scored_avg_total") or stats_h.get("goals_scored_avg_home") or 1.2
+    hgc = stats_h.get("goals_conceded_avg_total") or stats_h.get("goals_conceded_avg_home") or 1.2
+    ags = stats_a.get("goals_scored_avg_total") or stats_a.get("goals_scored_avg_away") or 1.2
+    agc = stats_a.get("goals_conceded_avg_total") or stats_a.get("goals_conceded_avg_away") or 1.2
+
+    # Goals averages — venue-specific (home team at home, away team away)
+    hgs_home = stats_h.get("goals_scored_avg_home") or hgs
+    hgc_home = stats_h.get("goals_conceded_avg_home") or hgc
+    ags_away = stats_a.get("goals_scored_avg_away") or ags
+    agc_away = stats_a.get("goals_conceded_avg_away") or agc
 
     # ------------------------------------------------------------------ #
     # 1. ELO — lookup from persistent snapshot (scripts/build_elo_snapshot.py)
@@ -266,16 +272,60 @@ def build_live_features(
     # ------------------------------------------------------------------ #
     # 7. Poisson lambda features
     # ------------------------------------------------------------------ #
+    # Global (total season averages)
     lh = hgs * agc
     la = ags * hgc
     f["lambda_home_5"] = lh
     f["lambda_away_5"] = la
     f["lambda_ratio_5"] = lh / max(0.01, la)
-    f["lambda_home_venue"] = lh
-    f["lambda_away_venue"] = la
-    f["lambda_home_weighted"] = lh
-    f["lambda_away_weighted"] = la
-    f["lambda_ratio_weighted"] = lh / max(0.01, la)
+
+    # Venue-specific: home team goals at home × away team goals conceded away
+    lh_venue = hgs_home * agc_away
+    la_venue = ags_away * hgc_home
+    f["lambda_home_venue"] = lh_venue
+    f["lambda_away_venue"] = la_venue
+
+    # Weighted: exponential recency weighting via form string (WWDLW → most recent last)
+    # Weights: most recent = 1.0, -0.2 per step back (1.0, 0.8, 0.6, 0.4, 0.2)
+    form_h_raw = (stats_h.get("form") or "")[-5:].upper()
+    form_a_raw = (stats_a.get("form") or "")[-5:].upper()
+
+    def _weighted_goals_avg(form: str, base_scored: float, base_conceded: float) -> tuple[float, float]:
+        """Compute recency-weighted goal averages from form string.
+
+        Each W maps to +1 goal scored proxy, L to +0 goals, D to base avg.
+        Falls back to base_scored/base_conceded if form is empty.
+        """
+        if not form:
+            return base_scored, base_conceded
+        weights = [0.2, 0.4, 0.6, 0.8, 1.0]  # oldest to most recent
+        n = len(form)
+        weights_used = weights[-n:]
+        scored_vals: list[float] = []
+        conceded_vals: list[float] = []
+        for i, c in enumerate(form):
+            w = weights_used[i]
+            if c == "W":
+                scored_vals.append(base_scored * 1.15 * w)
+                conceded_vals.append(base_conceded * 0.85 * w)
+            elif c == "L":
+                scored_vals.append(base_scored * 0.85 * w)
+                conceded_vals.append(base_conceded * 1.15 * w)
+            else:  # D
+                scored_vals.append(base_scored * w)
+                conceded_vals.append(base_conceded * w)
+        total_w = sum(weights_used)
+        ws = sum(scored_vals) / total_w if total_w > 0 else base_scored
+        wc = sum(conceded_vals) / total_w if total_w > 0 else base_conceded
+        return ws, wc
+
+    hgs_w, hgc_w = _weighted_goals_avg(form_h_raw, hgs, hgc)
+    ags_w, agc_w = _weighted_goals_avg(form_a_raw, ags, agc)
+    lh_weighted = hgs_w * agc_w
+    la_weighted = ags_w * hgc_w
+    f["lambda_home_weighted"] = lh_weighted
+    f["lambda_away_weighted"] = la_weighted
+    f["lambda_ratio_weighted"] = lh_weighted / max(0.01, la_weighted)
 
     # ------------------------------------------------------------------ #
     # 8. Implied probabilities & bookmaker vig

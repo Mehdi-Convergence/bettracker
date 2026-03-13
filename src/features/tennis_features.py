@@ -536,11 +536,32 @@ class TennisFeatureBuilder:
         elo_s_map = player_snapshot.get("elo_surface", {})
         elo_surf = elo_s_map.get(surface, {})
 
+        _player_keys = list(players.keys())
+
+        def _resolve(name: str) -> str:
+            """Return the snapshot key that best matches *name*.
+
+            Lookup order:
+            1. Exact match
+            2. Normalized form ("Djokovic N." style)
+            3. Fuzzy last-name match (unique surname in snapshot)
+            """
+            if name in players:
+                return name
+            normalized = _normalize_player_name(name)
+            if normalized in players:
+                return normalized
+            fuzzy = _fuzzy_lookup_by_last_name(name, _player_keys)
+            return fuzzy if fuzzy is not None else name
+
         def _get(name: str) -> dict:
-            return players.get(name) or players.get(_normalize_player_name(name)) or {}
+            return players.get(_resolve(name)) or {}
 
         def _elo(name: str, elo_dict: dict) -> float:
-            v = elo_dict.get(name) or elo_dict.get(_normalize_player_name(name))
+            resolved = _resolve(name)
+            v = elo_dict.get(resolved)
+            if v is None and resolved != name:
+                v = elo_dict.get(name)
             return float(v) if v is not None else _INITIAL_ELO
 
         p1_stats = _get(p1)
@@ -688,6 +709,39 @@ def build_tennis_live_features(
     )
 
 
+def _fuzzy_lookup_by_last_name(name: str, keys: list[str]) -> str | None:
+    """Return the snapshot key whose surname matches name's surname.
+
+    Extracts the last name of *name* (first token before a space, since snapshot
+    keys are "Surname I." format) and compares it against the surname token of
+    every key.  Returns the matched key only when exactly one candidate matches
+    (to avoid ambiguity between players like "Murray A." and "Murray J.").
+    """
+    if not name or not keys:
+        return None
+
+    # Derive last name from *name* — try to extract the surname component
+    raw = name.strip()
+    if "," in raw:
+        surname_part = raw.split(",", 1)[0].strip()
+    elif " " in raw:
+        parts = raw.split()
+        # "N. Djokovic" style — surname is last token
+        if len(parts[0]) <= 2 and parts[0].endswith("."):
+            surname_part = parts[-1]
+        # "First Last" or "First Middle Last" — use last token
+        else:
+            surname_part = parts[-1]
+    else:
+        surname_part = raw
+
+    surname_lower = surname_part.lower()
+    matches = [k for k in keys if k.split()[0].lower() == surname_lower]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
 def _parse_h2h_summary(summary: str | None) -> tuple[int, int] | None:
     """Parse a SofaScore H2H summary string into (p1_wins, p2_losses).
 
@@ -709,20 +763,59 @@ def _parse_h2h_summary(summary: str | None) -> tuple[int, int] | None:
 
 
 def _normalize_player_name(name: str) -> str:
-    """Attempt to normalize player name for lookup.
+    """Normalize a player name to the tennis-data.co.uk format "Surname I.".
 
-    Sofascore: "Novak Djokovic" → try "Djokovic N."
-    Also handles already-normalized names like "Djokovic N."
+    Handles the following input formats:
+      "Novak Djokovic"           -> "Djokovic N."
+      "N. Djokovic"              -> "Djokovic N."
+      "Djokovic, Novak"          -> "Djokovic N."
+      "Djokovic N."              -> "Djokovic N."  (already correct — passthrough)
+      "Carlos Alcaraz Garfia"    -> "Alcaraz C."   (3-part name: use middle as surname)
+      "Fritz Taylor Jr."         -> "Fritz T."     (strip Jr./Sr. suffix)
+    Accented characters are kept as-is.
     """
     if not name:
         return name
-    parts = name.strip().split()
+
+    # Strip known honorific / generation suffixes (case-insensitive)
+    _SUFFIXES = {"jr.", "jr", "sr.", "sr", "ii", "iii", "iv"}
+    raw = name.strip()
+
+    # Format: "Surname, Firstname" (comma-separated)
+    if "," in raw:
+        surname_part, given_part = raw.split(",", 1)
+        surname = surname_part.strip()
+        given = given_part.strip()
+        initial = given[0] if given else "?"
+        return f"{surname} {initial}."
+
+    parts = raw.split()
+    # Strip trailing suffix tokens
+    while parts and parts[-1].lower() in _SUFFIXES:
+        parts = parts[:-1]
+
+    if not parts:
+        return name
     if len(parts) == 1:
-        return name
-    # Already in "Surname I." format
+        return parts[0]
+
+    # Already in "Surname I." format  e.g. "Djokovic N."
     if len(parts) == 2 and len(parts[1]) <= 2 and parts[1].endswith("."):
-        return name
-    # Convert "First Last" → "Last F."
+        return raw  # passthrough
+
+    # "I. Surname" format — first token is an initial  e.g. "N. Djokovic"
+    if len(parts[0]) <= 2 and parts[0].endswith("."):
+        initial = parts[0][0]
+        surname = parts[-1]
+        return f"{surname} {initial}."
+
+    # 3-part name: "First Middle Last" — use middle as surname (e.g. "Carlos Alcaraz Garfia")
+    if len(parts) == 3:
+        first = parts[0]
+        middle = parts[1]
+        return f"{middle} {first[0]}."
+
+    # Default: "First Last" (or 4+ parts — use last token as surname)
     first = parts[0]
     last = parts[-1]
     return f"{last} {first[0]}."

@@ -831,6 +831,12 @@ function TennisAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; a
             {am.p1_aces_avg != null && am.p2_aces_avg != null && (
               <FormRow label="Aces/match" homeVal={am.p1_aces_avg.toFixed(1)} awayVal={am.p2_aces_avg.toFixed(1)} homeBetter={am.p1_aces_avg > am.p2_aces_avg ? true : am.p1_aces_avg < am.p2_aces_avg ? false : undefined} />
             )}
+            {am.home_bp_saved_pct != null && am.away_bp_saved_pct != null && (
+              <FormRow label="BP Saves %" homeVal={`${am.home_bp_saved_pct}%`} awayVal={`${am.away_bp_saved_pct}%`} homeBetter={am.home_bp_saved_pct > am.away_bp_saved_pct ? true : am.home_bp_saved_pct < am.away_bp_saved_pct ? false : undefined} />
+            )}
+            {am.home_tb_win_pct != null && am.away_tb_win_pct != null && (
+              <FormRow label="TB Win %" homeVal={`${am.home_tb_win_pct}%`} awayVal={`${am.away_tb_win_pct}%`} homeBetter={am.home_tb_win_pct > am.away_tb_win_pct ? true : am.home_tb_win_pct < am.away_tb_win_pct ? false : undefined} />
+            )}
           </div>
         </div>
       )}
@@ -919,6 +925,8 @@ function TennisStatsTab({ am, home, away }: { am: AIScanMatch; home: string; awa
     { label: "Service %", hv: am.p1_serve_pct != null ? `${am.p1_serve_pct}%` : null, av: am.p2_serve_pct != null ? `${am.p2_serve_pct}%` : null },
     { label: "Retour %", hv: am.p1_return_pct != null ? `${am.p1_return_pct}%` : null, av: am.p2_return_pct != null ? `${am.p2_return_pct}%` : null },
     { label: "Aces/match", hv: am.p1_aces_avg != null ? am.p1_aces_avg.toFixed(1) : null, av: am.p2_aces_avg != null ? am.p2_aces_avg.toFixed(1) : null },
+    { label: "BP Saves %", hv: am.home_bp_saved_pct != null ? `${am.home_bp_saved_pct}%` : null, av: am.away_bp_saved_pct != null ? `${am.away_bp_saved_pct}%` : null },
+    { label: "TB Win %", hv: am.home_tb_win_pct != null ? `${am.home_tb_win_pct}%` : null, av: am.away_tb_win_pct != null ? `${am.away_tb_win_pct}%` : null },
     { label: "Jours de repos", hv: am.p1_rest_days != null ? `${am.p1_rest_days}j` : null, av: am.p2_rest_days != null ? `${am.p2_rest_days}j` : null },
   ].filter((r) => r.hv != null || r.av != null);
 
@@ -2347,7 +2355,7 @@ function MLBStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: 
     { label: "Runs marques / match (10j)", hv: am.home_runs_avg_10 != null ? am.home_runs_avg_10.toFixed(2) : null, av: am.away_runs_avg_10 != null ? am.away_runs_avg_10.toFixed(2) : null },
     { label: "Runs encaisses / match (10j)", hv: am.home_runs_allowed_10 != null ? am.home_runs_allowed_10.toFixed(2) : null, av: am.away_runs_allowed_10 != null ? am.away_runs_allowed_10.toFixed(2) : null, lowerBetter: true },
     { label: "Moyenne au baton (BA)", hv: am.home_batting_avg != null ? am.home_batting_avg.toFixed(3) : null, av: am.away_batting_avg != null ? am.away_batting_avg.toFixed(3) : null },
-    { label: "ERA (lanceur partant)", hv: am.home_era != null ? am.home_era.toFixed(2) : null, av: am.away_era != null ? am.away_era.toFixed(2) : null, lowerBetter: true },
+    { label: "ERA (equipe, saison)", hv: am.home_era != null ? am.home_era.toFixed(2) : null, av: am.away_era != null ? am.away_era.toFixed(2) : null, lowerBetter: true },
   ].filter(r => r.hv != null || r.av != null);
 
   const hasDivision = am.home_division != null || am.away_division != null;

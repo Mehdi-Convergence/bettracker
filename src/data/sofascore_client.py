@@ -401,6 +401,10 @@ class SofascoreClient:
                 match[f"{prefix}_return_pct"] = serve_stats["return_pct"]
             if serve_stats.get("aces_avg") is not None:
                 match[f"{prefix}_aces_avg"] = serve_stats["aces_avg"]
+            if serve_stats.get("bp_saved_pct") is not None:
+                match[f"{prefix}_bp_saved_pct"] = serve_stats["bp_saved_pct"]
+            if serve_stats.get("tb_win_pct") is not None:
+                match[f"{prefix}_tb_win_pct"] = serve_stats["tb_win_pct"]
 
     def _compute_player_stats(
         self, events: list[dict], player_id: int, target_surface: str | None

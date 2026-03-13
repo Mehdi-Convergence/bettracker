@@ -598,6 +598,10 @@ class AIScanMatch(BaseModel):
     p2_aces_avg: float | None = None
     p1_rest_days: int | None = None
     p2_rest_days: int | None = None
+    home_bp_saved_pct: float | None = None
+    away_bp_saved_pct: float | None = None
+    home_tb_win_pct: float | None = None
+    away_tb_win_pct: float | None = None
     # Historical service stats from Tennis Abstract (rolling avg 5 matches)
     p1_serve_stats: dict | None = None  # {ace_rate, df_rate, 1st_serve_in, 1st_serve_won, 2nd_serve_won, bp_save}
     p2_serve_stats: dict | None = None

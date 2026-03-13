@@ -469,6 +469,10 @@ export interface AIScanMatch {
   p2_aces_avg: number | null;
   p1_rest_days: number | null;
   p2_rest_days: number | null;
+  home_bp_saved_pct: number | null;
+  away_bp_saved_pct: number | null;
+  home_tb_win_pct: number | null;
+  away_tb_win_pct: number | null;
   // Historical serve stats from Tennis Abstract (rolling avg 5 matches)
   p1_serve_stats: Record<string, number> | null;
   p2_serve_stats: Record<string, number> | null;
