@@ -1,7 +1,7 @@
 """add pmu_races and pmu_runners tables
 
 Revision ID: h8i9j3k4l5m6
-Revises: h8i9j1k2l3m4
+Revises: h8i9j2k3l4m5
 Create Date: 2026-03-13
 """
 from typing import Sequence, Union
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "h8i9j3k4l5m6"
-down_revision: Union[str, None] = "h8i9j1k2l3m4"
+down_revision: Union[str, None] = "h8i9j2k3l4m5"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

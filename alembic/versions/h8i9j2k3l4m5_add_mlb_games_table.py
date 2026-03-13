@@ -1,7 +1,7 @@
 """add mlb_games table
 
 Revision ID: h8i9j2k3l4m5
-Revises: h8i9j1k2l3m4
+Revises: ai0001a1b2c3
 Create Date: 2026-03-13
 """
 from typing import Sequence, Union
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "h8i9j2k3l4m5"
-down_revision: Union[str, None] = "h8i9j1k2l3m4"
+down_revision: Union[str, None] = "ai0001a1b2c3"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
