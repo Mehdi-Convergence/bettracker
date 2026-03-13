@@ -1774,17 +1774,19 @@ async def run_pmu_scan():
 async def main():
     logger.info("Scan worker starting...")
 
-    # Initial scan on startup
-    logger.info("Running initial football scan...")
-    await run_football_scan()
-    logger.info("Running initial tennis scan...")
-    await run_tennis_scan()
-    logger.info("Running initial NBA scan...")
-    await run_nba_scan()
-    logger.info("Running initial rugby scan...")
-    await run_rugby_scan()
-    logger.info("Running initial MLB scan...")
-    await run_mlb_scan()
+    # Initial scan on startup (each wrapped to avoid crashing the whole worker)
+    for scan_name, scan_fn in [
+        ("football", run_football_scan),
+        ("tennis", run_tennis_scan),
+        ("NBA", run_nba_scan),
+        ("rugby", run_rugby_scan),
+        ("MLB", run_mlb_scan),
+    ]:
+        logger.info("Running initial %s scan...", scan_name)
+        try:
+            await scan_fn()
+        except Exception as exc:
+            logger.error("Initial %s scan failed: %s", scan_name, exc)
 
     # Schedule recurring scans
     async def _football_loop():

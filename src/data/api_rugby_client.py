@@ -386,7 +386,8 @@ class ApiRugbyClient:
             try:
                 team = entry.get("team", {})
                 games = entry.get("games", {})
-                pts_info = entry.get("points", {})
+                pts_raw = entry.get("points", {})
+                pts_info = pts_raw if isinstance(pts_raw, dict) else {}
 
                 played = games.get("played", 0) or 0
                 wins = games.get("win", 0) or 0
@@ -400,8 +401,8 @@ class ApiRugbyClient:
                     "team_id": team.get("id"),
                     "team_name": team.get("name", ""),
                     "rank": entry.get("position"),
-                    "league_points": entry.get("points", {}).get("league") if isinstance(entry.get("points"), dict) else entry.get("league_points"),
-                    "bonus_points": entry.get("points", {}).get("bonus") if isinstance(entry.get("points"), dict) else None,
+                    "league_points": pts_info.get("league") if pts_info else (pts_raw if isinstance(pts_raw, int) else None),
+                    "bonus_points": pts_info.get("bonus") if pts_info else None,
                     "wins": wins,
                     "draws": draws,
                     "losses": losses,

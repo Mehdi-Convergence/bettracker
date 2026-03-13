@@ -332,7 +332,15 @@ class ApiBaseballClient:
             return []
 
         standings = []
-        for entry in raw:
+        # API-Sports may wrap standings in nested groups (by division) — flatten
+        entries: list[dict] = []
+        for item in raw:
+            if isinstance(item, list):
+                entries.extend(item)
+            elif isinstance(item, dict):
+                entries.append(item)
+
+        for entry in entries:
             try:
                 team = entry.get("team", {})
                 group_info = entry.get("group", {})
