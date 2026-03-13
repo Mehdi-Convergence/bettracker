@@ -42,10 +42,14 @@ def _safe_str(val) -> str | None:
 def _parse_date(date_str: str) -> date | None:
     for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%m/%d/%Y"):
         try:
-            return datetime.strptime(date_str[:len(fmt)], fmt).date()
+            return datetime.strptime(date_str.strip(), fmt).date()
         except (ValueError, TypeError):
             continue
-    return None
+    # Try parsing just the first 10 chars as YYYY-MM-DD
+    try:
+        return datetime.strptime(date_str[:10], "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
 
 
 def _fetch_boxscore(game_id: int) -> dict:
@@ -81,8 +85,8 @@ def collect_season(season: str, with_details: bool = False) -> list[dict]:
         logger.info("  No games found for %s", season)
         return []
 
-    # Filter to Final games only (completed)
-    completed = [g for g in schedule if g.get("status") == "Final"]
+    # Filter to completed games
+    completed = [g for g in schedule if g.get("status") in ("Final", "Completed Early", "Game Over")]
     logger.info("  %d completed games found for %s", len(completed), season)
 
     games = []
