@@ -69,6 +69,10 @@ jobs:
             cd /opt/bettracker
 
             echo "-> Installing Python dependencies..."
+            if [ -d .venv ] && ! .venv/bin/python --version &>/dev/null; then
+              echo "-> Removing invalid .venv..."
+              rm -rf .venv
+            fi
             uv sync --no-dev
 
             echo "-> Building frontend..."
