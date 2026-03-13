@@ -1,14 +1,8 @@
 betracker.fr {
-    # Frontend statique
-    root * /opt/bettracker/frontend/dist
-    file_server
-
-    # API proxy
+    # API proxy — doit etre avant file_server
     handle /api/* {
         reverse_proxy localhost:8000
     }
-
-    # Routes backend directes
     handle /health {
         reverse_proxy localhost:8000
     }
@@ -19,6 +13,10 @@ betracker.fr {
         reverse_proxy localhost:8000
     }
 
-    # SPA fallback
-    try_files {path} /index.html
+    # Frontend statique + SPA fallback
+    handle {
+        root * /opt/bettracker/frontend/dist
+        try_files {path} /index.html
+        file_server
+    }
 }
