@@ -34,6 +34,8 @@ API_BASE = "https://v1.baseball.api-sports.io"
 # MLB league ID in API-Sports Baseball
 MLB_LEAGUE_ID = 1
 MLB_SEASON = "2024"
+MLB_SPRING_TRAINING_ID = 71
+MLB_TRACKED_LEAGUES = {MLB_LEAGUE_ID, MLB_SPRING_TRAINING_ID}
 
 # MLB divisions
 MLB_DIVISIONS = [
@@ -170,10 +172,12 @@ class ApiBaseballClient:
         raw = await _get_cached(
             "fixtures", key_id,
             "/games",
-            {"league": MLB_LEAGUE_ID, "season": MLB_SEASON, "date": date_str},
+            {"date": date_str},
         )
         if not raw:
             return []
+        # Filter to MLB + Spring Training (free plan doesn't support season filter)
+        raw = [g for g in raw if g.get("league", {}).get("id") in MLB_TRACKED_LEAGUES]
 
         fixtures = []
         for g in (raw or []):
@@ -431,7 +435,7 @@ class ApiBaseballClient:
         raw = await _get_cached(
             "last_games", f"{team_id}_last{n}",
             "/games",
-            {"team": team_id, "league": MLB_LEAGUE_ID, "season": MLB_SEASON, "last": n},
+            {"team": team_id, "league": MLB_LEAGUE_ID, "last": n},
         )
         if not raw:
             return []

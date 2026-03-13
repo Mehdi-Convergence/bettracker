@@ -71,8 +71,9 @@ class PMUFeatureBuilder:
         self.combo_history = defaultdict(list)
 
         # Merge runners with race metadata
+        # Drop race_id from races_df to avoid duplicate column after merge
         merged = runners_df.merge(
-            races_df.rename(columns={"id": "race_pk"}),
+            races_df.rename(columns={"id": "race_pk"}).drop(columns=["race_id"], errors="ignore"),
             left_on="race_id",
             right_on="race_pk",
             how="left",

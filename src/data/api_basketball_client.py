@@ -164,10 +164,12 @@ class ApiBasketballClient:
         raw = await _get_cached(
             "fixtures", key_id,
             "/games",
-            {"league": NBA_LEAGUE_ID, "season": NBA_SEASON, "date": date_str},
+            {"date": date_str},
         )
         if not raw:
             return []
+        # Filter to NBA league only (free plan doesn't support season filter)
+        raw = [g for g in raw if g.get("league", {}).get("id") == NBA_LEAGUE_ID]
 
         fixtures = []
         for g in (raw or []):
@@ -312,7 +314,7 @@ class ApiBasketballClient:
         raw = await _get_cached(
             "standings", f"nba_{NBA_SEASON}",
             "/standings",
-            {"league": NBA_LEAGUE_ID, "season": NBA_SEASON},
+            {"league": NBA_LEAGUE_ID, "season": "2023-2024"},
         )
         if not raw:
             return []
@@ -365,7 +367,7 @@ class ApiBasketballClient:
         raw = await _get_cached(
             "team_stats", str(team_id),
             "/statistics",
-            {"team": team_id, "league": NBA_LEAGUE_ID, "season": NBA_SEASON},
+            {"team": team_id, "league": NBA_LEAGUE_ID, "season": "2023-2024"},
         )
         if not raw:
             return {}
@@ -415,7 +417,7 @@ class ApiBasketballClient:
         raw = await _get_cached(
             "last_games", f"{team_id}_last{n}",
             "/games",
-            {"team": team_id, "league": NBA_LEAGUE_ID, "season": NBA_SEASON, "last": n},
+            {"team": team_id, "league": NBA_LEAGUE_ID, "last": n},
         )
         if not raw:
             return []

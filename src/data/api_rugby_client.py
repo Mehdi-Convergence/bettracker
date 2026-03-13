@@ -183,44 +183,50 @@ class ApiRugbyClient:
         all_fixtures: list[dict] = []
         seen_ids: set = set()
 
-        for league_key, league_info in RUGBY_LEAGUES.items():
-            league_id = league_info["id"]
-            key_id = f"{league_key}_{date_str}"
-            raw = await _get_cached(
-                "fixtures", key_id,
-                "/games",
-                {"league": league_id, "season": RUGBY_SEASON, "date": date_str},
-            )
-            if not raw:
-                raw = []
+        # Single date-only request (free plan doesn't support season filter)
+        all_raw = await _get_cached(
+            "fixtures", f"all_{date_str}",
+            "/games",
+            {"date": date_str},
+        )
+        if not all_raw:
+            all_raw = []
 
-            for g in (raw or []):
-                try:
-                    status_short = g.get("status", {}).get("short", "")
-                    # Only future or live games
-                    if status_short in ("FT", "AOT", "POST", "CANC", "ABD"):
-                        continue
-                    game_id = g.get("id")
-                    if game_id in seen_ids:
-                        continue
-                    seen_ids.add(game_id)
-                    fixture = {
-                        "game_id": game_id,
-                        "date": g.get("date", ""),
-                        "home_id": g.get("teams", {}).get("home", {}).get("id"),
-                        "home_name": g.get("teams", {}).get("home", {}).get("name", ""),
-                        "away_id": g.get("teams", {}).get("away", {}).get("id"),
-                        "away_name": g.get("teams", {}).get("away", {}).get("name", ""),
-                        "venue": g.get("venue"),
-                        "league": league_info["name"],
-                        "league_id": league_id,
-                        "status": status_short,
-                        "home_score": g.get("scores", {}).get("home"),
-                        "away_score": g.get("scores", {}).get("away"),
-                    }
-                    all_fixtures.append(fixture)
-                except (KeyError, TypeError):
+        tracked_ids = {v["id"] for v in RUGBY_LEAGUES.values()}
+
+        for g in all_raw:
+            try:
+                league_id = g.get("league", {}).get("id")
+                if league_id not in tracked_ids:
                     continue
+                status_short = g.get("status", {}).get("short", "")
+                if status_short in ("FT", "AOT", "POST", "CANC", "ABD"):
+                    continue
+                game_id = g.get("id")
+                if game_id in seen_ids:
+                    continue
+                seen_ids.add(game_id)
+                league_name = next(
+                    (v["name"] for v in RUGBY_LEAGUES.values() if v["id"] == league_id),
+                    "Rugby"
+                )
+                fixture = {
+                    "game_id": game_id,
+                    "date": g.get("date", ""),
+                    "home_id": g.get("teams", {}).get("home", {}).get("id"),
+                    "home_name": g.get("teams", {}).get("home", {}).get("name", ""),
+                    "away_id": g.get("teams", {}).get("away", {}).get("id"),
+                    "away_name": g.get("teams", {}).get("away", {}).get("name", ""),
+                    "venue": g.get("venue"),
+                    "league": league_name,
+                    "league_id": league_id,
+                    "status": status_short,
+                    "home_score": g.get("scores", {}).get("home"),
+                    "away_score": g.get("scores", {}).get("away"),
+                }
+                all_fixtures.append(fixture)
+            except (KeyError, TypeError):
+                continue
 
         return all_fixtures
 
@@ -534,7 +540,7 @@ class ApiRugbyClient:
         raw = await _get_cached(
             "last_games", f"{team_id}_last{n}",
             "/games",
-            {"team": team_id, "season": RUGBY_SEASON, "last": n},
+            {"team": team_id, "last": n},
         )
         if not raw:
             return []

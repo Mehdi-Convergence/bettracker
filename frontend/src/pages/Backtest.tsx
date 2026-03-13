@@ -224,8 +224,12 @@ export default function Backtest() {
         sportLabel = sportEmoji[sportList[0]] ?? sportList[0];
         sportKey = sportList[0];
       } else {
-        const allRes = await Promise.all(sportList.map(s => runBacktest({ ...params, sport: s })));
-        data = allRes.reduce((acc, r) => mergeBacktestResults(acc, r, params.initial_bankroll));
+        const allRes = await Promise.allSettled(sportList.map(s => runBacktest({ ...params, sport: s })));
+        const successRes = allRes
+          .filter((r): r is PromiseFulfilledResult<import("../types").BacktestResponse> => r.status === "fulfilled")
+          .map(r => r.value);
+        if (successRes.length === 0) throw new Error("Aucun backtest n'a abouti");
+        data = successRes.reduce((acc, r) => mergeBacktestResults(acc, r, params.initial_bankroll));
         sportLabel = sportList.map(s => sportEmoji[s] ?? s).join("+");
         sportKey = sportList.join("+");
       }
@@ -698,6 +702,8 @@ export default function Backtest() {
                   tennis:   { emoji: "🎾", label: "Tennis ATP", train: "2019–2023 (5 ans)", test: "2024–2025 (2 ans)" },
                   nba:      { emoji: "🏀", label: "NBA", train: "2018–2023 (5 saisons)", test: "2023–2025 (2 saisons)" },
                   rugby:    { emoji: "🏉", label: "Rugby Union", train: "2019–2023 (5 saisons)", test: "2024–2025 (2 saisons)" },
+                  mlb:      { emoji: "\u26BE", label: "MLB", train: "2019\u20132023 (5 saisons)", test: "2023\u20132025 (2 saisons)" },
+                  pmu:      { emoji: "\uD83D\uDC0E", label: "Courses PMU", train: "80% chronologique", test: "20% recentes" },
                 };
                 const c = cfg[s];
                 if (!c) return null;
