@@ -627,6 +627,14 @@ class AIScanMatch(BaseModel):
     away_tries_avg_10: float | None = None
     home_penalties_avg_10: float | None = None
     away_penalties_avg_10: float | None = None
+    # MLB fields
+    mlb_ml_used: bool = False
+    home_runs_avg_10: float | None = None
+    away_runs_avg_10: float | None = None
+    home_runs_allowed_10: float | None = None
+    away_runs_allowed_10: float | None = None
+    starter_home_name: str | None = None
+    starter_away_name: str | None = None
     # Lineup
     fixture_id: int | None = None
     lineup_status: str = "unavailable"     # "presumed" | "confirmed" | "unavailable"
@@ -724,6 +732,50 @@ class UserPreferencesResponse(BaseModel):
     odds_format: str
     default_tickets_view: str
     default_campaigns_view: str
+
+
+# --- PMU Scanner schemas ---
+
+
+class PMURunnerCard(BaseModel):
+    """Un partant dans une course PMU."""
+    number: int
+    horse_name: str
+    jockey: str | None = None
+    trainer: str | None = None
+    weight: float | None = None
+    odds: float | None = None
+    odds_morning: float | None = None
+    model_prob_win: float | None = None
+    model_prob_place: float | None = None
+    edge_win: float | None = None
+    edge_place: float | None = None
+    form: str | None = None
+    last_5: list[int] | None = None
+
+
+class PMURaceCard(BaseModel):
+    """Une course PMU avec ses partants."""
+    race_id: str
+    hippodrome: str
+    race_number: int
+    race_type: str
+    distance: int
+    terrain: str | None = None
+    post_time: str | None = None
+    prize_pool: float | None = None
+    num_runners: int
+    is_quinteplus: bool = False
+    runners: list[PMURunnerCard] = []
+
+
+class PMUScanResponse(BaseModel):
+    """Reponse du scanner PMU (liste de courses avec partants)."""
+    races: list[PMURaceCard]
+    sport: str = "pmu"
+    source: str = "pmu_api"
+    cached: bool = False
+    cached_at: str | None = None
 
 
 class UserPreferencesUpdateRequest(BaseModel):

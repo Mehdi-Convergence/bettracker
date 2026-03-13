@@ -770,6 +770,102 @@ def calculate_nba(
 
 
 # ---------------------------------------------------------------------------
+# MLB probability calculator (rule-based baseline)
+# ---------------------------------------------------------------------------
+
+MLB_MAX_POINTS = 6
+
+
+def calculate_mlb(
+    odds_home: float,
+    odds_away: float,
+    home_win_rate: float | None = None,
+    away_win_rate: float | None = None,
+    home_run_diff: float | None = None,
+    away_run_diff: float | None = None,
+    home_runs_avg: float | None = None,
+    away_runs_avg: float | None = None,
+    home_runs_allowed: float | None = None,
+    away_runs_allowed: float | None = None,
+) -> MatchProbabilityResult:
+    """Estimate fair probabilities and edges for an MLB game (rule-based baseline).
+
+    Baseball: no draw, moneyline only.
+    Used as a fallback when the ML model is unavailable.
+
+    Data quality points:
+      odds (2) + win_rate (1) + run_diff (1) + runs_avg (1) + runs_allowed (1) = 6 max
+    """
+    if odds_home <= 0 or odds_away <= 0:
+        return MatchProbabilityResult(
+            home_prob=0.5, draw_prob=0.0, away_prob=0.5,
+            edges={"Home": 0.0, "Away": 0.0},
+            data_quality="red", data_score=0.0,
+        )
+
+    raw_h = 1 / odds_home
+    raw_a = 1 / odds_away
+    fair_h, _, fair_a = _remove_overround(raw_h, 0.0, raw_a)
+    data_points = 2
+
+    adj = 0.0
+
+    # Win rate adjustment
+    if home_win_rate is not None and away_win_rate is not None:
+        adj += (home_win_rate - away_win_rate) * 0.05
+        data_points += 1
+
+    # Run differential adjustment
+    if home_run_diff is not None and away_run_diff is not None:
+        rd_diff = home_run_diff - away_run_diff
+        # MLB run differential rarely exceeds ±3 per game — normalize to ±0.05
+        adj += max(-0.05, min(0.05, rd_diff / 60))
+        data_points += 1
+
+    # Offensive/defensive balance: high scoring + good defense = advantage
+    if (home_runs_avg is not None and away_runs_allowed is not None
+            and away_runs_avg is not None and home_runs_allowed is not None):
+        off_edge_h = home_runs_avg - away_runs_allowed
+        off_edge_a = away_runs_avg - home_runs_allowed
+        balance_adj = (off_edge_h - off_edge_a) / 20.0  # normalize by typical range ~10 runs
+        adj += max(-0.04, min(0.04, balance_adj))
+        data_points += 2  # runs_avg + runs_allowed
+
+    est_h = min(0.85, max(0.15, fair_h + adj))
+    est_a = 1.0 - est_h
+
+    edge_h = round(est_h - 1.0 / odds_home, 4)
+    edge_a = round(est_a - 1.0 / odds_away, 4)
+
+    edges: dict[str, float] = {}
+    if edge_h > 0:
+        edges["Home"] = edge_h
+    if edge_a > 0:
+        edges["Away"] = edge_a
+
+    data_score = data_points / MLB_MAX_POINTS
+    if data_score >= 0.75:
+        quality: Literal["green", "yellow", "red"] = "green"
+    elif data_score >= 0.4:
+        quality = "yellow"
+    else:
+        quality = "red"
+
+    return MatchProbabilityResult(
+        home_prob=round(est_h, 4),
+        draw_prob=0.0,
+        away_prob=round(est_a, 4),
+        edges=edges,
+        data_quality=quality,
+        data_score=round(data_score, 3),
+        data_points_used=data_points,
+        data_points_max=MLB_MAX_POINTS,
+        used_odds=True,
+        used_form=home_win_rate is not None,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Rugby probability calculator (rule-based baseline)
 # ---------------------------------------------------------------------------
 
@@ -884,3 +980,112 @@ def calculate_rugby(
         used_odds=True,
         used_form=home_win_rate is not None,
     )
+
+
+# ---------------------------------------------------------------------------
+# PMU probability calculator
+# ---------------------------------------------------------------------------
+
+# Points disponibles pour la qualite des donnees PMU:
+#   odds_final              -> 1 pt (toujours)
+#   win_model_prob          -> 2 pts (ML disponible)
+#   place_model_prob        -> 2 pts (ML disponible)
+#   horse_form              -> 1 pt
+#   jockey_stats            -> 1 pt
+PMU_MAX_POINTS = 7
+
+
+def calculate_pmu(runners: list[dict]) -> list[dict]:
+    """Calcule prob_win, prob_place, edge_win, edge_place pour chaque partant.
+
+    Args:
+        runners: Liste de dicts avec au minimum:
+            - odds: cote finale du cheval (float)
+            - model_prob_win: probabilite ML gagnant (float | None)
+            - model_prob_place: probabilite ML place (float | None)
+            - horse_name: nom du cheval (str)
+            - number: numero de dossard (int)
+
+    Returns:
+        Meme liste enrichie avec prob_win, prob_place, edge_win, edge_place.
+
+    Logique:
+        - Si ML dispo: utilise les probas ML
+        - Sinon: utilise les probas implicites des cotes (1/odds, normalisees)
+        - Commission PMU estimee: 15% gagnant, 18% place
+        - Edges = prob_modele - prob_implicite_brute
+    """
+    PMU_COMMISSION_WIN = 0.15
+    PMU_COMMISSION_PLACE = 0.18
+
+    # Filtrer les non-partants (odds nulles ou scratches)
+    active = [r for r in runners if r.get("odds") and float(r["odds"]) > 1.0]
+    if not active:
+        return runners
+
+    # --- Probas implicites brutes ---
+    inv_odds = []
+    for r in active:
+        try:
+            inv_odds.append(1.0 / float(r["odds"]))
+        except (TypeError, ValueError, ZeroDivisionError):
+            inv_odds.append(0.0)
+
+    total_inv = sum(inv_odds) or 1.0
+    # Probas implicites normalisees (sans marge bookmaker)
+    implied_probs = [v / total_inv for v in inv_odds]
+
+    # --- Place cotes approx: odds_win / 4 (PMU standard) ---
+    # Les cotes place sont generalement environ le quart des cotes gagnant
+    place_odds_list = [max(1.05, float(r["odds"]) / 4.0) for r in active]
+    inv_place_odds = [1.0 / p for p in place_odds_list]
+    total_inv_place = sum(inv_place_odds) or 1.0
+    implied_place_probs = [v / total_inv_place for v in inv_place_odds]
+
+    result = []
+    active_idx = 0
+    for runner in runners:
+        r = dict(runner)
+        odds_val = r.get("odds")
+        if not odds_val or float(odds_val) <= 1.0:
+            # Partant non-actif: pas d'enrichissement
+            r["prob_win"] = None
+            r["prob_place"] = None
+            r["edge_win"] = None
+            r["edge_place"] = None
+            result.append(r)
+            continue
+
+        impl_win = implied_probs[active_idx]
+        impl_place = implied_place_probs[active_idx]
+
+        # Utiliser les probas ML si disponibles, sinon probas implicites
+        model_win = r.get("model_prob_win")
+        model_place = r.get("model_prob_place")
+
+        prob_win = float(model_win) if model_win is not None else impl_win
+        prob_place = float(model_place) if model_place is not None else impl_place
+
+        # Probabilite implicite brute (sans normalisation) pour le calcul d'edge
+        raw_implied_win = 1.0 / float(r["odds"])
+        raw_implied_place = 1.0 / place_odds_list[active_idx]
+
+        # Cotes nettes apres commission
+        net_odds_win = float(r["odds"]) * (1.0 - PMU_COMMISSION_WIN)
+        net_odds_place = place_odds_list[active_idx] * (1.0 - PMU_COMMISSION_PLACE)
+
+        # Edge = prob_modele - prob_implicite_brute
+        edge_win = round(prob_win - raw_implied_win, 4)
+        edge_place = round(prob_place - raw_implied_place, 4)
+
+        r["prob_win"] = round(prob_win, 4)
+        r["prob_place"] = round(prob_place, 4)
+        r["edge_win"] = edge_win
+        r["edge_place"] = edge_place
+        r["net_odds_win"] = round(net_odds_win, 3)
+        r["net_odds_place"] = round(net_odds_place, 3)
+
+        result.append(r)
+        active_idx += 1
+
+    return result

@@ -36,6 +36,10 @@ def run_backtest(request: BacktestRequest):
         result = _run_nba_backtest(request)
     elif sport == "rugby":
         result = _run_rugby_backtest(request)
+    elif sport == "mlb":
+        result = _run_mlb_backtest(request)
+    elif sport == "pmu":
+        result = _run_pmu_backtest(request)
     else:
         result = _run_football_backtest(request)
 
@@ -276,6 +280,125 @@ def _run_rugby_backtest(request: BacktestRequest) -> dict:
         stop_loss_total_pct=request.stop_loss_total_pct,
     )
     return engine.run(df)
+
+
+def _run_mlb_backtest(request: BacktestRequest) -> dict:
+    import pandas as pd
+    from src.database import SessionLocal
+    from src.models.mlb_game import MLBGame
+    from src.backtest.mlb_engine import MLBBacktestEngine
+
+    db = SessionLocal()
+    rows = db.query(MLBGame).filter(MLBGame.home_score.isnot(None)).all()
+    db.close()
+
+    if not rows:
+        raise HTTPException(status_code=503, detail="Aucune donnee MLB. Lancez la collecte MLB d'abord.")
+
+    df = pd.DataFrame([{
+        "id": g.id,
+        "game_id": g.game_id,
+        "game_date": g.game_date,
+        "season": g.season,
+        "home_team": g.home_team,
+        "away_team": g.away_team,
+        "home_score": g.home_score,
+        "away_score": g.away_score,
+        "home_hits": g.home_hits,
+        "away_hits": g.away_hits,
+        "home_errors": g.home_errors,
+        "away_errors": g.away_errors,
+        "odds_home": g.odds_home,
+        "odds_away": g.odds_away,
+        "odds_over": g.odds_over,
+        "odds_under": g.odds_under,
+        "total_line": g.total_line,
+    } for g in rows])
+
+    engine = MLBBacktestEngine(
+        staking_strategy=request.staking_strategy,
+        flat_stake_amount=request.flat_stake_amount,
+        pct_bankroll=request.pct_bankroll,
+        kelly_fraction=request.kelly_fraction,
+        max_stake_pct=request.max_stake_pct,
+        initial_bankroll=request.initial_bankroll,
+        min_edge=request.min_edge,
+        min_model_prob=request.min_model_prob,
+        max_odds=request.max_odds,
+        min_odds=request.min_odds,
+        stop_loss_daily_pct=request.stop_loss_daily_pct,
+        stop_loss_total_pct=request.stop_loss_total_pct,
+    )
+    return engine.run(df)
+
+
+def _run_pmu_backtest(request: BacktestRequest) -> dict:
+    import pandas as pd
+    from src.database import SessionLocal
+    from src.models.pmu_race import PMURace, PMURunner
+    from src.backtest.pmu_engine import PMUBacktestEngine
+
+    db = SessionLocal()
+    races = db.query(PMURace).all()
+    runners = db.query(PMURunner).filter(PMURunner.finish_position.isnot(None)).all()
+    db.close()
+
+    if not races:
+        raise HTTPException(status_code=503, detail="Aucune donnee PMU. Lancez la collecte PMU d'abord.")
+    if not runners:
+        raise HTTPException(status_code=503, detail="Aucun resultat de course PMU disponible.")
+
+    races_df = pd.DataFrame([{
+        "id": r.id,
+        "race_id": r.race_id,
+        "race_date": r.race_date,
+        "race_time": r.race_time,
+        "hippodrome": r.hippodrome,
+        "race_number": r.race_number,
+        "race_type": r.race_type,
+        "distance": r.distance,
+        "terrain": r.terrain,
+        "prize_pool": r.prize_pool,
+        "num_runners": r.num_runners,
+        "is_quinteplus": r.is_quinteplus,
+    } for r in races])
+
+    runners_df = pd.DataFrame([{
+        "id": ru.id,
+        "race_id": ru.race_id,
+        "number": ru.number,
+        "horse_name": ru.horse_name,
+        "jockey_name": ru.jockey_name,
+        "trainer_name": ru.trainer_name,
+        "age": ru.age,
+        "weight": ru.weight,
+        "odds_final": ru.odds_final,
+        "odds_morning": ru.odds_morning,
+        "finish_position": ru.finish_position,
+        "is_scratched": ru.is_scratched,
+        "form_string": ru.form_string,
+        "last_5_positions": ru.last_5_positions,
+    } for ru in runners])
+
+    # Filtres PMU specifiques (race_type) depuis allowed_outcomes (re-utilise ce champ)
+    race_types = request.allowed_outcomes if request.allowed_outcomes else None
+
+    engine = PMUBacktestEngine(
+        staking_strategy=request.staking_strategy,
+        flat_stake_amount=request.flat_stake_amount,
+        pct_bankroll=request.pct_bankroll,
+        kelly_fraction=request.kelly_fraction,
+        max_stake_pct=request.max_stake_pct,
+        initial_bankroll=request.initial_bankroll,
+        min_edge=request.min_edge,
+        min_model_prob=request.min_model_prob,
+        max_odds=request.max_odds,
+        min_odds=request.min_odds,
+        stop_loss_daily_pct=request.stop_loss_daily_pct,
+        stop_loss_total_pct=request.stop_loss_total_pct,
+        race_types=race_types,
+    )
+    return engine.run(races_df, runners_df)
 
 
 @router.post("/backtest/save", response_model=SavedBacktestSummary)

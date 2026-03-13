@@ -152,6 +152,7 @@ dependencies = [
     { name = "kaggle" },
     { name = "kagglehub" },
     { name = "lightgbm" },
+    { name = "mlb-statsapi" },
     { name = "nba-api" },
     { name = "numpy" },
     { name = "openpyxl" },
@@ -199,6 +200,7 @@ requires-dist = [
     { name = "kaggle", specifier = ">=2.0.0" },
     { name = "kagglehub", specifier = ">=1.0.0" },
     { name = "lightgbm", specifier = ">=4.6.0" },
+    { name = "mlb-statsapi", specifier = ">=1.7.0" },
     { name = "nba-api", specifier = ">=1.11.4" },
     { name = "numpy", specifier = ">=2.4.2" },
     { name = "openpyxl", specifier = ">=3.1.5" },
@@ -1133,6 +1135,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
+]
+
+[[package]]
+name = "mlb-statsapi"
+version = "1.9.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6e/82/803f7679f4447eedece75ded1966b1584807ac6aa5acfeb5e4746438654f/mlb_statsapi-1.9.0.tar.gz", hash = "sha256:8d8b65080e80d1b14ac5eb7905106609b46a8571d69edb45228e408c35d8d022", size = 30567, upload-time = "2025-04-04T19:02:23.858Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fd/a7/0c56310db3b67b449a19a1872def21c62e15497557a5fab6e228b5da6e15/mlb_statsapi-1.9.0-py3-none-any.whl", hash = "sha256:1da5cad74588a8fdbb6d3a4928180b9b79a2edab649aba4395fa03301fa896ad", size = 31275, upload-time = "2025-04-04T19:02:22.588Z" },
 ]
 
 [[package]]

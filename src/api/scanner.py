@@ -16,6 +16,8 @@ from src.api.schemas import (
     AIResearchResponse,
     AIScanMatch,
     AIScanResponse,
+    PMURaceCard,
+    PMUScanResponse,
 )
 from src.cache import cache_get
 
@@ -110,6 +112,26 @@ async def ai_scan(
             except Exception as exc:
                 logger.error("Inline rugby scan failed: %s", exc)
         return _read_rugby_scan()
+
+    if sport == "mlb":
+        cached_mlb = cache_get("scan:mlb:all")
+        if cached_mlb is None and force:
+            try:
+                from src.workers.scan_worker import run_mlb_scan
+                await run_mlb_scan()
+            except Exception as exc:
+                logger.error("Inline MLB scan failed: %s", exc)
+        return _read_mlb_scan()
+
+    if sport == "pmu":
+        cached_pmu = cache_get("scan:pmu:all")
+        if cached_pmu is None and force:
+            try:
+                from src.workers.scan_worker import run_pmu_scan
+                await run_pmu_scan()
+            except Exception as exc:
+                logger.error("Inline PMU scan failed: %s", exc)
+        return _read_pmu_scan()  # type: ignore[return-value]
 
     # --- Football: read from cache ---
     # Build the same cache key the worker uses (no league filter = "all" key)
@@ -206,6 +228,43 @@ def _read_rugby_scan() -> AIScanResponse:
     )
 
 
+def _read_mlb_scan() -> AIScanResponse:
+    """Read pre-computed MLB scan from cache."""
+    _MLB_CACHE_DIR = Path("data/cache/mlb")
+    cached = cache_get("scan:mlb:all")
+    if cached is None:
+        # File fallback
+        if _MLB_CACHE_DIR.exists():
+            cache_files = sorted(
+                _MLB_CACHE_DIR.glob("scan_result_*.json"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            for cf in cache_files[:1]:
+                try:
+                    import time as _time2
+                    data = _json.loads(cf.read_text(encoding="utf-8"))
+                    age = _time2.time() - data.get("_cached_at", 0)
+                    if age < 1800:
+                        cached = data
+                except Exception:
+                    pass
+    if cached is None:
+        return AIScanResponse(
+            matches=[], sport="mlb", source="odds_api",
+            cached=False, cached_at=None, research_duration_seconds=0.0,
+        )
+    raw = cached.get("matches", [])
+    return AIScanResponse(
+        matches=[AIScanMatch(**m) for m in raw],
+        sport="mlb",
+        source="odds_api",
+        cached=True,
+        cached_at=datetime.fromtimestamp(cached["_cached_at"]).isoformat(),
+        research_duration_seconds=cached.get("duration", 0.0),
+    )
+
+
 def get_scanned_matches(
     min_edge: float | None = None,
     min_prob: float | None = None,
@@ -270,6 +329,74 @@ def get_scanned_matches(
             filtered.append(m)
 
     return filtered, total_scanned, 0, 0, 0
+
+
+# ---------------------------------------------------------------------------
+# PMU scan helpers
+# ---------------------------------------------------------------------------
+
+_PMU_CACHE_DIR = Path("data/cache/pmu")
+
+
+def _read_pmu_scan() -> PMUScanResponse:
+    """Read pre-computed PMU scan from Redis or file cache."""
+    cached = cache_get("scan:pmu:all")
+
+    # File fallback (jusqu'a 30 min)
+    if cached is None and _PMU_CACHE_DIR.exists():
+        cache_files = sorted(
+            _PMU_CACHE_DIR.glob("scan_result_*.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        for cf in cache_files[:1]:
+            try:
+                data = _json.loads(cf.read_text(encoding="utf-8"))
+                age = _time.time() - data.get("_cached_at", 0)
+                if age < 1800:
+                    cached = data
+            except Exception:
+                pass
+
+    if cached is None:
+        return PMUScanResponse(races=[], cached=False, cached_at=None)
+
+    raw_races = cached.get("races", [])
+    races_out: list[PMURaceCard] = []
+    for r in raw_races:
+        try:
+            races_out.append(PMURaceCard(**r))
+        except Exception:
+            pass
+
+    cached_at_str = None
+    ts = cached.get("_cached_at")
+    if ts:
+        try:
+            cached_at_str = datetime.fromtimestamp(float(ts)).isoformat()
+        except Exception:
+            pass
+
+    return PMUScanResponse(
+        races=races_out,
+        cached=True,
+        cached_at=cached_at_str,
+        source="pmu_api",
+    )
+
+
+@router.get("/scanner/pmu", response_model=PMUScanResponse)
+async def pmu_scan(
+    force: bool = Query(default=False, description="Force refresh depuis l'API PMU"),
+):
+    """Retourne les courses PMU du jour avec probas et edges pre-calcules."""
+    if force:
+        try:
+            from src.workers.scan_worker import run_pmu_scan
+            await run_pmu_scan()
+        except Exception as exc:
+            logger.error("Inline PMU scan failed: %s", exc)
+    return _read_pmu_scan()
 
 
 @router.get("/scanner/ai-research", response_model=AIResearchResponse)

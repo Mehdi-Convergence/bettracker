@@ -1,3 +1,39 @@
+MLB_TEAMS = [
+    "Arizona Diamondbacks",
+    "Atlanta Braves",
+    "Baltimore Orioles",
+    "Boston Red Sox",
+    "Chicago Cubs",
+    "Chicago White Sox",
+    "Cincinnati Reds",
+    "Cleveland Guardians",
+    "Colorado Rockies",
+    "Detroit Tigers",
+    "Houston Astros",
+    "Kansas City Royals",
+    "Los Angeles Angels",
+    "Los Angeles Dodgers",
+    "Miami Marlins",
+    "Milwaukee Brewers",
+    "Minnesota Twins",
+    "New York Mets",
+    "New York Yankees",
+    "Oakland Athletics",
+    "Philadelphia Phillies",
+    "Pittsburgh Pirates",
+    "San Diego Padres",
+    "San Francisco Giants",
+    "Seattle Mariners",
+    "St. Louis Cardinals",
+    "Tampa Bay Rays",
+    "Texas Rangers",
+    "Toronto Blue Jays",
+    "Washington Nationals",
+]
+
+MLB_SEASONS = ["2019", "2020", "2021", "2022", "2023", "2024", "2025"]
+
+
 RUGBY_LEAGUES = {
     61:  "Top 14",
     45:  "Premiership",
@@ -89,6 +125,42 @@ FOOTBALL_ODDS_FALLBACK = {
     "B365D": "odds_draw",
     "B365A": "odds_away",
 }
+
+PMU_RACE_TYPES = {
+    "plat": "Plat",
+    "trot_attele": "Trot Attele",
+    "trot_monte": "Trot Monte",
+    "obstacle": "Obstacle",
+}
+
+PMU_TERRAIN_CONDITIONS = [
+    "bon",
+    "souple",
+    "lourd",
+    "collant",
+    "tres_souple",
+    "leger",
+    "sec",
+]
+
+PMU_TOP_HIPPODROMES = [
+    "Longchamp",
+    "Chantilly",
+    "Deauville",
+    "Saint-Cloud",
+    "Vincennes",
+    "Auteuil",
+    "Maisons-Laffitte",
+    "Compiegne",
+    "Enghien",
+    "Cagnes-sur-Mer",
+    "Lyon-Parilly",
+    "Toulouse",
+    "Marseille-Borely",
+    "Bordeaux",
+    "Nantes",
+]
+
 
 # Season code to display name
 SEASON_DISPLAY = {

@@ -30,7 +30,7 @@ type Tab = "analyse" | "equipes" | "cotes";
 function getTabs(sport: string): { key: Tab; label: string }[] {
   return [
     { key: "analyse", label: "Analyse" },
-    { key: "equipes", label: sport === "tennis" ? "Joueurs & Stats" : "Equipes & Stats" },
+    { key: "equipes", label: sport === "tennis" ? "Joueurs & Stats" : sport === "nba" ? "Stats NBA" : sport === "mlb" ? "Stats MLB" : "Equipes & Stats" },
     { key: "cotes", label: "Cotes" },
   ];
 }
@@ -39,6 +39,7 @@ export default function AIScanMatchDetailPanel({ am, home, away, onClose, inline
   const [tab, setTab] = useState<Tab>("analyse");
   const isTennis = am.sport === "tennis";
   const isNBA = am.sport === "nba";
+  const isMLB = am.sport === "mlb";
   const isRugby = am.sport === "rugby";
   const tabs = getTabs(am.sport ?? "football");
 
@@ -69,6 +70,7 @@ export default function AIScanMatchDetailPanel({ am, home, away, onClose, inline
               {am.venue && <span className="text-slate-400"> &bull; {am.venue}</span>}
               {isTennis && am.surface && <span className="text-slate-400"> &bull; {am.surface}</span>}
               {isTennis && am.round && <span className="text-slate-400"> &bull; {am.round}</span>}
+              {isMLB && <span className="text-slate-400"> &bull; Baseball</span>}
             </p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1 mt-1">
@@ -103,12 +105,14 @@ export default function AIScanMatchDetailPanel({ am, home, away, onClose, inline
                 <TennisAnalyseTab am={am} home={home} away={away} />
               ) : isNBA ? (
                 <NBAnalyseTab am={am} home={home} away={away} />
+              ) : isMLB ? (
+                <MLBAnalyseTab am={am} home={home} away={away} />
               ) : isRugby ? (
                 <RugbyAnalyseTab am={am} home={home} away={away} />
               ) : (
                 <IADataTab am={am} home={home} away={away} />
               )}
-              {!isNBA && !isRugby && <IAConseilTab am={am} home={home} away={away} />}
+              {!isNBA && !isMLB && !isRugby && <IAConseilTab am={am} home={home} away={away} />}
             </>
           )}
           {tab === "equipes" && (
@@ -117,6 +121,8 @@ export default function AIScanMatchDetailPanel({ am, home, away, onClose, inline
                 <TennisStatsTab am={am} home={home} away={away} />
               ) : isNBA ? (
                 <NBAStatsTab am={am} home={home} away={away} />
+              ) : isMLB ? (
+                <MLBStatsTab am={am} home={home} away={away} />
               ) : isRugby ? (
                 <RugbyStatsTab am={am} home={home} away={away} />
               ) : (
@@ -146,7 +152,8 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
   const probD = am.model_prob_draw ?? 0;
   const probA = am.model_prob_away ?? 0;
 
-  const pieData = isTennis || am.sport === "nba"
+  const isBinary = isTennis || am.sport === "nba" || am.sport === "mlb";
+  const pieData = isBinary
     ? [
         { name: home, value: probH, color: OUTCOME_COLORS.H },
         { name: away, value: probA, color: OUTCOME_COLORS.A },
@@ -159,17 +166,17 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
 
   const bestOutcome = isTennis
     ? (probH >= probA ? "P1" : "P2")
-    : am.sport === "nba"
+    : (am.sport === "nba" || am.sport === "mlb")
       ? (probH >= probA ? "Home" : "Away")
       : (probH >= probD && probH >= probA ? "H" : probD >= probH && probD >= probA ? "D" : "A");
   const bestOutcomeLabel = isTennis
     ? (bestOutcome === "P1" ? home : away)
-    : am.sport === "nba"
+    : (am.sport === "nba" || am.sport === "mlb")
       ? (bestOutcome === "Home" ? home : away)
       : (bestOutcome === "H" ? home : bestOutcome === "D" ? "Nul" : away);
   const bestProb = isTennis
     ? (bestOutcome === "P1" ? probH : probA)
-    : am.sport === "nba"
+    : (am.sport === "nba" || am.sport === "mlb")
       ? (bestOutcome === "Home" ? probH : probA)
       : (bestOutcome === "H" ? probH : bestOutcome === "D" ? probD : probA);
 
@@ -179,7 +186,7 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
 
   const oddForEdge = (() => {
     const o = am.odds as Record<string, Record<string, unknown>>;
-    const marketKey = isTennis || am.sport === "nba" ? "winner" : "1x2";
+    const marketKey = isBinary ? "winner" : "1x2";
     const market = o?.[marketKey];
     if (!market || !bestEdgeKey) return null;
     const entry = market[bestEdgeKey];
@@ -192,8 +199,8 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
     return null;
   })();
 
-  // Data score display: /18 for tennis, /20 for football, /6 for NBA, /7 for rugby
-  const maxPts = isTennis ? 18 : am.sport === "nba" ? 6 : am.sport === "rugby" ? 7 : 20;
+  // Data score display: /18 for tennis, /20 for football, /6 for NBA/MLB, /7 for rugby
+  const maxPts = isTennis ? 18 : (am.sport === "nba" || am.sport === "mlb") ? 6 : am.sport === "rugby" ? 7 : 20;
 
   return (
     <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
@@ -231,7 +238,7 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
                 <ProbBar label={home.split(" ").pop() ?? "P1"} prob={probH} color="bg-blue-500" edge={am.edges?.P1 ?? null} />
                 <ProbBar label={away.split(" ").pop() ?? "P2"} prob={probA} color="bg-red-500" edge={am.edges?.P2 ?? null} />
               </>
-            ) : am.sport === "nba" ? (
+            ) : (am.sport === "nba" || am.sport === "mlb") ? (
               <>
                 <ProbBar label="DOM" prob={probH} color="bg-blue-500" edge={am.edges?.Home ?? null} />
                 <ProbBar label="EXT" prob={probA} color="bg-red-500" edge={am.edges?.Away ?? null} />
@@ -259,7 +266,7 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
                 }`}>
                   {isTennis
                     ? (bestEdgeKey === "P1" ? home.split(" ").pop() : away.split(" ").pop())
-                    : am.sport === "nba"
+                    : (am.sport === "nba" || am.sport === "mlb")
                       ? (bestEdgeKey === "Home" ? "DOM" : "EXT")
                       : (bestEdgeKey === "H" ? "DOM" : bestEdgeKey === "D" ? "NUL" : "EXT")}
                 </span>
@@ -1026,9 +1033,15 @@ function CotesTab({ am }: { am: AIScanMatch }) {
   }
 
   const isTennis = am.sport === "tennis";
+  const isNBAOdds = am.sport === "nba";
+  const isMLBOdds = am.sport === "mlb";
   const MARKET_ORDER = isTennis
     ? ["winner", "sets", "games", "handicap_sets", "handicap_games", "over_under_games", "first_set_winner", "correct_score"]
-    : ["1x2", "btts", "over_under_2.5", "over_under", "double_chance", "draw_no_bet", "asian_handicap", "goalscorer_anytime", "goalscorer_first"];
+    : isNBAOdds
+      ? ["winner", "over_under", "handicap", "player_points", "player_assists", "player_rebounds"]
+      : isMLBOdds
+        ? ["winner", "over_under", "run_line", "first_5_innings", "team_total_runs"]
+        : ["1x2", "btts", "over_under_2.5", "over_under", "double_chance", "draw_no_bet", "asian_handicap", "goalscorer_anytime", "goalscorer_first"];
   const MARKET_LABELS: Record<string, string> = isTennis
     ? {
         "winner": "Vainqueur du match",
@@ -1040,17 +1053,34 @@ function CotesTab({ am }: { am: AIScanMatch }) {
         "first_set_winner": "Vainqueur 1er set",
         "correct_score": "Score exact (sets)",
       }
-    : {
-        "1x2": "Resultat du match",
-        "btts": "Les deux equipes marquent",
-        "over_under": "Plus / Moins de buts",
-        "over_under_2.5": "Plus / Moins 2.5 buts",
-        "double_chance": "Double chance",
-        "draw_no_bet": "Match nul rembourse",
-        "goalscorer_first": "Premier buteur",
-        "goalscorer_anytime": "Buteur (a tout moment)",
-        "asian_handicap": "Handicap asiatique",
-      };
+    : isNBAOdds
+      ? {
+          "winner": "Vainqueur du match",
+          "over_under": "Total de points (O/U)",
+          "handicap": "Handicap",
+          "player_points": "Points joueur",
+          "player_assists": "Passes decisives joueur",
+          "player_rebounds": "Rebonds joueur",
+        }
+      : isMLBOdds
+        ? {
+            "winner": "Vainqueur du match (Moneyline)",
+            "over_under": "Total de runs (O/U)",
+            "run_line": "Run Line (handicap)",
+            "first_5_innings": "5 premieres manches",
+            "team_total_runs": "Total equipe",
+          }
+        : {
+            "1x2": "Resultat du match",
+            "btts": "Les deux equipes marquent",
+            "over_under": "Plus / Moins de buts",
+            "over_under_2.5": "Plus / Moins 2.5 buts",
+            "double_chance": "Double chance",
+            "draw_no_bet": "Match nul rembourse",
+            "goalscorer_first": "Premier buteur",
+            "goalscorer_anytime": "Buteur (a tout moment)",
+            "asian_handicap": "Handicap asiatique",
+          };
 
   const orderedMarkets = [
     ...MARKET_ORDER.filter((m) => odds[m]),
@@ -1060,9 +1090,11 @@ function CotesTab({ am }: { am: AIScanMatch }) {
   // Model probs for main market probability bar
   const modelProbs: Record<string, number> = isTennis
     ? { P1: am.model_prob_home ?? 0, P2: am.model_prob_away ?? 0 }
-    : { H: am.model_prob_home ?? 0, D: am.model_prob_draw ?? 0, A: am.model_prob_away ?? 0 };
+    : (isNBAOdds || isMLBOdds)
+      ? { Home: am.model_prob_home ?? 0, Away: am.model_prob_away ?? 0 }
+      : { H: am.model_prob_home ?? 0, D: am.model_prob_draw ?? 0, A: am.model_prob_away ?? 0 };
   const maxProb = Math.max(...Object.values(modelProbs));
-  const mainMarket = isTennis ? "winner" : "1x2";
+  const mainMarket = isTennis || isNBAOdds || isMLBOdds ? "winner" : "1x2";
 
   // Model info for alternative markets (BTTS, Over 2.5)
   function getAltModelInfo(market: string, outcome: string): { prob: number | null; edge: number | null } {
@@ -1225,25 +1257,32 @@ function CotesTab({ am }: { am: AIScanMatch }) {
 
 function IAConseilTab({ am, home, away }: { am: AIScanMatch; home: string; away: string }) {
   const isTennis = am.sport === "tennis";
+  const isNBA = am.sport === "nba";
+  const isMLBC = am.sport === "mlb";
+  const isBinaryC = isTennis || isNBA || isMLBC;
   const probH = am.model_prob_home ?? 0;
   const probD = am.model_prob_draw ?? 0;
   const probA = am.model_prob_away ?? 0;
 
   const bestOutcome = isTennis
     ? (probH >= probA ? "P1" : "P2")
-    : (probH >= probD && probH >= probA ? "H" : probD >= probA ? "D" : "A");
+    : (isNBA || isMLBC)
+      ? (probH >= probA ? "Home" : "Away")
+      : (probH >= probD && probH >= probA ? "H" : probD >= probA ? "D" : "A");
   const bestLabel = isTennis
     ? (bestOutcome === "P1" ? home : away)
-    : (bestOutcome === "H" ? home : bestOutcome === "D" ? "Nul" : away);
-  const bestProb = isTennis
-    ? (bestOutcome === "P1" ? probH : probA)
+    : (isNBA || isMLBC)
+      ? (bestOutcome === "Home" ? home : away)
+      : (bestOutcome === "H" ? home : bestOutcome === "D" ? "Nul" : away);
+  const bestProb = isBinaryC
+    ? (bestOutcome === "P1" || bestOutcome === "Home" ? probH : probA)
     : (bestOutcome === "H" ? probH : bestOutcome === "D" ? probD : probA);
 
   const oddsObj = am.odds as Record<string, Record<string, unknown>> | null;
 
   // Best odd for best outcome
   const bestOdd = (() => {
-    const marketKey = isTennis ? "winner" : "1x2";
+    const marketKey = isBinaryC ? "winner" : "1x2";
     const market = oddsObj?.[marketKey];
     if (!market) return null;
     const val = market[bestOutcome];
@@ -1328,6 +1367,72 @@ function IAConseilTab({ am, home, away }: { am: AIScanMatch; home: string; away:
     // Season record
     if (am.p1_season_record && am.p2_season_record) {
       sentences.push({ text: `Bilan saison : ${home} (${am.p1_season_record}) vs ${away} (${am.p2_season_record}).`, type: "secondary" });
+    }
+  } else if (isNBA) {
+    // NBA-specific insights
+    // Win rate context
+    if (am.home_win_rate_10 != null && am.away_win_rate_10 != null) {
+      const diff = Math.abs(am.home_win_rate_10 - am.away_win_rate_10);
+      if (diff >= 0.15) {
+        const better = am.home_win_rate_10 > am.away_win_rate_10 ? home : away;
+        const betterRate = Math.max(am.home_win_rate_10, am.away_win_rate_10);
+        sentences.push({ text: `${better} est en meilleure forme (${(betterRate * 100).toFixed(0)}% de victoires sur les 10 derniers matchs).`, type: "info" });
+      }
+    }
+
+    // Point differential
+    if (am.home_pt_diff_10 != null && am.away_pt_diff_10 != null) {
+      const diff = am.home_pt_diff_10 - am.away_pt_diff_10;
+      if (Math.abs(diff) >= 5) {
+        const better = diff > 0 ? home : away;
+        const betterDiff = diff > 0 ? am.home_pt_diff_10 : am.away_pt_diff_10;
+        sentences.push({ text: `${better} domine par le differentiel de points (${betterDiff > 0 ? "+" : ""}${betterDiff.toFixed(1)} pts/match sur 10j).`, type: "info" });
+      }
+    }
+
+    // Scoring attack
+    if (am.home_pts_avg_10 != null && am.away_pts_avg_10 != null) {
+      const totalAvg = am.home_pts_avg_10 + am.away_pts_avg_10;
+      sentences.push({ text: `Attaque : ${home} marque en moyenne ${am.home_pts_avg_10.toFixed(1)} pts, ${away} ${am.away_pts_avg_10.toFixed(1)} pts (total moyen attendu : ${totalAvg.toFixed(1)} pts).`, type: "secondary" });
+    }
+
+    // B2B fatigue
+    if (am.home_b2b) {
+      sentences.push({ text: `Attention : ${home} joue dos-a-dos (2e match en 2 nuits), ce qui peut affecter ses performances.`, type: "info" });
+    }
+    if (am.away_b2b) {
+      sentences.push({ text: `Attention : ${away} joue dos-a-dos (2e match en 2 nuits), ce qui peut affecter ses performances.`, type: "info" });
+    }
+
+    // Streak context
+    if (am.home_streak != null && Math.abs(am.home_streak) >= 3) {
+      const type = am.home_streak > 0 ? "serie de victoires" : "serie de defaites";
+      sentences.push({ text: `${home} est en ${type} (${Math.abs(am.home_streak)} matchs consecutifs).`, type: am.home_streak > 0 ? "secondary" : "info" });
+    }
+    if (am.away_streak != null && Math.abs(am.away_streak) >= 3) {
+      const type = am.away_streak > 0 ? "serie de victoires" : "serie de defaites";
+      sentences.push({ text: `${away} est en ${type} (${Math.abs(am.away_streak)} matchs consecutifs).`, type: am.away_streak > 0 ? "secondary" : "info" });
+    }
+
+    // Edge context
+    if (edge !== null && Math.abs(edge) > 0.01 && bestOdd) {
+      const bookProb = (1 / bestOdd * 100).toFixed(1);
+      if (edge > 0) {
+        sentences.push({
+          text: `Le bookmaker donne ${bookProb}% a ${bestLabel} (cote ${bestOdd.toFixed(2)}). Notre modele estime ${(bestProb * 100).toFixed(1)}%. Difference : +${(edge * 100).toFixed(1)}%.`,
+          type: "info",
+        });
+      }
+    }
+
+    // Over/under context
+    if (am.total_line != null && am.home_pts_avg_10 != null && am.away_pts_avg_10 != null) {
+      const avgTotal = am.home_pts_avg_10 + am.away_pts_avg_10;
+      if (avgTotal > am.total_line + 5) {
+        sentences.push({ text: `Les deux equipes marquent en moyenne ${avgTotal.toFixed(0)} pts cumulees, au-dessus de la ligne O/U (${am.total_line}).`, type: "secondary" });
+      } else if (avgTotal < am.total_line - 5) {
+        sentences.push({ text: `Les deux equipes marquent en moyenne ${avgTotal.toFixed(0)} pts cumulees, en dessous de la ligne O/U (${am.total_line}).`, type: "secondary" });
+      }
     }
   } else {
     // Football-specific insights (unchanged)
@@ -1568,6 +1673,18 @@ function CompoTab({ am, home, away }: { am: AIScanMatch; home: string; away: str
 // ─── NBA Analyse Tab ──────────────────────────────────────────────────────────
 
 function NBAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away: string }) {
+  const edges = am.edges ?? {};
+  const edgeData = Object.entries(edges)
+    .filter(([k]) => k === "Home" || k === "Away")
+    .map(([k, v]) => ({
+      name: k === "Home" ? home : away,
+      value: parseFloat((v * 100).toFixed(2)),
+      fill: v > 0 ? "#10b981" : "#ef4444",
+    }))
+    .filter((d) => Math.abs(d.value) > 0.01);
+
+  const maxPts = 6;
+
   return (
     <div className="space-y-4">
       {am.nba_ml_used && (
@@ -1581,11 +1698,11 @@ function NBAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away:
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp size={15} className="text-orange-500" />
-            <h4 className="text-slate-900 font-semibold text-sm">Forme & attaque (10 derniers matchs)</h4>
+            <h4 className="text-slate-900 font-semibold text-sm">Forme (10 derniers matchs)</h4>
           </div>
           <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-sm">
             <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
-            <div className="text-center text-slate-400 text-xs"></div>
+            <div className="text-center text-slate-400 text-xs">VS</div>
             <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
             {[
               { label: "Win rate (10j)", h: am.home_win_rate_10, a: am.away_win_rate_10, fmt: (v: number) => `${(v * 100).toFixed(0)}%`, higherBetter: true },
@@ -1625,18 +1742,64 @@ function NBAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away:
           )}
           {(am.home_b2b || am.away_b2b) && (
             <div className="flex gap-2 flex-wrap pt-1">
-              {am.home_b2b && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">{home} B2B</span>}
-              {am.away_b2b && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">{away} B2B</span>}
+              {am.home_b2b && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">{home} joue dos-a-dos</span>}
+              {am.away_b2b && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">{away} joue dos-a-dos</span>}
             </div>
           )}
           {am.total_line != null && (
             <div className="flex justify-between text-sm pt-1">
-              <span className="text-slate-500">Total O/U</span>
-              <span className="font-semibold text-slate-700">{am.total_line}</span>
+              <span className="text-slate-500">Ligne Over/Under</span>
+              <span className="font-semibold text-slate-700">{am.total_line} pts</span>
             </div>
           )}
         </div>
       </div>
+      {/* Edge breakdown */}
+      {edgeData.length > 0 && (
+        <div>
+          <div className="text-xs font-semibold text-slate-600 mb-2">
+            <Tip text="Difference entre la probabilite de notre modele et celle implicite dans la cote du bookmaker. Positif = value bet.">
+              Avantage modele vs bookmakers <span className="text-slate-400 underline decoration-dotted">i</span>
+            </Tip>
+          </div>
+          <div className="h-20">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={edgeData} layout="vertical" margin={{ left: 80, right: 30, top: 0, bottom: 0 }}>
+                <XAxis type="number" stroke="#94a3b8" tick={{ fontSize: 10 }} tickFormatter={(v) => `${v > 0 ? "+" : ""}${v}%`} />
+                <YAxis type="category" dataKey="name" stroke="#94a3b8" tick={{ fontSize: 10 }} width={75} />
+                <Tooltip
+                  formatter={(v: number | undefined) => { const n = v ?? 0; return `${n > 0 ? "+" : ""}${n}%`; }}
+                  contentStyle={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 11 }}
+                />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  {edgeData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex gap-4 text-[10px] text-slate-400 mt-1">
+            <span><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1" />Value (modele &gt; marche)</span>
+            <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1" />Cote trop basse</span>
+          </div>
+        </div>
+      )}
+      {/* Data quality */}
+      {am.data_quality && (
+        <div>
+          <div className="text-xs font-semibold text-slate-600 mb-2">
+            <Tip text="Nombre de sources de donnees disponibles. Plus c'est eleve, plus notre modele est fiable.">
+              Fiabilite des donnees <span className="text-slate-400 underline decoration-dotted">i</span>
+            </Tip>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${am.data_quality === "green" ? "bg-emerald-500" : am.data_quality === "yellow" ? "bg-amber-400" : "bg-red-500"}`} />
+            <span className="text-sm text-slate-700">
+              {am.data_quality === "green" ? "Excellente" : am.data_quality === "yellow" ? "Correcte" : "Limitee"}
+              {am.data_score != null && <span className="text-slate-400 ml-1">({Math.round(am.data_score * maxPts)}/{maxPts} points)</span>}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1839,6 +2002,197 @@ function RugbyStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── MLB Analyse Tab ──────────────────────────────────────────────────────────
+
+function MLBAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away: string }) {
+  const edges = am.edges ?? {};
+  const edgeData = Object.entries(edges)
+    .filter(([k]) => k === "Home" || k === "Away")
+    .map(([k, v]) => ({
+      name: k === "Home" ? home : away,
+      value: parseFloat((v * 100).toFixed(2)),
+      fill: v > 0 ? "#10b981" : "#ef4444",
+    }))
+    .filter((d) => Math.abs(d.value) > 0.01);
+
+  const maxPts = 6;
+
+  return (
+    <div className="space-y-4">
+      {am.mlb_ml_used && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
+          <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
+          <span className="text-xs text-orange-700 font-medium">Modele ML actif (XGBoost + LightGBM, features baseball)</span>
+        </div>
+      )}
+      {/* Pitcher matchup */}
+      {(am.starter_home_name || am.starter_away_name) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <Trophy size={15} className="text-amber-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Lanceurs partants</h4>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-center">
+              <div className="text-sm font-bold text-blue-700 truncate">{am.starter_home_name ?? "?"}</div>
+              <div className="text-xs text-blue-500 mt-0.5 truncate">{home}</div>
+            </div>
+            <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-center">
+              <div className="text-sm font-bold text-red-700 truncate">{am.starter_away_name ?? "?"}</div>
+              <div className="text-xs text-red-500 mt-0.5 truncate">{away}</div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Runs avg */}
+      {(am.home_runs_avg_10 != null || am.away_runs_avg_10 != null) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={15} className="text-orange-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Offensif / Defensif (10 derniers)</h4>
+          </div>
+          <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-sm">
+            <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
+            <div className="text-center text-slate-400 text-xs">VS</div>
+            <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
+            {[
+              { label: "Runs marques / match", h: am.home_runs_avg_10, a: am.away_runs_avg_10, fmt: (v: number) => v.toFixed(2), higherBetter: true },
+              { label: "Runs encaisses / match", h: am.home_runs_allowed_10, a: am.away_runs_allowed_10, fmt: (v: number) => v.toFixed(2), higherBetter: false },
+            ].map(({ label, h, a, fmt, higherBetter }) => {
+              if (h == null && a == null) return null;
+              const homeBetter = h != null && a != null ? (higherBetter ? h > a : h < a) : undefined;
+              return <FormRow key={label} label={label} homeVal={h != null ? fmt(h) : "-"} awayVal={a != null ? fmt(a) : "-"} homeBetter={homeBetter} />;
+            })}
+          </div>
+        </div>
+      )}
+      {/* Edge breakdown */}
+      {edgeData.length > 0 && (
+        <div>
+          <div className="text-xs font-semibold text-slate-600 mb-2">
+            <Tip text="Difference entre la probabilite de notre modele et celle implicite dans la cote du bookmaker. Positif = value bet.">
+              Avantage modele vs bookmakers <span className="text-slate-400 underline decoration-dotted">i</span>
+            </Tip>
+          </div>
+          <div className="h-20">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={edgeData} layout="vertical" margin={{ left: 80, right: 30, top: 0, bottom: 0 }}>
+                <XAxis type="number" stroke="#94a3b8" tick={{ fontSize: 10 }} tickFormatter={(v) => `${v > 0 ? "+" : ""}${v}%`} />
+                <YAxis type="category" dataKey="name" stroke="#94a3b8" tick={{ fontSize: 10 }} width={75} />
+                <Tooltip
+                  formatter={(v: number | undefined) => { const n = v ?? 0; return `${n > 0 ? "+" : ""}${n}%`; }}
+                  contentStyle={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 11 }}
+                />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  {edgeData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex gap-4 text-[10px] text-slate-400 mt-1">
+            <span><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1" />Value (modele &gt; marche)</span>
+            <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1" />Cote trop basse</span>
+          </div>
+        </div>
+      )}
+      {/* Data quality */}
+      {am.data_quality && (
+        <div>
+          <div className="text-xs font-semibold text-slate-600 mb-2">
+            <Tip text="Nombre de sources de donnees disponibles. Plus c'est eleve, plus notre modele est fiable.">
+              Fiabilite des donnees <span className="text-slate-400 underline decoration-dotted">i</span>
+            </Tip>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${am.data_quality === "green" ? "bg-emerald-500" : am.data_quality === "yellow" ? "bg-amber-400" : "bg-red-500"}`} />
+            <span className="text-sm text-slate-700">
+              {am.data_quality === "green" ? "Excellente" : am.data_quality === "yellow" ? "Correcte" : "Limitee"}
+              {am.data_score != null && <span className="text-slate-400 ml-1">({Math.round(am.data_score * maxPts)}/{maxPts} points)</span>}
+            </span>
+          </div>
+        </div>
+      )}
+      {/* Context */}
+      {am.context && (
+        <div>
+          <div className="text-xs font-semibold text-slate-600 mb-1">Contexte</div>
+          <p className="text-xs text-slate-600 leading-relaxed">{am.context}</p>
+        </div>
+      )}
+      {/* Venue */}
+      {am.venue && (
+        <div className="text-[11px] text-slate-500">
+          <span>Stade : <span className="text-slate-700 font-medium">{am.venue}</span></span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MLB Stats Tab ────────────────────────────────────────────────────────────
+
+function MLBStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: string }) {
+  const rows: { label: string; hv: string | null; av: string | null; lowerBetter?: boolean }[] = [
+    { label: "Runs marques / match (10j)", hv: am.home_runs_avg_10 != null ? am.home_runs_avg_10.toFixed(2) : null, av: am.away_runs_avg_10 != null ? am.away_runs_avg_10.toFixed(2) : null },
+    { label: "Runs encaisses / match (10j)", hv: am.home_runs_allowed_10 != null ? am.home_runs_allowed_10.toFixed(2) : null, av: am.away_runs_allowed_10 != null ? am.away_runs_allowed_10.toFixed(2) : null, lowerBetter: true },
+  ].filter(r => r.hv != null || r.av != null);
+
+  return (
+    <div className="space-y-4">
+      {/* Pitcher matchup */}
+      {(am.starter_home_name || am.starter_away_name) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <Trophy size={15} className="text-amber-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Lanceurs partants</h4>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-center">
+              <div className="text-sm font-bold text-blue-700 truncate">{am.starter_home_name ?? "?"}</div>
+              <div className="text-xs text-blue-500 mt-0.5 truncate">{home}</div>
+            </div>
+            <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-center">
+              <div className="text-sm font-bold text-red-700 truncate">{am.starter_away_name ?? "?"}</div>
+              <div className="text-xs text-red-500 mt-0.5 truncate">{away}</div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Stats comparison */}
+      {rows.length > 0 && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={15} className="text-orange-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Statistiques des equipes (10 derniers)</h4>
+          </div>
+          <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-sm">
+            <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
+            <div className="text-center text-slate-400 text-xs">VS</div>
+            <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
+            {rows.map(({ label, hv, av, lowerBetter }) => {
+              const hNum = parseFloat(hv?.replace(/[^0-9.-]/g, "") ?? "");
+              const aNum = parseFloat(av?.replace(/[^0-9.-]/g, "") ?? "");
+              const canCompare = !isNaN(hNum) && !isNaN(aNum) && hNum !== aNum;
+              const homeBetter = canCompare ? (lowerBetter ? hNum < aNum : hNum > aNum) : undefined;
+              return <FormRow key={label} label={label} homeVal={hv ?? "-"} awayVal={av ?? "-"} homeBetter={homeBetter} />;
+            })}
+          </div>
+        </div>
+      )}
+      {/* Scoring guide */}
+      <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
+        <div className="text-xs font-semibold text-orange-700 mb-1.5">Regles baseball (MLB)</div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px] text-orange-800">
+          <span>9 manches par match</span>
+          <span>3 outs par manche</span>
+          <span>Moneyline : victoire nette</span>
+          <span>Run Line : handicap ±1.5</span>
+        </div>
+      </div>
     </div>
   );
 }

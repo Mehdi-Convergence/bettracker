@@ -498,6 +498,14 @@ export interface AIScanMatch {
   away_tries_avg_10: number | null;
   home_penalties_avg_10: number | null;
   away_penalties_avg_10: number | null;
+  // MLB fields
+  mlb_ml_used?: boolean;
+  home_runs_avg_10?: number;
+  away_runs_avg_10?: number;
+  home_runs_allowed_10?: number;
+  away_runs_allowed_10?: number;
+  starter_home_name?: string;
+  starter_away_name?: string;
   // Lineup
   fixture_id: number | null;
   lineup_status: "presumed" | "confirmed" | "unavailable";
@@ -598,4 +606,44 @@ export interface AIRateLimit {
   used: number;
   limit: number;
   remaining: number;
+}
+
+// --- PMU types ---
+
+export interface PMURunnerCard {
+  number: number;
+  horse_name: string;
+  jockey: string | null;
+  trainer: string | null;
+  weight: number | null;
+  odds: number | null;
+  odds_morning: number | null;
+  model_prob_win: number | null;
+  model_prob_place: number | null;
+  edge_win: number | null;
+  edge_place: number | null;
+  form: string | null;
+  last_5: number[] | null;
+}
+
+export interface PMURaceCard {
+  race_id: string;
+  hippodrome: string;
+  race_number: number;
+  race_type: string;
+  distance: number;
+  terrain: string | null;
+  post_time: string | null;
+  prize_pool: number | null;
+  num_runners: number;
+  is_quinteplus: boolean;
+  runners: PMURunnerCard[];
+}
+
+export interface PMUScanResponse {
+  races: PMURaceCard[];
+  sport: string;
+  source: string;
+  cached: boolean;
+  cached_at: string | null;
 }

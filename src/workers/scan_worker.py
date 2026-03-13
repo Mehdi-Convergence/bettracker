@@ -1136,6 +1136,377 @@ async def run_rugby_scan():
 
 
 # ---------------------------------------------------------------------------
+# MLB scan
+# ---------------------------------------------------------------------------
+
+MLB_SCAN_INTERVAL = 60 * 60  # 1h
+_MLB_FILE_CACHE_DIR = Path("data/cache/mlb")
+
+
+def _load_mlb_model():
+    """Load MLB ML model + team stats snapshot. Returns (model, snapshot) or (None, None)."""
+    try:
+        from src.ml.mlb_model import MLBModel
+        model_dir = Path("models/mlb")
+        if not (model_dir / "model.joblib").exists():
+            return None, None
+        model = MLBModel.load(model_dir)
+        import json as _json_mlb
+        with open(model_dir / "team_stats.json") as f:
+            snapshot = _json_mlb.load(f)
+        return model, snapshot
+    except Exception as e:
+        logger.warning("MLB model not available: %s", e)
+        return None, None
+
+
+async def run_mlb_scan():
+    """Run MLB scan — fetch upcoming games with odds and compute ML edges."""
+    from src.data.mlb_client import MLBClient
+    from src.services.probability_calculator import calculate_mlb
+    from src.api.schemas import AIScanMatch
+
+    t0 = time.time()
+    client = MLBClient()
+
+    mlb_ml_model, mlb_snapshot = _load_mlb_model()
+    if mlb_ml_model:
+        from src.features.mlb_features import MLB_FEATURE_COLUMNS, build_mlb_live_features as _mlb_feats
+        _mlb_medians = np.array(mlb_snapshot.get("col_medians", [np.nan] * len(MLB_FEATURE_COLUMNS)))
+        logger.info("MLB ML model loaded (%d feature columns)", len(MLB_FEATURE_COLUMNS))
+    else:
+        logger.info("MLB ML model not available — using rule-based only")
+
+    loop = asyncio.get_event_loop()
+    try:
+        raw_games = await loop.run_in_executor(None, lambda: client.get_matches(timeframe="48h"))
+    except Exception as exc:
+        logger.error("MLB scan failed: %s", exc)
+        return
+
+    matches: list[AIScanMatch] = []
+    teams_data = mlb_snapshot.get("teams", {}) if mlb_snapshot else {}
+
+    for g in raw_games:
+        try:
+            home = g["home_team"]
+            away = g["away_team"]
+            odds_home = float(g.get("odds_home") or 0)
+            odds_away = float(g.get("odds_away") or 0)
+            odds_over = g.get("odds_over")
+            odds_under = g.get("odds_under")
+            total_line = g.get("total_line")
+
+            if odds_home <= 1.0 or odds_away <= 1.0:
+                continue
+
+            h_stats = teams_data.get(home, {})
+            a_stats = teams_data.get(away, {})
+
+            # Rule-based baseline
+            calc = calculate_mlb(
+                odds_home=odds_home,
+                odds_away=odds_away,
+                home_win_rate=h_stats.get("win_rate_10"),
+                away_win_rate=a_stats.get("win_rate_10"),
+                home_run_diff=h_stats.get("run_diff_10"),
+                away_run_diff=a_stats.get("run_diff_10"),
+                home_runs_avg=h_stats.get("runs_avg_10"),
+                away_runs_avg=a_stats.get("runs_avg_10"),
+                home_runs_allowed=h_stats.get("runs_allowed_10"),
+                away_runs_allowed=a_stats.get("runs_allowed_10"),
+            )
+
+            _mlb_ml_used = False
+            if mlb_ml_model and mlb_snapshot:
+                try:
+                    feat_dict = _mlb_feats(
+                        home_team=home,
+                        away_team=away,
+                        odds_home=odds_home,
+                        odds_away=odds_away,
+                        team_snapshot=mlb_snapshot,
+                    )
+                    feat_array = np.array([[feat_dict.get(col, np.nan) for col in MLB_FEATURE_COLUMNS]])
+                    for col_idx in range(feat_array.shape[1]):
+                        if np.isnan(feat_array[0, col_idx]):
+                            feat_array[0, col_idx] = _mlb_medians[col_idx] if not np.isnan(_mlb_medians[col_idx]) else 0.0
+                    ml_prob_home = float(mlb_ml_model.predict_proba(feat_array)[0])
+                    ml_prob_away = 1.0 - ml_prob_home
+                    # Blend: 65% ML + 35% rule-based
+                    rule_h = calc.home_prob or 0.5
+                    rule_a = calc.away_prob or 0.5
+                    blend_h = round(0.65 * ml_prob_home + 0.35 * rule_h, 4)
+                    blend_a = round(0.65 * ml_prob_away + 0.35 * rule_a, 4)
+                    edges_blended: dict = {}
+                    if odds_home > 1.0:
+                        edges_blended["Home"] = round(blend_h - 1.0 / odds_home, 4)
+                    if odds_away > 1.0:
+                        edges_blended["Away"] = round(blend_a - 1.0 / odds_away, 4)
+                    from dataclasses import replace as _replace
+                    calc = _replace(calc, home_prob=blend_h, away_prob=blend_a, edges=edges_blended)
+                    _mlb_ml_used = True
+                except Exception as ml_exc:
+                    logger.debug("MLB ML prediction failed: %s", ml_exc)
+
+            odds_dict: dict = {
+                "winner": {
+                    "Home": odds_home,
+                    "Away": odds_away,
+                },
+            }
+            if odds_over:
+                odds_dict["over_under"] = {"Over": odds_over, "Under": odds_under}
+
+            matches.append(AIScanMatch(
+                sport="mlb",
+                home_team=home,
+                away_team=away,
+                league="MLB",
+                date=g.get("date", ""),
+                odds=odds_dict,
+                model_prob_home=calc.home_prob,
+                model_prob_away=calc.away_prob,
+                edges=calc.edges,
+                data_quality=calc.data_quality,
+                data_score=calc.data_score,
+                mlb_ml_used=_mlb_ml_used,
+                home_runs_avg_10=h_stats.get("runs_avg_10"),
+                away_runs_avg_10=a_stats.get("runs_avg_10"),
+                home_runs_allowed_10=h_stats.get("runs_allowed_10"),
+                away_runs_allowed_10=a_stats.get("runs_allowed_10"),
+                home_win_rate_10=h_stats.get("win_rate_10"),
+                away_win_rate_10=a_stats.get("win_rate_10"),
+                home_streak=h_stats.get("streak"),
+                away_streak=a_stats.get("streak"),
+                odds_over=odds_over,
+                odds_under=odds_under,
+                total_line=total_line,
+            ))
+        except Exception:
+            continue
+
+    duration = time.time() - t0
+
+    # Persist odds snapshots (non-blocking)
+    _save_odds_snapshots(matches, "mlb")
+
+    cache_payload = {
+        "_cached_at": time.time(),
+        "duration": duration,
+        "matches": [m.model_dump() for m in matches],
+    }
+    cache_set("scan:mlb:all", cache_payload, ttl=SCAN_CACHE_TTL + 300)
+    cache_set("scan:meta:last_mlb", time.time(), ttl=86400)
+
+    # File backup
+    try:
+        _MLB_FILE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        scan_key = "mlb_latest"
+        backup_file = _MLB_FILE_CACHE_DIR / f"scan_result_{scan_key}.json"
+        backup_file.write_text(json.dumps(cache_payload, ensure_ascii=False, default=str), encoding="utf-8")
+    except Exception as exc:
+        logger.warning("MLB file backup failed: %s", exc)
+
+    logger.info("MLB scan completed: %d games in %.1fs", len(matches), duration)
+
+
+# ---------------------------------------------------------------------------
+# PMU scan
+# ---------------------------------------------------------------------------
+
+PMU_SCAN_INTERVAL = 60 * 30  # 30 minutes (programme mis a jour souvent)
+_PMU_FILE_CACHE_DIR = Path("data/cache/pmu")
+
+
+def _load_pmu_models():
+    """Charge les modeles PMU win + place si disponibles. Retourne (win_model, place_model) ou (None, None)."""
+    try:
+        from src.ml.pmu_model import PMUWinModel, PMUPlaceModel, MODEL_DIR_WIN, MODEL_DIR_PLACE
+        if not (MODEL_DIR_WIN / "model.joblib").exists():
+            return None, None
+        if not (MODEL_DIR_PLACE / "model.joblib").exists():
+            return None, None
+        win_model = PMUWinModel.load_from_dir(MODEL_DIR_WIN)
+        place_model = PMUPlaceModel.load_from_dir(MODEL_DIR_PLACE)
+        return win_model, place_model
+    except Exception as exc:
+        logger.warning("PMU models not available: %s", exc)
+        return None, None
+
+
+async def run_pmu_scan():
+    """Run PMU scan — recupere le programme du jour et calcule les edges."""
+    from src.services.probability_calculator import calculate_pmu
+    from src.api.schemas import PMURaceCard, PMURunnerCard
+
+    t0 = time.time()
+
+    # Charger les modeles PMU si disponibles
+    win_model, place_model = _load_pmu_models()
+    if win_model and place_model:
+        from src.features.pmu_features import PMU_FEATURE_COLUMNS
+        logger.info("PMU ML models loaded (%d features)", len(PMU_FEATURE_COLUMNS))
+    else:
+        logger.info("PMU ML models not available — using implied probabilities only")
+
+    # Recuperer les courses PMU depuis la base de donnees (races du jour ou a venir)
+    races_out: list[PMURaceCard] = []
+    try:
+        import datetime as _dt
+        from src.database import SessionLocal
+        from src.models.pmu_race import PMURace, PMURunner
+
+        db = SessionLocal()
+        today = _dt.date.today()
+        races = (
+            db.query(PMURace)
+            .filter(PMURace.race_date >= today)
+            .order_by(PMURace.race_date, PMURace.race_number)
+            .all()
+        )
+        race_ids = {r.id for r in races}
+        runners_all = (
+            db.query(PMURunner)
+            .filter(PMURunner.race_id.in_(race_ids), PMURunner.is_scratched.is_(False))
+            .all()
+        )
+        db.close()
+
+        # Regrouper les partants par course
+        runners_by_race: dict[int, list[PMURunner]] = {}
+        for ru in runners_all:
+            runners_by_race.setdefault(ru.race_id, []).append(ru)
+
+        for race in races:
+            race_runners = runners_by_race.get(race.id, [])
+
+            # Construire les runners cards avec enrichissement ML si dispo
+            runner_dicts: list[dict] = []
+            for ru in sorted(race_runners, key=lambda x: x.number):
+                # Parsing last_5_positions JSON
+                last5: list[int] | None = None
+                if ru.last_5_positions:
+                    try:
+                        import json as _json_inner
+                        last5 = _json_inner.loads(ru.last_5_positions)
+                    except Exception:
+                        pass
+
+                runner_dicts.append({
+                    "number": ru.number,
+                    "horse_name": ru.horse_name,
+                    "jockey": ru.jockey_name,
+                    "trainer": ru.trainer_name,
+                    "weight": ru.weight,
+                    "odds": ru.odds_final,
+                    "odds_morning": ru.odds_morning,
+                    "form": ru.form_string,
+                    "last_5": last5,
+                    "model_prob_win": None,
+                    "model_prob_place": None,
+                    "edge_win": None,
+                    "edge_place": None,
+                })
+
+            # Enrichir avec ML si disponible
+            if win_model and place_model and runner_dicts:
+                try:
+                    from src.features.pmu_features import PMU_FEATURE_COLUMNS
+                    import numpy as np
+
+                    # Construire features live de maniere simplifiee
+                    # (pas d'historique: on utilise uniquement les features disponibles)
+                    feat_rows = []
+                    for rd in runner_dicts:
+                        odds_val = rd.get("odds")
+                        implied = (1.0 / float(odds_val)) if odds_val and float(odds_val) > 1.0 else np.nan
+                        row = {col: np.nan for col in PMU_FEATURE_COLUMNS}
+                        row["odds_implied_prob"] = implied
+                        row["num_runners"] = float(len(runner_dicts))
+                        row["post_position"] = float(rd["number"])
+                        row["is_quinteplus"] = float(race.is_quinteplus)
+                        if rd.get("weight"):
+                            row["age"] = np.nan  # pas d'age en live
+                        feat_rows.append(row)
+
+                    X = np.array([[r[col] for col in PMU_FEATURE_COLUMNS] for r in feat_rows], dtype=float)
+                    # Imputer NaN avec 0
+                    X = np.where(np.isnan(X), 0.0, X)
+
+                    proba_win = win_model.predict_proba(X)
+                    proba_place = place_model.predict_proba(X)
+
+                    for i, rd in enumerate(runner_dicts):
+                        rd["model_prob_win"] = round(float(proba_win[i]), 4)
+                        rd["model_prob_place"] = round(float(proba_place[i]), 4)
+                except Exception as ml_exc:
+                    logger.debug("PMU ML enrichment failed: %s", ml_exc)
+
+            # Calculer edges via probability_calculator
+            enriched = calculate_pmu(runner_dicts)
+
+            runner_cards = []
+            for rd in enriched:
+                try:
+                    runner_cards.append(PMURunnerCard(
+                        number=rd["number"],
+                        horse_name=rd["horse_name"],
+                        jockey=rd.get("jockey"),
+                        trainer=rd.get("trainer"),
+                        weight=rd.get("weight"),
+                        odds=rd.get("odds"),
+                        odds_morning=rd.get("odds_morning"),
+                        model_prob_win=rd.get("model_prob_win"),
+                        model_prob_place=rd.get("model_prob_place"),
+                        edge_win=rd.get("edge_win"),
+                        edge_place=rd.get("edge_place"),
+                        form=rd.get("form"),
+                        last_5=rd.get("last_5"),
+                    ))
+                except Exception:
+                    continue
+
+            races_out.append(PMURaceCard(
+                race_id=race.race_id,
+                hippodrome=race.hippodrome,
+                race_number=race.race_number,
+                race_type=race.race_type,
+                distance=race.distance,
+                terrain=race.terrain,
+                post_time=race.race_time,
+                prize_pool=race.prize_pool,
+                num_runners=race.num_runners or len(runner_cards),
+                is_quinteplus=race.is_quinteplus,
+                runners=runner_cards,
+            ))
+
+    except Exception as exc:
+        logger.error("PMU scan failed: %s", exc)
+        return
+
+    duration = time.time() - t0
+
+    cache_payload = {
+        "_cached_at": time.time(),
+        "duration": duration,
+        "races": [r.model_dump() for r in races_out],
+    }
+    cache_set("scan:pmu:all", cache_payload, ttl=PMU_SCAN_INTERVAL)
+    cache_set("scan:meta:last_pmu", time.time(), ttl=86400)
+
+    # File backup
+    try:
+        _PMU_FILE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        backup_file = _PMU_FILE_CACHE_DIR / "scan_result_pmu_latest.json"
+        backup_file.write_text(json.dumps(cache_payload, ensure_ascii=False, default=str), encoding="utf-8")
+    except Exception as exc:
+        logger.warning("PMU file backup failed: %s", exc)
+
+    logger.info("PMU scan completed: %d races in %.1fs", len(races_out), duration)
+
+
+# ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
 
@@ -1151,6 +1522,8 @@ async def main():
     await run_nba_scan()
     logger.info("Running initial rugby scan...")
     await run_rugby_scan()
+    logger.info("Running initial MLB scan...")
+    await run_mlb_scan()
 
     # Schedule recurring scans
     async def _football_loop():
@@ -1185,8 +1558,24 @@ async def main():
             except Exception as exc:
                 logger.error("Rugby scan error: %s", exc)
 
-    logger.info("Worker running — football/tennis/nba/rugby every %ds", FOOTBALL_SCAN_INTERVAL)
-    await asyncio.gather(_football_loop(), _tennis_loop(), _nba_loop(), _rugby_loop())
+    async def _mlb_loop():
+        while True:
+            await asyncio.sleep(MLB_SCAN_INTERVAL)
+            try:
+                await run_mlb_scan()
+            except Exception as exc:
+                logger.error("MLB scan error: %s", exc)
+
+    async def _pmu_loop():
+        while True:
+            await asyncio.sleep(PMU_SCAN_INTERVAL)
+            try:
+                await run_pmu_scan()
+            except Exception as exc:
+                logger.error("PMU scan error: %s", exc)
+
+    logger.info("Worker running — football/tennis/nba/rugby/mlb/pmu every %ds", FOOTBALL_SCAN_INTERVAL)
+    await asyncio.gather(_football_loop(), _tennis_loop(), _nba_loop(), _rugby_loop(), _mlb_loop(), _pmu_loop())
 
 
 if __name__ == "__main__":

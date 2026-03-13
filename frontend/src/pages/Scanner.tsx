@@ -4,10 +4,12 @@ import {
   X, Eye, Star, ChevronDown, Trophy, RefreshCw,
   ScanSearch, TrendingUp, Shield, CheckCircle2,
 } from "lucide-react";
-import { aiScan } from "@/services/api";
+import { aiScan, pmuScan } from "@/services/api";
 import TicketBuilder from "@/components/TicketBuilder";
 import AIScanMatchDetailPanel from "@/components/AIScanMatchDetailPanel";
-import type { ValueBet, Ticket, AIScanMatch } from "@/types";
+import PMURaceCard from "@/components/PMURaceCard";
+import PMURaceDetailPanel from "@/components/PMURaceDetailPanel";
+import type { ValueBet, Ticket, AIScanMatch, PMURaceCard as PMURaceCardType } from "@/types";
 import { LEAGUE_INFO } from "@/types";
 import { useTour } from "@/hooks/useTour";
 import SpotlightTour from "@/components/SpotlightTour";
@@ -150,9 +152,9 @@ export default function Scanner() {
   const [hasScanned, setHasScanned] = useState(false);
   const [isCached, setIsCached] = useState(false);
   const [cachedAt, setCachedAt] = useState<string | null>(null);
-  const [sports, setSports] = useState<Set<"football" | "tennis" | "nba" | "rugby">>(new Set(["football"]));
+  const [sports, setSports] = useState<Set<"football" | "tennis" | "nba" | "rugby" | "mlb" | "pmu">>(new Set(["football"]));
 
-  function toggleSport(s: "football" | "tennis" | "nba" | "rugby") {
+  function toggleSport(s: "football" | "tennis" | "nba" | "rugby" | "mlb" | "pmu") {
     setSports(prev => {
       const next = new Set(prev);
       if (next.has(s)) {
@@ -165,6 +167,14 @@ export default function Scanner() {
   }
   const [aiMatches, setAiMatches] = useState<AIScanMatch[]>([]);
   const [aiDuration, setAiDuration] = useState(0);
+
+  // PMU state
+  const [pmuRaces, setPmuRaces] = useState<PMURaceCardType[]>([]);
+  const [pmuLoading, setPmuLoading] = useState(false);
+  const [pmuExpandedRace, setPmuExpandedRace] = useState<string | null>(null);
+  const [pmuDetailRace, setPmuDetailRace] = useState<{ race: PMURaceCardType; runnerIndex: number } | null>(null);
+  const [pmuRaceTypeFilter, setPmuRaceTypeFilter] = useState<string>("all");
+  const [pmuHasScanned, setPmuHasScanned] = useState(false);
 
   // Auto-load cached scan on mount
   useEffect(() => {
@@ -209,11 +219,16 @@ export default function Scanner() {
     if (!silent) { setLoading(true); setError(""); }
     try {
       const timeframeMap: Record<string, string> = { today: "24h", "48h": "48h", "72h": "72h", week: "1w" };
-      const sportList = [...sports];
+      // Exclure PMU du scan normal (PMU a son propre endpoint)
+      const sportList = [...sports].filter(s => s !== "pmu");
+      if (sportList.length === 0) {
+        if (!silent) setLoading(false);
+        return;
+      }
       const results = await Promise.all(
         sportList.map(s => aiScan({
           sport: s,
-          leagues: s === "tennis" ? "ATP,WTA" : s === "nba" ? "NBA" : s === "rugby" ? "Rugby" : "",
+          leagues: s === "tennis" ? "ATP,WTA" : s === "nba" ? "NBA" : s === "rugby" ? "Rugby" : s === "mlb" ? "MLB" : "",
           timeframe: timeframeMap[datePreset] || "48h",
           force: forceRefresh || undefined,
           cacheOnly: silent || undefined,
@@ -234,11 +249,25 @@ export default function Scanner() {
     if (!silent) setLoading(false);
   }
 
+  async function handlePMUScan(forceRefresh = false) {
+    setPmuLoading(true);
+    setError("");
+    try {
+      const data = await pmuScan(forceRefresh || undefined);
+      setPmuRaces(data.races ?? []);
+      setPmuHasScanned(true);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+    setPmuLoading(false);
+  }
+
   /* ── Filtered + sorted AI matches ── */
   const filteredAiMatches = useMemo(() => {
     let result = aiMatches.filter((am) => !hiddenMatches.has(
-      am.sport === "football" ? `${am.home_team}_${am.away_team}` : `${am.player1}_${am.player2}`
+      am.sport === "tennis" ? `${am.player1}_${am.player2}` : `${am.home_team}_${am.away_team}`
     ));
+
 
     // League display filter (football only)
     if (sports.has("football") && activeLeagues.size < ALL_LEAGUE_CODES.length) {
@@ -478,12 +507,14 @@ export default function Scanner() {
 
   /* ── AI match -> TicketLeg conversion ── */
   function aiMatchToLeg(am: AIScanMatch, outcome: string): import("@/types").TicketLeg | null {
-    const isFootball = am.sport === "football";
-    const home = isFootball ? (am.home_team || "") : (am.player1 || "");
-    const away = isFootball ? (am.away_team || "") : (am.player2 || "");
-    const rawOddsBase = isFootball
+    const isTennisSport = am.sport === "tennis";
+    const isFootballOrRugby = am.sport === "football" || am.sport === "rugby";
+    const home = isTennisSport ? (am.player1 || "") : (am.home_team || "");
+    const away = isTennisSport ? (am.player2 || "") : (am.away_team || "");
+    const rawOddsBase = isFootballOrRugby
       ? (am.odds?.["1x2"] as Record<string, unknown> | undefined)
       : (am.odds?.["winner"] as Record<string, unknown> | undefined);
+    // MLB uses "winner" market with Home/Away outcomes — already handled above
 
     const allBks = extractBkOdds(rawOddsBase?.[outcome]);
     const best = Object.entries(allBks).sort((a, b) => b[1] - a[1])[0];
@@ -493,6 +524,7 @@ export default function Scanner() {
     const modelProbs: Record<string, number | null> = {
       H: am.model_prob_home, D: am.model_prob_draw, A: am.model_prob_away,
       P1: am.model_prob_home, P2: am.model_prob_away,
+      Home: am.model_prob_home, Away: am.model_prob_away,
     };
     const mlProb = modelProbs[outcome] ?? null;
 
@@ -508,9 +540,8 @@ export default function Scanner() {
   }
 
   function isAiOutcomeInTicket(am: AIScanMatch, outcome: string): boolean {
-    const isFootball = am.sport === "football";
-    const home = isFootball ? (am.home_team || "") : (am.player1 || "");
-    const away = isFootball ? (am.away_team || "") : (am.player2 || "");
+    const home = am.sport === "tennis" ? (am.player1 || "") : (am.home_team || "");
+    const away = am.sport === "tennis" ? (am.player2 || "") : (am.away_team || "");
     const id = `${home}_${away}_${outcome}`;
     return tickets.some((t) => t.legs.some((l) => l.id === id));
   }
@@ -722,14 +753,14 @@ export default function Scanner() {
             <div data-tour="sport-toggle">
               <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Sport</label>
               <div className="flex gap-1">
-                {(["football", "tennis", "nba", "rugby"] as const).map((s) => (
+                {(["football", "tennis", "nba", "rugby", "mlb", "pmu"] as const).map((s) => (
                   <button key={s} onClick={() => toggleSport(s)}
                     className={`px-3 py-[5px] rounded-full text-[11.5px] font-semibold transition-all ${
                       sports.has(s)
                         ? "bg-[#3b5bdb] text-white shadow-sm"
                         : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
                     }`}>
-                    {s === "football" ? "⚽ Football" : s === "tennis" ? "🎾 Tennis" : s === "nba" ? "🏀 NBA" : "🏉 Rugby"}
+                    {s === "football" ? "⚽ Football" : s === "tennis" ? "🎾 Tennis" : s === "nba" ? "🏀 NBA" : s === "rugby" ? "🏉 Rugby" : s === "mlb" ? "⚾ MLB" : "🐎 PMU"}
                   </button>
                 ))}
               </div>
@@ -969,6 +1000,37 @@ export default function Scanner() {
             </div>
           )}
 
+          {/* PMU filter bar */}
+          {sports.has("pmu") && (
+            <div className="flex items-center gap-3 flex-wrap mt-1">
+              <div className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px]">
+                <span className="text-[12px]">🐎</span>
+                <span className="text-[12px] font-semibold text-[#111318]">Type</span>
+              </div>
+              <div className="flex items-center gap-1">
+                {(["all", "Plat", "Trot", "Obstacle"] as const).map((t) => (
+                  <button key={t} onClick={() => setPmuRaceTypeFilter(t)}
+                    className={`text-[11px] font-semibold px-2.5 py-[5px] rounded-full transition-all ${
+                      pmuRaceTypeFilter === t
+                        ? "bg-[#3b5bdb] text-white"
+                        : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
+                    }`}>
+                    {t === "all" ? "Toutes" : t}
+                  </button>
+                ))}
+              </div>
+              {pmuRaces.length > 0 && (
+                <span className="text-[11px] text-[#8a919e]">
+                  <span className="text-[#111318] font-semibold">{
+                    pmuRaceTypeFilter === "all"
+                      ? pmuRaces.length
+                      : pmuRaces.filter(r => r.race_type === pmuRaceTypeFilter).length
+                  }</span> course{pmuRaces.length !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Leagues dropdown panel */}
           {/* Leagues dropdown panel (football) */}
           {showLeagues && sports.has("football") && (
@@ -1099,11 +1161,35 @@ export default function Scanner() {
 
       {/* Action Bar */}
       <div className="shrink-0 px-5 py-2 bg-[#f4f5f7] border-b border-[#e3e6eb] flex items-center gap-3">
-        <button data-tour="refresh-btn" onClick={() => handleAIScan(!hasScanned)} disabled={loading}
-          className="bg-[#3b5bdb] hover:bg-[#2b4bc7] disabled:bg-[#b0b7c3] text-white px-4 py-[6px] rounded-lg text-[12px] flex items-center gap-1.5 font-semibold shadow-sm transition-colors">
-          <Search size={13} />
-          {loading ? "Scan..." : "Scanner"}
-        </button>
+        {sports.has("pmu") && !sports.has("football") && !sports.has("tennis") && !sports.has("nba") && !sports.has("rugby") && !sports.has("mlb") ? (
+          // Mode PMU exclusif
+          <button
+            onClick={() => handlePMUScan(pmuHasScanned)}
+            disabled={pmuLoading}
+            className="bg-[#3b5bdb] hover:bg-[#2b4bc7] disabled:bg-[#b0b7c3] text-white px-4 py-[6px] rounded-lg text-[12px] flex items-center gap-1.5 font-semibold shadow-sm transition-colors"
+          >
+            <Search size={13} />
+            {pmuLoading ? "Scan PMU..." : "Scanner PMU"}
+          </button>
+        ) : (
+          <>
+            <button data-tour="refresh-btn" onClick={() => handleAIScan(!hasScanned)} disabled={loading}
+              className="bg-[#3b5bdb] hover:bg-[#2b4bc7] disabled:bg-[#b0b7c3] text-white px-4 py-[6px] rounded-lg text-[12px] flex items-center gap-1.5 font-semibold shadow-sm transition-colors">
+              <Search size={13} />
+              {loading ? "Scan..." : "Scanner"}
+            </button>
+            {sports.has("pmu") && (
+              <button
+                onClick={() => handlePMUScan(pmuHasScanned)}
+                disabled={pmuLoading}
+                className="px-3 py-[6px] rounded-lg text-[11px] flex items-center gap-1.5 bg-white text-[#3b5bdb] border border-[#3b5bdb]/30 hover:bg-[#3b5bdb]/5 transition-colors disabled:opacity-50"
+              >
+                <Search size={12} />
+                {pmuLoading ? "Scan PMU..." : "Scanner PMU"}
+              </button>
+            )}
+          </>
+        )}
         {hasScanned && isCached && cachedAt && (
           <button onClick={() => handleAIScan(true)} disabled={loading}
             className="px-3 py-[6px] rounded-lg text-[11px] flex items-center gap-1.5 bg-white text-[#8a919e] border border-[#e3e6eb] hover:bg-[#3b5bdb]/5 hover:text-[#3b5bdb] hover:border-[#3b5bdb]/30 transition-colors disabled:opacity-50"
@@ -1164,7 +1250,7 @@ export default function Scanner() {
       {/* ═══ BOTTOM: Results (left) + Ticket (right), resizable ═══ */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
 
-        {/* Match list */}
+        {/* Match list / PMU Race list */}
         <div className="flex-1 overflow-y-auto px-3 py-2 scanner-scroll">
           {error && (
             <div className="bg-[#f04438]/8 border border-[#f04438]/20 rounded-xl p-3 flex items-center gap-2 text-[#f04438] text-[12px] mb-2">
@@ -1173,47 +1259,113 @@ export default function Scanner() {
             </div>
           )}
 
-          {hiddenMatches.size > 0 && (
-            <button onClick={() => setHiddenMatches(new Set())}
-              className="text-[11px] text-[#3b5bdb] hover:text-[#2b4bc7] flex items-center gap-1 font-semibold mb-1">
-              <Eye size={12} /> Afficher les {hiddenMatches.size} matchs masques
-            </button>
-          )}
+          {/* ── PMU mode ── */}
+          {sports.has("pmu") && !sports.has("football") && !sports.has("tennis") && !sports.has("nba") && !sports.has("rugby") && !sports.has("mlb") ? (
+            <>
+              {pmuLoading && (
+                <div className="text-center py-12 text-[#8a919e]">
+                  <ScanSearch size={28} className="mx-auto mb-3 text-[#b0b7c3] animate-pulse" />
+                  <p className="text-[13px]">Scan des courses PMU en cours...</p>
+                </div>
+              )}
+              {!pmuLoading && pmuRaces.length > 0 && (
+                <div className="space-y-1.5">
+                  {pmuRaces
+                    .filter((r) => pmuRaceTypeFilter === "all" || r.race_type === pmuRaceTypeFilter)
+                    .map((race) => (
+                      <PMURaceCard
+                        key={race.race_id}
+                        race={race}
+                        expanded={pmuExpandedRace === race.race_id}
+                        onToggle={() => setPmuExpandedRace(prev => prev === race.race_id ? null : race.race_id)}
+                        onSelectRunner={(r, idx) => setPmuDetailRace({ race: r, runnerIndex: idx })}
+                      />
+                    ))
+                  }
+                </div>
+              )}
+              {!pmuLoading && pmuHasScanned && pmuRaces.length === 0 && (
+                <div className="text-center py-12 text-[#8a919e]">Aucune course trouvee. Relancez un scan PMU.</div>
+              )}
+              {!pmuLoading && !pmuHasScanned && (
+                <div className="text-center py-16 text-[#8a919e]">
+                  <ScanSearch size={32} className="mx-auto mb-3 text-[#b0b7c3]" />
+                  <p className="text-[13px] font-medium">Cliquez sur Scanner PMU pour charger les courses du jour</p>
+                </div>
+              )}
+            </>
+          ) : (
+            /* ── Matchs normaux ── */
+            <>
+              {hiddenMatches.size > 0 && (
+                <button onClick={() => setHiddenMatches(new Set())}
+                  className="text-[11px] text-[#3b5bdb] hover:text-[#2b4bc7] flex items-center gap-1 font-semibold mb-1">
+                  <Eye size={12} /> Afficher les {hiddenMatches.size} matchs masques
+                </button>
+              )}
 
-          {/* Match cards — flat list, date in each card */}
-          <div className="space-y-1.5">
-            {filteredAiMatches.map((am, i) => (
-              <MatchCard
-                key={`${am.home_team || am.player1}_${am.away_team || am.player2}_${i}`}
-                dataTour={i === 0 ? "match-card" : undefined}
-                am={am}
-                cardBk={cardBk}
-                setCardBk={setCardBk}
-                isAiOutcomeInTicket={isAiOutcomeInTicket}
-                toggleAiOutcomeInTicket={toggleAiOutcomeInTicket}
-                handleAIMatchDragStart={handleAIMatchDragStart}
-                setDetailMatch={setDetailMatch}
-                setHiddenMatches={setHiddenMatches}
-                isInTicket={isMatchInAnyTicket(am)}
-                isSelected={detailMatch?.am === am}
-              />
-            ))}
-          </div>
+              {/* PMU races en supplement si mode mixte */}
+              {sports.has("pmu") && pmuRaces.length > 0 && (
+                <div className="mb-3">
+                  <div className="flex items-center gap-2 mb-2 px-1">
+                    <span className="text-[11px] font-bold text-[#8a919e] uppercase tracking-wider">Courses PMU</span>
+                    <span className="text-[10px] text-[#b0b7c3]">{pmuRaces.length} course{pmuRaces.length !== 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {pmuRaces
+                      .filter((r) => pmuRaceTypeFilter === "all" || r.race_type === pmuRaceTypeFilter)
+                      .slice(0, 5)
+                      .map((race) => (
+                        <PMURaceCard
+                          key={race.race_id}
+                          race={race}
+                          expanded={pmuExpandedRace === race.race_id}
+                          onToggle={() => setPmuExpandedRace(prev => prev === race.race_id ? null : race.race_id)}
+                          onSelectRunner={(r, idx) => setPmuDetailRace({ race: r, runnerIndex: idx })}
+                        />
+                      ))
+                    }
+                  </div>
+                  <div className="h-px bg-[#e3e6eb] mt-3 mb-2" />
+                </div>
+              )}
 
-          {hasScanned && aiMatches.length === 0 && !loading && (
-            <div className="text-center py-12 text-[#8a919e]">Aucun match trouve. Essayez d'autres filtres ou relancez un scan.</div>
-          )}
-          {filteredAiMatches.length === 0 && aiMatches.length > 0 && !loading && (
-            <div className="text-center py-12 text-[#8a919e]">
-              Aucun match avec ces filtres.
-              <span className="block mt-1 text-[11px] text-[#b0b7c3]">({aiMatches.length} matchs en memoire)</span>
-            </div>
-          )}
-          {!hasScanned && !loading && (
-            <div className="text-center py-16 text-[#8a919e]">
-              <ScanSearch size={32} className="mx-auto mb-3 text-[#b0b7c3]" />
-              <p className="text-[13px] font-medium">Selectionnez vos filtres puis cliquez sur Scanner</p>
-            </div>
+              {/* Match cards — flat list, date in each card */}
+              <div className="space-y-1.5">
+                {filteredAiMatches.map((am, i) => (
+                  <MatchCard
+                    key={`${am.home_team || am.player1}_${am.away_team || am.player2}_${i}`}
+                    dataTour={i === 0 ? "match-card" : undefined}
+                    am={am}
+                    cardBk={cardBk}
+                    setCardBk={setCardBk}
+                    isAiOutcomeInTicket={isAiOutcomeInTicket}
+                    toggleAiOutcomeInTicket={toggleAiOutcomeInTicket}
+                    handleAIMatchDragStart={handleAIMatchDragStart}
+                    setDetailMatch={setDetailMatch}
+                    setHiddenMatches={setHiddenMatches}
+                    isInTicket={isMatchInAnyTicket(am)}
+                    isSelected={detailMatch?.am === am}
+                  />
+                ))}
+              </div>
+
+              {hasScanned && aiMatches.length === 0 && !loading && (
+                <div className="text-center py-12 text-[#8a919e]">Aucun match trouve. Essayez d'autres filtres ou relancez un scan.</div>
+              )}
+              {filteredAiMatches.length === 0 && aiMatches.length > 0 && !loading && (
+                <div className="text-center py-12 text-[#8a919e]">
+                  Aucun match avec ces filtres.
+                  <span className="block mt-1 text-[11px] text-[#b0b7c3]">({aiMatches.length} matchs en memoire)</span>
+                </div>
+              )}
+              {!hasScanned && !loading && (
+                <div className="text-center py-16 text-[#8a919e]">
+                  <ScanSearch size={32} className="mx-auto mb-3 text-[#b0b7c3]" />
+                  <p className="text-[13px] font-medium">Selectionnez vos filtres puis cliquez sur Scanner</p>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -1261,6 +1413,15 @@ export default function Scanner() {
         </div>
       )}
 
+      {/* ═══ PMU DETAIL PANEL ═══ */}
+      {pmuDetailRace && (
+        <PMURaceDetailPanel
+          race={pmuDetailRace.race}
+          runnerIndex={pmuDetailRace.runnerIndex}
+          onClose={() => setPmuDetailRace(null)}
+        />
+      )}
+
       {showTour && <SpotlightTour steps={scannerTour} onComplete={completeTour} />}
     </div>
   );
@@ -1289,16 +1450,21 @@ function MatchCard({
   dataTour?: string;
 }) {
   const isFootball = am.sport === "football";
-  const home = isFootball ? (am.home_team || "?") : (am.player1 || "?");
-  const away = isFootball ? (am.away_team || "?") : (am.player2 || "?");
+  const isNBA = am.sport === "nba";
+  const isMLB = am.sport === "mlb";
+  const isRugby = am.sport === "rugby";
+  const isTennis = am.sport === "tennis";
+  const isBinary = isNBA || isMLB; // sports with only Home/Away outcomes
+  const home = isTennis ? (am.player1 || "?") : (am.home_team || "?");
+  const away = isTennis ? (am.player2 || "?") : (am.away_team || "?");
   const info = isFootball ? (LEAGUE_INFO_BY_NAME[am.league] ?? null) : null;
   const { dateStr, timeStr } = am.date ? parseBetDate(am.date) : { dateStr: "", timeStr: null };
   const matchKey = `${home}_${away}`;
 
-  const rawOddsBase = isFootball
+  const rawOddsBase = isFootball || isRugby
     ? (am.odds?.["1x2"] as Record<string, unknown> | undefined)
     : (am.odds?.["winner"] as Record<string, unknown> | undefined);
-  const outcomeKeys = isFootball ? ["H", "D", "A"] : ["P1", "P2"];
+  const outcomeKeys = isFootball || isRugby ? ["H", "D", "A"] : isBinary ? ["Home", "Away"] : ["P1", "P2"];
 
   const bkMaps: Record<string, Record<string, number>> = {};
   for (const k of outcomeKeys) bkMaps[k] = extractBkOdds(rawOddsBase?.[k]);
@@ -1310,19 +1476,26 @@ function MatchCard({
     return best;
   }
 
-  const outcomes = isFootball
+  const outcomes = isFootball || isRugby
     ? (["H", "D", "A"] as const).map((k) => {
         const { odds, bk } = bestOddsForKey(k);
         return { key: k, label: k === "H" ? home : k === "D" ? "Nul" : away, odds, bk };
       })
-    : (["P1", "P2"] as const).map((k) => {
-        const { odds, bk } = bestOddsForKey(k);
-        return { key: k, label: k === "P1" ? home : away, odds, bk };
-      });
+    : isBinary
+      ? (["Home", "Away"] as const).map((k) => {
+          const { odds, bk } = bestOddsForKey(k);
+          return { key: k, label: k === "Home" ? home : away, odds, bk };
+        })
+      : (["P1", "P2"] as const).map((k) => {
+          const { odds, bk } = bestOddsForKey(k);
+          return { key: k, label: k === "P1" ? home : away, odds, bk };
+        });
 
-  const modelProbs: Record<string, number> = isFootball
+  const modelProbs: Record<string, number> = isFootball || isRugby
     ? { H: am.model_prob_home ?? 0, D: am.model_prob_draw ?? 0, A: am.model_prob_away ?? 0 }
-    : { P1: am.model_prob_home ?? 0, P2: am.model_prob_away ?? 0 };
+    : isBinary
+      ? { Home: am.model_prob_home ?? 0, Away: am.model_prob_away ?? 0 }
+      : { P1: am.model_prob_home ?? 0, P2: am.model_prob_away ?? 0 };
 
   const bestOutcome = outcomes.filter(o => o.odds > 0).reduce(
     (best, o) => {
@@ -1333,7 +1506,7 @@ function MatchCard({
     null as typeof outcomes[0] | null
   );
 
-  const maxPts = am.sport === "tennis" ? 18 : 20;
+  const maxPts = am.sport === "tennis" ? 18 : am.sport === "nba" || am.sport === "mlb" ? 6 : am.sport === "rugby" ? 7 : 20;
   const dataScore = Math.round((am.data_score ?? 0) * maxPts);
   const confidence = Math.max(am.model_prob_home ?? 0, am.model_prob_draw ?? 0, am.model_prob_away ?? 0) * 100;
 
@@ -1365,7 +1538,13 @@ function MatchCard({
           <div className="text-[#8a919e] text-[10px] truncate mt-0.5">
             {isFootball
               ? (info ? `${info.flag} ${info.name}` : am.league)
-              : am.surface ? <><span className="text-[#f79009] font-medium">{am.surface}</span> · {am.league}</> : am.league
+              : isTennis
+                ? (am.surface ? <><span className="text-[#f79009] font-medium">{am.surface}</span> · {am.league}</> : am.league)
+                : isNBA
+                  ? <><span className="text-[#f97316] font-medium">NBA</span> · {am.venue ? am.venue : am.league}</>
+                  : isMLB
+                    ? <><span className="text-[#ea580c] font-medium">MLB</span> · {am.venue ? am.venue : am.league}</>
+                    : am.league
             }
           </div>
           {/* Line 3: teams */}
@@ -1429,7 +1608,7 @@ function MatchCard({
         </div>
 
         {/* mc-outcomes */}
-        <div {...(dataTour ? { "data-tour": "outcome-buttons" } : {})} className={`grid flex-1 min-w-0 ${isFootball ? "grid-cols-3" : "grid-cols-2"}`}>
+        <div {...(dataTour ? { "data-tour": "outcome-buttons" } : {})} className={`grid flex-1 min-w-0 ${isFootball || isRugby ? "grid-cols-3" : "grid-cols-2"}`}>
           {outcomes.map(({ key, label, odds, bk }) => {
             const inTicket = isAiOutcomeInTicket(am, key);
             const noOdds = !odds;
@@ -1551,8 +1730,29 @@ function MatchCard({
         </div>
       )}
 
+      {/* ── Bottom row — MLB ── */}
+      {isMLB && (am.starter_home_name || am.starter_away_name || am.home_runs_avg_10 != null || am.away_runs_avg_10 != null) && (
+        <div className="px-3 py-1.5 border-t border-[#f0f1f3] bg-[#f9fafb] flex flex-wrap items-center gap-x-3 gap-y-1">
+          {(am.starter_home_name || am.starter_away_name) && (
+            <span className="text-[10px] text-[#8a919e] font-medium" title="Lanceurs partants">
+              {am.starter_home_name ?? "?"} vs {am.starter_away_name ?? "?"}
+            </span>
+          )}
+          {am.home_runs_avg_10 != null && am.away_runs_avg_10 != null && (
+            <span className="text-[10px] text-[#3b5bdb]" title="Runs marques / 10 matchs">
+              R/m {am.home_runs_avg_10.toFixed(1)} | {am.away_runs_avg_10.toFixed(1)}
+            </span>
+          )}
+          {am.home_runs_allowed_10 != null && am.away_runs_allowed_10 != null && (
+            <span className="text-[10px] text-[#b0b7c3]" title="Runs encaisses / 10 matchs">
+              RA/m {am.home_runs_allowed_10.toFixed(1)} | {am.away_runs_allowed_10.toFixed(1)}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* ── Bottom row — tennis ── */}
-      {!isFootball && (am.ranking_p1 != null || am.form_home || am.p1_surface_record || am.p1_serve_pct != null || am.h2h_surface || am.h2h_last3?.length) && (
+      {!isFootball && !isMLB && (am.ranking_p1 != null || am.form_home || am.p1_surface_record || am.p1_serve_pct != null || am.h2h_surface || am.h2h_last3?.length) && (
         <div className="px-3 py-1.5 border-t border-[#f0f1f3] bg-[#f9fafb] flex flex-wrap items-center gap-x-3 gap-y-1">
           {am.ranking_p1 != null && am.ranking_p2 != null && (
             <span className="text-[10px] text-[#8a919e] font-medium" title="Classement ATP/WTA">

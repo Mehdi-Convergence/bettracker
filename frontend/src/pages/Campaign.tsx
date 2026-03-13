@@ -28,6 +28,7 @@ function sportIcon(name: string) {
   const lower = name.toLowerCase();
   if (lower.includes("tennis")) return "\uD83C\uDFBE";
   if (lower.includes("basket")) return "\uD83C\uDFC0";
+  if (lower.includes("pmu") || lower.includes("course") || lower.includes("cheval")) return "\uD83D\uDC0E";
   return "\u26BD";
 }
 
@@ -552,6 +553,8 @@ const SPORTS = [
   { key: "football", label: "Football", icon: "\u26BD" },
   { key: "tennis", label: "Tennis", icon: "\uD83C\uDFBE" },
   { key: "basket", label: "Basketball", icon: "\uD83C\uDFC0" },
+  { key: "mlb", label: "Baseball", icon: "\u26BE" },
+  { key: "pmu", label: "Courses PMU", icon: "\uD83D\uDC0E" },
 ];
 
 const STAKING_STRATEGIES = [

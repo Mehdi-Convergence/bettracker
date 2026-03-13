@@ -241,6 +241,14 @@ export function aiScan(params: { sport: string; leagues?: string; timeframe?: st
   return request<import("../types").AIScanResponse>(`/scanner/ai-scan?${qs}`);
 }
 
+// PMU
+export function pmuScan(force?: boolean) {
+  const qs = new URLSearchParams();
+  if (force) qs.set("force", "true");
+  const query = qs.toString() ? `?${qs}` : "";
+  return request<import("../types").PMUScanResponse>(`/scanner/pmu${query}`);
+}
+
 // User stats
 export function getUserStats() {
   return request<import("../types").UserStats>("/auth/stats");

@@ -62,10 +62,12 @@ const STAKING_OPTIONS: { key: StakingStrategy; name: string; desc: string }[] = 
 ];
 
 const SPORT_PERIODS: Record<string, { emoji: string; label: string; train: string; test: string }> = {
-  football: { emoji: "⚽", label: "Football",   train: "2018–2023 (5 saisons)", test: "2023–2025" },
-  tennis:   { emoji: "🎾", label: "Tennis ATP", train: "2019–2023 (5 ans)",     test: "2024–2025" },
-  nba:      { emoji: "🏀", label: "NBA",         train: "2018–2023 (5 saisons)", test: "2023–2025" },
-  rugby:    { emoji: "🏉", label: "Rugby Union", train: "2019–2023 (5 saisons)", test: "2024–2025" },
+  football: { emoji: "⚽", label: "Football",    train: "2018–2023 (5 saisons)", test: "2023–2025" },
+  tennis:   { emoji: "🎾", label: "Tennis ATP",  train: "2019–2023 (5 ans)",     test: "2024–2025" },
+  nba:      { emoji: "🏀", label: "NBA",          train: "2018–2023 (5 saisons)", test: "2023–2025" },
+  rugby:    { emoji: "🏉", label: "Rugby Union",  train: "2019–2023 (5 saisons)", test: "2024–2025" },
+  pmu:      { emoji: "🐎", label: "Courses PMU",  train: "80% chronologique",     test: "20% recentes" },
+  mlb:      { emoji: "⚾", label: "MLB",           train: "2019–2022 (4 saisons)", test: "2023–2025" },
 };
 
 function periodLabel(sports: Set<string>): string {
@@ -178,7 +180,7 @@ export default function Backtest() {
   const [mode, setMode] = useState<"quick" | "adv">("quick");
 
   // Sport multi-select
-  const [sports, setSports] = useState<Set<"football" | "tennis" | "nba" | "rugby">>(new Set(["football"]));
+  const [sports, setSports] = useState<Set<"football" | "tennis" | "nba" | "rugby" | "pmu" | "mlb">>(new Set(["football"]));
 
   // Params (strategy 1 — editable)
   const [params, setParams] = useState<BacktestParams>({ ...DEFAULT_PARAMS });
@@ -212,8 +214,8 @@ export default function Backtest() {
     setLoading(true);
     setError("");
     try {
-      const sportList = [...sports] as ("football" | "tennis" | "nba" | "rugby")[];
-      const sportEmoji: Record<string, string> = { football: "⚽", tennis: "🎾", nba: "🏀", rugby: "🏉" };
+      const sportList = [...sports] as ("football" | "tennis" | "nba" | "rugby" | "pmu" | "mlb")[];
+      const sportEmoji: Record<string, string> = { football: "⚽", tennis: "🎾", nba: "🏀", rugby: "🏉", pmu: "🐎", mlb: "⚾" };
       let data: BacktestResponse;
       let sportLabel: string;
       let sportKey: string;
@@ -355,7 +357,7 @@ export default function Backtest() {
   const p = params;
   const set = (patch: Partial<BacktestParams>) => setParams((prev) => ({ ...prev, ...patch }));
   const toggleSection = (key: string) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
-  const toggleSportBt = (s: "football" | "tennis" | "nba" | "rugby") => {
+  const toggleSportBt = (s: "football" | "tennis" | "nba" | "rugby" | "pmu" | "mlb") => {
     setSports(prev => {
       const next = new Set(prev);
       if (next.has(s)) { if (next.size > 1) next.delete(s); }
@@ -443,12 +445,12 @@ export default function Backtest() {
                 <div>
                   <label className={labelCls}>Sport</label>
                   <div className="flex gap-1.5 flex-wrap">
-                    {(["football", "tennis", "nba", "rugby"] as const).map(s => (
+                    {(["football", "tennis", "nba", "rugby", "pmu", "mlb"] as const).map(s => (
                       <button key={s} onClick={() => toggleSportBt(s)}
                         className={`flex-1 py-2 px-1 rounded-lg border-2 text-[13px] font-semibold text-center transition-all cursor-pointer min-w-[70px] ${
                           sports.has(s) ? "border-[#3b5bdb] bg-[#3b5bdb]/7 text-[#3b5bdb]" : "border-[#e3e6eb] text-[#3c4149] hover:border-[#3b5bdb]/30"
                         }`}>
-                        {s === "football" ? "⚽ Football" : s === "tennis" ? "🎾 Tennis" : s === "nba" ? "🏀 NBA" : "🏉 Rugby"}
+                        {s === "football" ? "⚽ Football" : s === "tennis" ? "🎾 Tennis" : s === "nba" ? "🏀 NBA" : s === "rugby" ? "🏉 Rugby" : s === "pmu" ? "🐎 PMU" : "⚾ MLB"}
                       </button>
                     ))}
                   </div>
@@ -565,12 +567,12 @@ export default function Backtest() {
                     <div>
                       <label className={labelCls}>Sport</label>
                       <div className="flex gap-1.5 flex-wrap">
-                        {(["football", "tennis", "nba", "rugby"] as const).map(s => (
+                        {(["football", "tennis", "nba", "rugby", "pmu", "mlb"] as const).map(s => (
                           <button key={s} onClick={() => toggleSportBt(s)}
                             className={`flex-1 py-2 px-1 rounded-lg border-2 text-[13px] font-semibold text-center transition-all cursor-pointer min-w-[70px] ${
                               sports.has(s) ? "border-[#3b5bdb] bg-[#3b5bdb]/7 text-[#3b5bdb]" : "border-[#e3e6eb] text-[#3c4149] hover:border-[#3b5bdb]/30"
                             }`}>
-                            {s === "football" ? "⚽ Football" : s === "tennis" ? "🎾 Tennis" : s === "nba" ? "🏀 NBA" : "🏉 Rugby"}
+                            {s === "football" ? "⚽ Football" : s === "tennis" ? "🎾 Tennis" : s === "nba" ? "🏀 NBA" : s === "rugby" ? "🏉 Rugby" : s === "pmu" ? "🐎 PMU" : "⚾ MLB"}
                           </button>
                         ))}
                       </div>
@@ -941,7 +943,7 @@ export default function Backtest() {
           <div className="space-y-1.5">
             {savedList.map((s) => (
               <div key={s.id} className={`${cardCls} flex items-center gap-3 px-4 py-3 hover:border-[#3b5bdb]/30 hover:bg-[#3b5bdb]/3 transition-all cursor-pointer`}>
-                <span className="text-base">{s.sport === "football" ? "⚽" : s.sport === "tennis" ? "🎾" : s.sport === "nba" ? "🏀" : s.sport === "rugby" ? "🏉" : "⚽+🎾"}</span>
+                <span className="text-base">{s.sport === "football" ? "⚽" : s.sport === "tennis" ? "🎾" : s.sport === "nba" ? "🏀" : s.sport === "rugby" ? "🏉" : s.sport === "pmu" ? "🐎" : s.sport === "mlb" ? "⚾" : "⚽+🎾"}</span>
                 <span className="text-[13px] font-semibold flex-1">{s.name}</span>
                 <span className="text-[11px] text-[#8a919e] font-mono flex items-center gap-1">
                   <Clock size={11} /> {new Date(s.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
