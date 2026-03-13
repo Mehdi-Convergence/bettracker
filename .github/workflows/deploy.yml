@@ -50,7 +50,13 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
+            source ~/.profile 2>/dev/null || true
+            source ~/.bashrc 2>/dev/null || true
             export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
+
+            echo "-> PATH: $PATH"
+            echo "-> uv location: $(which uv 2>/dev/null || echo 'NOT FOUND')"
+
             cd /opt/bettracker
 
             echo "-> Installing Python dependencies..."
