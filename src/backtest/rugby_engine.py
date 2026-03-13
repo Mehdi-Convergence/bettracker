@@ -106,9 +106,9 @@ class RugbyBacktestEngine:
             console.print("[red]Not enough data for train/test split[/red]")
             return {"bets": [], "initial_bankroll": self.initial_bankroll, "config": self._config()}
 
-        X_train = train_df[RUGBY_FEATURE_COLUMNS].values
+        X_train = train_df[RUGBY_FEATURE_COLUMNS].values.copy()
         y_train = train_df["target"].values
-        X_test = test_df[RUGBY_FEATURE_COLUMNS].values
+        X_test = test_df[RUGBY_FEATURE_COLUMNS].values.copy()
 
         col_medians = np.nanmedian(X_train, axis=0)
         for col_idx in range(X_train.shape[1]):
@@ -246,6 +246,7 @@ class RugbyBacktestEngine:
                 "model_prob": round(best["model_prob"], 4),
                 "edge": round(best["edge"], 4),
                 "stake": round(stake, 2),
+                "stake_pct": round(float(stake / (bankroll - pnl)) if (bankroll - pnl) > 0 else 0, 4),
                 "pnl": round(pnl, 2),
                 "won": best["actual_won"],
                 "bankroll_after": round(bankroll, 2),

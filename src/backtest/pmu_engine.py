@@ -318,6 +318,7 @@ class PMUBacktestEngine:
                 "model_prob": round(best["model_prob"], 4),
                 "odds": round(best["odds"], 2),
                 "stake": round(stake, 2),
+                "stake_pct": round(float(stake / (bankroll - pnl)) if (bankroll - pnl) > 0 else 0, 4),
                 "won": best["won"],
                 "pnl": round(pnl, 2),
                 "bankroll_after": round(bankroll, 2),
