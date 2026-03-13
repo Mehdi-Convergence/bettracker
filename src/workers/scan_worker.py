@@ -603,12 +603,12 @@ def _load_tennis_model():
 
 async def run_tennis_scan():
     """Run a full tennis scan and store results in cache."""
-    from src.data.tennis_client import TennisClient
+    from src.data.sofascore_client import SofascoreClient
     from src.services.probability_calculator import calculate_tennis
     from src.api.schemas import AIScanMatch
 
     t0 = time.time()
-    client = TennisClient()
+    sofa = SofascoreClient()
 
     # Load ML model (optional — fallback to rule-based if unavailable)
     tennis_ml_model, tennis_snapshot = _load_tennis_model()
@@ -619,17 +619,18 @@ async def run_tennis_scan():
     else:
         logger.info("Tennis ML model not available — using rule-based only")
 
-    # Run sync client in executor
+    # Fetch matches from SofaScore (sync client, run in executor)
     loop = asyncio.get_event_loop()
     try:
-        result = await loop.run_in_executor(
-            None, lambda: client.get_matches(timeframe="48h", force=True)
+        raw_matches = await loop.run_in_executor(
+            None, lambda: sofa.get_tennis_matches(timeframe="48h")
         )
     except Exception as exc:
         logger.error("Tennis scan failed: %s", exc)
+        sofa.close()
         return
 
-    raw_matches = result.get("matches", [])
+    sofa.close()
     matches = []
 
     for m in raw_matches:
@@ -791,13 +792,13 @@ def _load_nba_model():
 
 
 async def run_nba_scan():
-    """Run NBA scan — fetch upcoming games with odds and compute ML edges."""
-    from src.data.nba_client import NBAClient
+    """Run NBA scan — fetch games + odds + stats from API-Sports Basketball."""
+    from src.data.api_basketball_client import ApiBasketballClient
     from src.services.probability_calculator import calculate_nba
     from src.api.schemas import AIScanMatch
 
     t0 = time.time()
-    client = NBAClient()
+    bball = ApiBasketballClient()
 
     nba_ml_model, nba_snapshot = _load_nba_model()
     if nba_ml_model:
@@ -807,32 +808,77 @@ async def run_nba_scan():
     else:
         logger.info("NBA ML model not available — using rule-based only")
 
-    loop = asyncio.get_event_loop()
+    # 1. Fetch fixtures (today + tomorrow)
     try:
-        raw_games = await loop.run_in_executor(None, lambda: client.get_matches(timeframe="48h"))
+        fixtures = await bball.get_fixtures_range(timeframe="48h")
     except Exception as exc:
-        logger.error("NBA scan failed: %s", exc)
+        logger.error("NBA fixtures fetch failed: %s", exc)
+        return
+    if not fixtures:
+        logger.info("NBA scan: no upcoming fixtures")
+        cache_set("scan:nba:all", {"_cached_at": time.time(), "duration": 0, "matches": []}, ttl=SCAN_CACHE_TTL + 300)
         return
 
+    logger.info("NBA scan: %d fixtures found", len(fixtures))
+
+    # 2. Fetch standings (1 API call, cached 24h)
+    standings = await bball.get_standings()
+    standings_by_name: dict[str, dict] = {}
+    standings_by_id: dict[int, dict] = {}
+    for s in standings:
+        standings_by_name[s["team_name"]] = s
+        if s.get("team_id"):
+            standings_by_id[s["team_id"]] = s
+
+    # 3. Process each fixture: fetch odds + team stats + last games
     matches: list[AIScanMatch] = []
     teams_data = nba_snapshot.get("teams", {}) if nba_snapshot else {}
 
-    for g in raw_games:
+    for fix in fixtures:
         try:
-            home = g["home_team"]
-            away = g["away_team"]
-            odds_home = float(g.get("odds_home") or 0)
-            odds_away = float(g.get("odds_away") or 0)
-            odds_over = g.get("odds_over")
-            odds_under = g.get("odds_under")
-            total_line = g.get("total_line")
+            home = fix["home_name"]
+            away = fix["away_name"]
+            home_id = fix.get("home_id")
+            away_id = fix.get("away_id")
+            game_id = fix.get("game_id")
 
-            if odds_home <= 1.0 or odds_away <= 1.0:
+            # Fetch odds for this game
+            odds_data = await bball.get_odds(game_id) if game_id else {}
+            h2h = odds_data.get("h2h", {})
+            totals = odds_data.get("totals", {})
+
+            odds_home = h2h.get("home") or 0
+            odds_away = h2h.get("away") or 0
+            odds_over = totals.get("over")
+            odds_under = totals.get("under")
+            total_line = totals.get("line")
+
+            if not odds_home or not odds_away or odds_home <= 1.0 or odds_away <= 1.0:
+                # Fallback: skip game without odds
                 continue
 
-            # Get team stats from snapshot
-            h_stats = teams_data.get(home, {})
-            a_stats = teams_data.get(away, {})
+            # Fetch live stats per team (cached 24h)
+            h_team_stats = await bball.get_team_stats(home_id) if home_id else {}
+            a_team_stats = await bball.get_team_stats(away_id) if away_id else {}
+
+            # Fetch last 10 games per team (cached 24h)
+            h_last = await bball.get_last_games(home_id) if home_id else []
+            a_last = await bball.get_last_games(away_id) if away_id else []
+
+            # Compute live stats from API data
+            h_standing = standings_by_id.get(home_id) or standings_by_name.get(home, {})
+            a_standing = standings_by_id.get(away_id) or standings_by_name.get(away, {})
+
+            h_live = bball.compute_live_stats(h_last, h_standing, h_team_stats)
+            a_live = bball.compute_live_stats(a_last, a_standing, a_team_stats)
+
+            # Also use snapshot data as fallback for ML features
+            h_snap = teams_data.get(home, {})
+            a_snap = teams_data.get(away, {})
+
+            # Merge: prefer live data, fallback to snapshot
+            def _pick(live: dict, snap: dict, key: str):
+                return live.get(key) if live.get(key) is not None else snap.get(key)
 
             # Rule-based baseline
             calc = calculate_nba(
@@ -841,10 +887,10 @@ async def run_nba_scan():
                 odds_over=odds_over,
                 odds_under=odds_under,
                 total_line=total_line,
-                home_win_rate=h_stats.get("win_rate_10"),
-                away_win_rate=a_stats.get("win_rate_10"),
-                home_pt_diff=h_stats.get("pt_diff_10"),
-                away_pt_diff=a_stats.get("pt_diff_10"),
+                home_win_rate=_pick(h_live, h_snap, "win_rate_10"),
+                away_win_rate=_pick(a_live, a_snap, "win_rate_10"),
+                home_pt_diff=_pick(h_live, h_snap, "pt_diff_10"),
+                away_pt_diff=_pick(a_live, a_snap, "pt_diff_10"),
             )
 
             _nba_ml_used = False
@@ -866,7 +912,6 @@ async def run_nba_scan():
                             feat_array[0, col_idx] = _nba_medians[col_idx] if not np.isnan(_nba_medians[col_idx]) else 0.0
                     ml_prob_home = float(nba_ml_model.predict_proba(feat_array)[0])
                     ml_prob_away = 1.0 - ml_prob_home
-                    # Blend: 70% ML + 30% rule-based
                     rule_h = calc.home_prob or 0.5
                     rule_a = calc.away_prob or 0.5
                     blend_h = round(0.70 * ml_prob_home + 0.30 * rule_h, 4)
@@ -876,7 +921,6 @@ async def run_nba_scan():
                         edges_blended["Home"] = round(blend_h - 1.0 / odds_home, 4)
                     if odds_away > 1.0:
                         edges_blended["Away"] = round(blend_a - 1.0 / odds_away, 4)
-                    # Carry over over/under edges from rule-based (ML doesn't predict totals)
                     for k in ["Over", "Under"]:
                         if k in (calc.edges or {}):
                             edges_blended[k] = calc.edges[k]
@@ -886,14 +930,20 @@ async def run_nba_scan():
                 except Exception as ml_exc:
                     logger.debug("NBA ML prediction failed: %s", ml_exc)
 
-            odds = {
+            odds_dict = {
                 "winner": {
                     "Home": odds_home,
                     "Away": odds_away,
                 },
             }
+            if h2h.get("bookmakers"):
+                odds_dict["winner_bookmakers"] = h2h["bookmakers"]
             if odds_over:
-                odds["over_under"] = {"Over 2.5": odds_over, "Under 2.5": odds_under}
+                odds_dict["over_under"] = {"Over": odds_over, "Under": odds_under, "line": total_line}
+
+            # Build season record strings
+            h_record = f"{h_standing.get('wins', '?')}-{h_standing.get('losses', '?')}" if h_standing else None
+            a_record = f"{a_standing.get('wins', '?')}-{a_standing.get('losses', '?')}" if a_standing else None
 
             matches.append(AIScanMatch(
                 sport="nba",
@@ -901,35 +951,70 @@ async def run_nba_scan():
                 player2=away,
                 home_team=home,
                 away_team=away,
-                league="NBA",
-                date=g.get("date", ""),
-                odds=odds,
+                league=fix.get("league", "NBA"),
+                date=fix.get("date", ""),
+                venue=fix.get("venue"),
+                odds=odds_dict,
                 model_prob_home=calc.home_prob,
                 model_prob_away=calc.away_prob,
                 edges=calc.edges,
                 data_quality=calc.data_quality,
                 data_score=calc.data_score,
                 nba_ml_used=_nba_ml_used,
-                home_win_rate_10=h_stats.get("win_rate_10"),
-                away_win_rate_10=a_stats.get("win_rate_10"),
-                home_pt_diff_10=h_stats.get("pt_diff_10"),
-                away_pt_diff_10=a_stats.get("pt_diff_10"),
-                home_pts_avg_10=h_stats.get("pts_avg_10"),
-                away_pts_avg_10=a_stats.get("pts_avg_10"),
-                home_pts_allowed_10=h_stats.get("pts_allowed_10"),
-                away_pts_allowed_10=a_stats.get("pts_allowed_10"),
-                home_streak=h_stats.get("streak"),
-                away_streak=a_stats.get("streak"),
+                # Stats from live API data
+                home_win_rate_10=_pick(h_live, h_snap, "win_rate_10"),
+                away_win_rate_10=_pick(a_live, a_snap, "win_rate_10"),
+                home_pt_diff_10=_pick(h_live, h_snap, "pt_diff_10"),
+                away_pt_diff_10=_pick(a_live, a_snap, "pt_diff_10"),
+                home_pts_avg_10=_pick(h_live, h_snap, "pts_avg_10"),
+                away_pts_avg_10=_pick(a_live, a_snap, "pts_avg_10"),
+                home_pts_allowed_10=_pick(h_live, h_snap, "pts_allowed_10"),
+                away_pts_allowed_10=_pick(a_live, a_snap, "pts_allowed_10"),
+                home_streak=h_live.get("streak") or h_snap.get("streak"),
+                away_streak=a_live.get("streak") or a_snap.get("streak"),
+                home_b2b=h_live.get("is_b2b", False),
+                away_b2b=a_live.get("is_b2b", False),
+                home_rest_days=h_live.get("rest_days"),
+                away_rest_days=a_live.get("rest_days"),
+                form_home=h_live.get("form"),
+                form_away=a_live.get("form"),
                 odds_over=odds_over,
                 odds_under=odds_under,
                 total_line=total_line,
+                # Enriched stats from API-Sports
+                home_fg_pct=h_live.get("fg_pct"),
+                away_fg_pct=a_live.get("fg_pct"),
+                home_three_pct=h_live.get("three_pct"),
+                away_three_pct=a_live.get("three_pct"),
+                home_ft_pct=h_live.get("ft_pct"),
+                away_ft_pct=a_live.get("ft_pct"),
+                home_rebounds_avg=h_live.get("rebounds_avg"),
+                away_rebounds_avg=a_live.get("rebounds_avg"),
+                home_assists_avg=h_live.get("assists_avg"),
+                away_assists_avg=a_live.get("assists_avg"),
+                home_turnovers_avg=h_live.get("turnovers_avg"),
+                away_turnovers_avg=a_live.get("turnovers_avg"),
+                home_steals_avg=h_live.get("steals_avg"),
+                away_steals_avg=a_live.get("steals_avg"),
+                home_blocks_avg=h_live.get("blocks_avg"),
+                away_blocks_avg=a_live.get("blocks_avg"),
+                home_conference=h_live.get("conference"),
+                away_conference=a_live.get("conference"),
+                home_conference_rank=h_live.get("conference_rank"),
+                away_conference_rank=a_live.get("conference_rank"),
+                home_season_record=h_record,
+                away_season_record=a_record,
+                home_last_5=h_live.get("last_5_results", []),
+                away_last_5=a_live.get("last_5_results", []),
+                position_home=h_live.get("conference_rank"),
+                position_away=a_live.get("conference_rank"),
             ))
-        except Exception:
+        except Exception as exc:
+            logger.debug("NBA fixture processing error: %s", exc)
             continue
 
     duration = time.time() - t0
 
-    # Persist odds snapshots (non-blocking)
     _save_odds_snapshots(matches, "nba")
 
     cache_payload = {
@@ -967,13 +1052,13 @@ def _load_rugby_model():
 
 
 async def run_rugby_scan():
-    """Run rugby scan — fetch upcoming matches with odds and compute ML edges."""
-    from src.data.rugby_client import RugbyClient
+    """Run rugby scan — fetch games + odds + stats from API-Sports Rugby."""
+    from src.data.api_rugby_client import ApiRugbyClient
     from src.services.probability_calculator import calculate_rugby
     from src.api.schemas import AIScanMatch
 
     t0 = time.time()
-    client = RugbyClient()
+    rugby_api = ApiRugbyClient()
 
     rugby_ml_model, rugby_snapshot = _load_rugby_model()
     if rugby_ml_model:
@@ -983,33 +1068,69 @@ async def run_rugby_scan():
     else:
         logger.info("Rugby ML model not available — using rule-based only")
 
-    loop = asyncio.get_event_loop()
+    # 1. Fetch fixtures
     try:
-        raw_games = await loop.run_in_executor(None, lambda: client.get_matches(timeframe="48h"))
+        fixtures = await rugby_api.get_fixtures_range(timeframe="48h")
     except Exception as exc:
-        logger.error("Rugby scan failed: %s", exc)
+        logger.error("Rugby fixtures fetch failed: %s", exc)
         return
+    if not fixtures:
+        logger.info("Rugby scan: no upcoming fixtures")
+        cache_set("scan:rugby:all", {"_cached_at": time.time(), "duration": 0, "matches": []}, ttl=SCAN_CACHE_TTL + 300)
+        return
+
+    logger.info("Rugby scan: %d fixtures found", len(fixtures))
+
+    # 2. Fetch standings per league (cached 24h)
+    standings_by_id: dict[int, dict] = {}
+    for league_info in rugby_api.get_tracked_leagues():
+        league_standings = await rugby_api.get_standings(league_info["id"])
+        for s in league_standings:
+            if s.get("team_id"):
+                standings_by_id[s["team_id"]] = s
 
     matches: list[AIScanMatch] = []
     teams_data = rugby_snapshot.get("teams", {}) if rugby_snapshot else {}
 
-    for g in raw_games:
+    for fix in fixtures:
         try:
-            home = g["home_team"]
-            away = g["away_team"]
-            odds_home = float(g.get("odds_home") or 0)
-            odds_draw = g.get("odds_draw")
-            odds_away = float(g.get("odds_away") or 0)
-            odds_over = g.get("odds_over")
-            odds_under = g.get("odds_under")
-            total_line = g.get("total_line")
-            league = g.get("league", "Rugby Union")
+            home = fix["home_name"]
+            away = fix["away_name"]
+            home_id = fix.get("home_id")
+            away_id = fix.get("away_id")
+            game_id = fix.get("game_id")
+            league = fix.get("league", "Rugby Union")
 
-            if odds_home <= 1.0 or odds_away <= 1.0:
+            # Fetch odds
+            odds_data = await rugby_api.get_odds(game_id) if game_id else {}
+            h2h = odds_data.get("h2h", {})
+            totals = odds_data.get("totals", {})
+
+            odds_home = h2h.get("home") or 0
+            odds_draw = h2h.get("draw")
+            odds_away = h2h.get("away") or 0
+            odds_over = totals.get("over")
+            odds_under = totals.get("under")
+            total_line = totals.get("line")
+
+            if not odds_home or not odds_away or odds_home <= 1.0 or odds_away <= 1.0:
                 continue
 
-            h_stats = teams_data.get(home, {})
-            a_stats = teams_data.get(away, {})
+            # Fetch live stats
+            h_last = await rugby_api.get_last_games(home_id) if home_id else []
+            a_last = await rugby_api.get_last_games(away_id) if away_id else []
+
+            h_standing = standings_by_id.get(home_id, {})
+            a_standing = standings_by_id.get(away_id, {})
+
+            h_live = rugby_api.compute_live_stats(h_last, h_standing, None)
+            a_live = rugby_api.compute_live_stats(a_last, a_standing, None)
+
+            h_snap = teams_data.get(home, {})
+            a_snap = teams_data.get(away, {})
+
+            def _pick(live: dict, snap: dict, key: str):
+                return live.get(key) if live.get(key) is not None else snap.get(key)
 
             # Rule-based baseline (1X2 with draw)
             calc = calculate_rugby(
@@ -1019,10 +1140,10 @@ async def run_rugby_scan():
                 odds_over=odds_over,
                 odds_under=odds_under,
                 total_line=total_line,
-                home_win_rate=h_stats.get("win_rate_10"),
-                away_win_rate=a_stats.get("win_rate_10"),
-                home_pt_diff=h_stats.get("pt_diff_10"),
-                away_pt_diff=a_stats.get("pt_diff_10"),
+                home_win_rate=_pick(h_live, h_snap, "win_rate_10"),
+                away_win_rate=_pick(a_live, a_snap, "win_rate_10"),
+                home_pt_diff=_pick(h_live, h_snap, "pt_diff_10"),
+                away_pt_diff=_pick(a_live, a_snap, "pt_diff_10"),
             )
 
             _rugby_ml_used = False
@@ -1044,12 +1165,10 @@ async def run_rugby_scan():
                         if np.isnan(feat_array[0, col_idx]):
                             feat_array[0, col_idx] = _rugby_medians[col_idx] if not np.isnan(_rugby_medians[col_idx]) else 0.0
                     ml_prob_home = float(rugby_ml_model.predict_proba(feat_array)[0])
-                    # Rugby has draws — redistribute non-home probability proportionally
                     _draw_base = 0.06
                     ml_prob_not_home = 1.0 - ml_prob_home
                     ml_prob_draw = _draw_base * ml_prob_not_home
                     ml_prob_away = ml_prob_not_home - ml_prob_draw
-                    # Blend 65% ML + 35% rule-based (less data than NBA → less ML weight)
                     rule_h = calc.home_prob or 0.47
                     rule_d = calc.draw_prob or _draw_base
                     rule_a = calc.away_prob or 0.47
@@ -1064,7 +1183,6 @@ async def run_rugby_scan():
                         edges_blended["D"] = round(blend_d - 1.0 / float(odds_draw), 4)
                     if odds_away > 1.0:
                         edges_blended["A"] = round(blend_a - 1.0 / odds_away, 4)
-                    # Keep only positive edges
                     edges_blended = {k: v for k, v in edges_blended.items() if v > 0}
                     from dataclasses import replace as _replace
                     calc = _replace(calc, home_prob=blend_h, draw_prob=blend_d, away_prob=blend_a, edges=edges_blended)
@@ -1081,7 +1199,7 @@ async def run_rugby_scan():
             if odds_draw and float(odds_draw) > 1.0:
                 odds["1x2"]["D"] = float(odds_draw)
             if odds_over:
-                odds["over_under"] = {"Over": odds_over, "Under": odds_under}
+                odds["over_under"] = {"Over": odds_over, "Under": odds_under, "line": total_line}
 
             matches.append(AIScanMatch(
                 sport="rugby",
@@ -1090,7 +1208,7 @@ async def run_rugby_scan():
                 player1=None,
                 player2=None,
                 league=league,
-                date=g.get("date", ""),
+                date=fix.get("date", ""),
                 odds=odds,
                 model_prob_home=calc.home_prob,
                 model_prob_draw=calc.draw_prob,
@@ -1099,30 +1217,38 @@ async def run_rugby_scan():
                 data_quality=calc.data_quality,
                 data_score=calc.data_score,
                 rugby_ml_used=_rugby_ml_used,
-                home_win_rate_10=h_stats.get("win_rate_10"),
-                away_win_rate_10=a_stats.get("win_rate_10"),
-                home_pt_diff_10=h_stats.get("pt_diff_10"),
-                away_pt_diff_10=a_stats.get("pt_diff_10"),
-                home_pts_avg_10=h_stats.get("pts_avg_10"),
-                away_pts_avg_10=a_stats.get("pts_avg_10"),
-                home_pts_allowed_10=h_stats.get("pts_allowed_10"),
-                away_pts_allowed_10=a_stats.get("pts_allowed_10"),
-                home_tries_avg_10=h_stats.get("tries_avg_10"),
-                away_tries_avg_10=a_stats.get("tries_avg_10"),
-                home_penalties_avg_10=h_stats.get("penalties_avg_10"),
-                away_penalties_avg_10=a_stats.get("penalties_avg_10"),
-                home_streak=h_stats.get("streak"),
-                away_streak=a_stats.get("streak"),
+                home_win_rate_10=_pick(h_live, h_snap, "win_rate_10"),
+                away_win_rate_10=_pick(a_live, a_snap, "win_rate_10"),
+                home_pt_diff_10=_pick(h_live, h_snap, "pt_diff_10"),
+                away_pt_diff_10=_pick(a_live, a_snap, "pt_diff_10"),
+                home_pts_avg_10=_pick(h_live, h_snap, "pts_avg_10"),
+                away_pts_avg_10=_pick(a_live, a_snap, "pts_avg_10"),
+                home_pts_allowed_10=_pick(h_live, h_snap, "pts_allowed_10"),
+                away_pts_allowed_10=_pick(a_live, a_snap, "pts_allowed_10"),
+                home_tries_avg_10=_pick(h_live, h_snap, "tries_avg_10"),
+                away_tries_avg_10=_pick(a_live, a_snap, "tries_avg_10"),
+                home_penalties_avg_10=_pick(h_live, h_snap, "penalties_avg_10"),
+                away_penalties_avg_10=_pick(a_live, a_snap, "penalties_avg_10"),
+                home_streak=h_live.get("streak") or h_snap.get("streak"),
+                away_streak=a_live.get("streak") or a_snap.get("streak"),
+                home_rest_days=h_live.get("rest_days"),
+                away_rest_days=a_live.get("rest_days"),
+                form_home=h_live.get("form"),
+                form_away=a_live.get("form"),
+                position_home=h_live.get("league_rank"),
+                position_away=a_live.get("league_rank"),
+                home_last_5=h_live.get("last_5_results", []),
+                away_last_5=a_live.get("last_5_results", []),
                 odds_over=odds_over,
                 odds_under=odds_under,
                 total_line=total_line,
             ))
-        except Exception:
+        except Exception as exc:
+            logger.debug("Rugby fixture processing error: %s", exc)
             continue
 
     duration = time.time() - t0
 
-    # Persist odds snapshots (rugby has draws, use football-style H/D/A)
     _save_odds_snapshots(matches, "rugby")
 
     cache_payload = {
@@ -1161,13 +1287,13 @@ def _load_mlb_model():
 
 
 async def run_mlb_scan():
-    """Run MLB scan — fetch upcoming games with odds and compute ML edges."""
-    from src.data.mlb_client import MLBClient
+    """Run MLB scan — fetch games + odds + stats from API-Sports Baseball."""
+    from src.data.api_baseball_client import ApiBaseballClient
     from src.services.probability_calculator import calculate_mlb
     from src.api.schemas import AIScanMatch
 
     t0 = time.time()
-    client = MLBClient()
+    bb = ApiBaseballClient()
 
     mlb_ml_model, mlb_snapshot = _load_mlb_model()
     if mlb_ml_model:
@@ -1177,44 +1303,83 @@ async def run_mlb_scan():
     else:
         logger.info("MLB ML model not available — using rule-based only")
 
-    loop = asyncio.get_event_loop()
+    # 1. Fetch fixtures
     try:
-        raw_games = await loop.run_in_executor(None, lambda: client.get_matches(timeframe="48h"))
+        fixtures = await bb.get_fixtures_range(timeframe="48h")
     except Exception as exc:
-        logger.error("MLB scan failed: %s", exc)
+        logger.error("MLB fixtures fetch failed: %s", exc)
         return
+    if not fixtures:
+        logger.info("MLB scan: no upcoming fixtures")
+        cache_set("scan:mlb:all", {"_cached_at": time.time(), "duration": 0, "matches": []}, ttl=SCAN_CACHE_TTL + 300)
+        return
+
+    logger.info("MLB scan: %d fixtures found", len(fixtures))
+
+    # 2. Fetch standings (cached 24h)
+    standings = await bb.get_standings()
+    standings_by_id: dict[int, dict] = {}
+    standings_by_name: dict[str, dict] = {}
+    for s in standings:
+        standings_by_name[s["team_name"]] = s
+        if s.get("team_id"):
+            standings_by_id[s["team_id"]] = s
 
     matches: list[AIScanMatch] = []
     teams_data = mlb_snapshot.get("teams", {}) if mlb_snapshot else {}
 
-    for g in raw_games:
+    for fix in fixtures:
         try:
-            home = g["home_team"]
-            away = g["away_team"]
-            odds_home = float(g.get("odds_home") or 0)
-            odds_away = float(g.get("odds_away") or 0)
-            odds_over = g.get("odds_over")
-            odds_under = g.get("odds_under")
-            total_line = g.get("total_line")
+            home = fix["home_name"]
+            away = fix["away_name"]
+            home_id = fix.get("home_id")
+            away_id = fix.get("away_id")
+            game_id = fix.get("game_id")
 
-            if odds_home <= 1.0 or odds_away <= 1.0:
+            # Fetch odds
+            odds_data = await bb.get_odds(game_id) if game_id else {}
+            h2h = odds_data.get("h2h", {})
+            totals = odds_data.get("totals", {})
+
+            odds_home = h2h.get("home") or 0
+            odds_away = h2h.get("away") or 0
+            odds_over = totals.get("over")
+            odds_under = totals.get("under")
+            total_line = totals.get("line")
+
+            if not odds_home or not odds_away or odds_home <= 1.0 or odds_away <= 1.0:
                 continue
 
-            h_stats = teams_data.get(home, {})
-            a_stats = teams_data.get(away, {})
+            # Fetch live stats
+            h_team_stats = await bb.get_team_stats(home_id) if home_id else {}
+            a_team_stats = await bb.get_team_stats(away_id) if away_id else {}
+            h_last = await bb.get_last_games(home_id) if home_id else []
+            a_last = await bb.get_last_games(away_id) if away_id else []
+
+            h_standing = standings_by_id.get(home_id) or standings_by_name.get(home, {})
+            a_standing = standings_by_id.get(away_id) or standings_by_name.get(away, {})
+
+            h_live = bb.compute_live_stats(h_last, h_standing, h_team_stats)
+            a_live = bb.compute_live_stats(a_last, a_standing, a_team_stats)
+
+            h_snap = teams_data.get(home, {})
+            a_snap = teams_data.get(away, {})
+
+            def _pick(live: dict, snap: dict, key: str):
+                return live.get(key) if live.get(key) is not None else snap.get(key)
 
             # Rule-based baseline
             calc = calculate_mlb(
                 odds_home=odds_home,
                 odds_away=odds_away,
-                home_win_rate=h_stats.get("win_rate_10"),
-                away_win_rate=a_stats.get("win_rate_10"),
-                home_run_diff=h_stats.get("run_diff_10"),
-                away_run_diff=a_stats.get("run_diff_10"),
-                home_runs_avg=h_stats.get("runs_avg_10"),
-                away_runs_avg=a_stats.get("runs_avg_10"),
-                home_runs_allowed=h_stats.get("runs_allowed_10"),
-                away_runs_allowed=a_stats.get("runs_allowed_10"),
+                home_win_rate=_pick(h_live, h_snap, "win_rate_10"),
+                away_win_rate=_pick(a_live, a_snap, "win_rate_10"),
+                home_run_diff=_pick(h_live, h_snap, "run_diff_10"),
+                away_run_diff=_pick(a_live, a_snap, "run_diff_10"),
+                home_runs_avg=_pick(h_live, h_snap, "runs_avg_10"),
+                away_runs_avg=_pick(a_live, a_snap, "runs_avg_10"),
+                home_runs_allowed=_pick(h_live, h_snap, "runs_allowed_10"),
+                away_runs_allowed=_pick(a_live, a_snap, "runs_allowed_10"),
             )
 
             _mlb_ml_used = False
@@ -1233,7 +1398,6 @@ async def run_mlb_scan():
                             feat_array[0, col_idx] = _mlb_medians[col_idx] if not np.isnan(_mlb_medians[col_idx]) else 0.0
                     ml_prob_home = float(mlb_ml_model.predict_proba(feat_array)[0])
                     ml_prob_away = 1.0 - ml_prob_home
-                    # Blend: 65% ML + 35% rule-based
                     rule_h = calc.home_prob or 0.5
                     rule_a = calc.away_prob or 0.5
                     blend_h = round(0.65 * ml_prob_home + 0.35 * rule_h, 4)
@@ -1255,15 +1419,21 @@ async def run_mlb_scan():
                     "Away": odds_away,
                 },
             }
+            if h2h.get("bookmakers"):
+                odds_dict["winner_bookmakers"] = h2h["bookmakers"]
             if odds_over:
-                odds_dict["over_under"] = {"Over": odds_over, "Under": odds_under}
+                odds_dict["over_under"] = {"Over": odds_over, "Under": odds_under, "line": total_line}
+
+            h_record = f"{h_standing.get('wins', '?')}-{h_standing.get('losses', '?')}" if h_standing else None
+            a_record = f"{a_standing.get('wins', '?')}-{a_standing.get('losses', '?')}" if a_standing else None
 
             matches.append(AIScanMatch(
                 sport="mlb",
                 home_team=home,
                 away_team=away,
                 league="MLB",
-                date=g.get("date", ""),
+                date=fix.get("date", ""),
+                venue=fix.get("venue"),
                 odds=odds_dict,
                 model_prob_home=calc.home_prob,
                 model_prob_away=calc.away_prob,
@@ -1271,24 +1441,43 @@ async def run_mlb_scan():
                 data_quality=calc.data_quality,
                 data_score=calc.data_score,
                 mlb_ml_used=_mlb_ml_used,
-                home_runs_avg_10=h_stats.get("runs_avg_10"),
-                away_runs_avg_10=a_stats.get("runs_avg_10"),
-                home_runs_allowed_10=h_stats.get("runs_allowed_10"),
-                away_runs_allowed_10=a_stats.get("runs_allowed_10"),
-                home_win_rate_10=h_stats.get("win_rate_10"),
-                away_win_rate_10=a_stats.get("win_rate_10"),
-                home_streak=h_stats.get("streak"),
-                away_streak=a_stats.get("streak"),
+                home_runs_avg_10=_pick(h_live, h_snap, "runs_avg_10"),
+                away_runs_avg_10=_pick(a_live, a_snap, "runs_avg_10"),
+                home_runs_allowed_10=_pick(h_live, h_snap, "runs_allowed_10"),
+                away_runs_allowed_10=_pick(a_live, a_snap, "runs_allowed_10"),
+                home_win_rate_10=_pick(h_live, h_snap, "win_rate_10"),
+                away_win_rate_10=_pick(a_live, a_snap, "win_rate_10"),
+                home_streak=h_live.get("streak") or h_snap.get("streak"),
+                away_streak=a_live.get("streak") or a_snap.get("streak"),
+                home_rest_days=h_live.get("rest_days"),
+                away_rest_days=a_live.get("rest_days"),
+                form_home=h_live.get("form"),
+                form_away=a_live.get("form"),
+                home_season_record=h_record,
+                away_season_record=a_record,
+                home_last_5=h_live.get("last_5_results", []),
+                away_last_5=a_live.get("last_5_results", []),
+                position_home=h_live.get("division_rank"),
+                position_away=a_live.get("division_rank"),
                 odds_over=odds_over,
                 odds_under=odds_under,
                 total_line=total_line,
+                # Enriched stats from API-Sports
+                home_batting_avg=h_live.get("batting_avg"),
+                away_batting_avg=a_live.get("batting_avg"),
+                home_era=h_live.get("era"),
+                away_era=a_live.get("era"),
+                home_division=h_live.get("division"),
+                away_division=a_live.get("division"),
+                home_division_rank=h_live.get("division_rank"),
+                away_division_rank=a_live.get("division_rank"),
             ))
-        except Exception:
+        except Exception as exc:
+            logger.debug("MLB fixture processing error: %s", exc)
             continue
 
     duration = time.time() - t0
 
-    # Persist odds snapshots (non-blocking)
     _save_odds_snapshots(matches, "mlb")
 
     cache_payload = {

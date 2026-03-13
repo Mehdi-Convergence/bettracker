@@ -5,7 +5,7 @@ fixtures, standings, H2H, injuries, team stats, odds, lineups, players.
 
 Cache TTLs:
   fixtures      12h   standings    24h   h2h     48h
-  team_stats    12h   injuries      2h   odds    30min
+  team_stats    12h   injuries      6h   odds    30min
   lineup        30min squad        24h   topscorers 24h
 """
 from __future__ import annotations
@@ -33,7 +33,7 @@ TTL = {
     "standings":    24 * 3600,
     "h2h":          48 * 3600,
     "team_stats":   12 * 3600,
-    "injuries":      2 * 3600,
+    "injuries":      6 * 3600,
     "odds":              1800,
     "lineup":            1800,
     "squad":        24 * 3600,
@@ -84,6 +84,10 @@ LEAGUE_ID_TO_CODE = {v: k for k, v in LEAGUE_ID_MAP.items()}
 SEASON = 2025  # saison 2025-2026 (courante en mars 2026)
 HOME_ADVANTAGE = 1.10  # facteur Poisson domicile
 
+# Quota restant vu dans le dernier header x-ratelimit-requests-remaining
+# (partagé entre toutes les instances, mis à jour par _quota_update)
+_last_remaining_quota: int = 10_000  # valeur conservatrice par défaut
+
 
 # ---------------------------------------------------------------------------
 # Cache helpers — unified via src/cache.py (Redis + in-memory)
@@ -116,13 +120,16 @@ def _quota_get() -> dict:
 
 
 def _quota_update(remaining: int | None) -> None:
+    global _last_remaining_quota
     today = datetime.now().strftime("%Y-%m-%d")
     q = _quota_get()
     q["requests_made"] += 1
     if remaining is not None:
         q["remaining"] = remaining
+        _last_remaining_quota = remaining
     else:
         q["remaining"] = max(0, q.get("remaining", 100) - 1)
+        _last_remaining_quota = q["remaining"]
     _cache_set_global(f"af_quota:{today}", q, ttl=86400)
     if q["remaining"] < 10:
         logger.warning("API-Football quota low: %d requests remaining today", q["remaining"])
@@ -188,6 +195,37 @@ async def _get_cached(key_type: str, key_id: str, path: str, params: dict | None
 # ---------------------------------------------------------------------------
 
 class ApiFootballClient:
+
+    # Tier 1 : grandes ligues — scan recommande toutes les 1h
+    TIER1_LEAGUES: list[int] = [
+        39, 140, 135, 78, 61, 88, 94, 253, 203, 262, 307, 179, 40, 41, 42, 43,
+    ]
+    # Tier 2 : coupes et ligues secondaires — scan recommande toutes les 3h
+    TIER2_LEAGUES: list[int] = [
+        2, 3, 848, 531, 45, 528, 529, 48, 188, 383, 556, 143, 81, 79,
+    ]
+
+    # Seuil de quota en dessous duquel les appels non-essentiels sont ignores
+    QUOTA_GUARD_THRESHOLD: int = 500
+
+    @staticmethod
+    def get_scan_tier(league_id: int) -> int:
+        """Retourne 1 (scan 1h) ou 2 (scan 3h) selon la ligue."""
+        if league_id in ApiFootballClient.TIER1_LEAGUES:
+            return 1
+        return 2
+
+    def _check_quota(self, method_name: str) -> bool:
+        """Retourne True si le quota est suffisant, False (avec warning) sinon."""
+        remaining = _last_remaining_quota
+        if remaining < self.QUOTA_GUARD_THRESHOLD:
+            logger.warning(
+                "API-Football quota low (%d remaining), skipping %s",
+                remaining,
+                method_name,
+            )
+            return False
+        return True
 
     # --- Fixtures ---
 
@@ -546,6 +584,8 @@ class ApiFootballClient:
 
     async def get_squad(self, team_id: int) -> list[dict]:
         """Return squad [{player_id, name, position, age}]"""
+        if not self._check_quota("get_squad"):
+            return []
         raw = await _get_cached(
             "squad", str(team_id),
             "/players/squads",
@@ -572,6 +612,8 @@ class ApiFootballClient:
 
     async def get_topscorers(self, league_id: int) -> list[dict]:
         """Return [{player_id, name, team_id, goals, assists, rating}]"""
+        if not self._check_quota("get_topscorers"):
+            return []
         raw = await _get_cached(
             "topscorers", str(league_id),
             "/players/topscorers",
@@ -606,6 +648,8 @@ class ApiFootballClient:
         Calls /players?team=&league=&season= (page 1, covers ~20 players, cached 24h).
         Returns {normalized_name: {goals, assists, rating, games}}.
         """
+        if not self._check_quota("get_team_player_stats"):
+            return {}
         raw = await _get_cached(
             "player_stats", f"{team_id}_{league_id}",
             "/players",

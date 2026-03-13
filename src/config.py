@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     # API Keys (optional, for live scanner)
     ODDS_API_KEY: str = ""
     API_FOOTBALL_KEY: str = ""
+    API_SPORTS_KEY: str = ""  # Shared key for API-Sports (Basketball, Baseball, Rugby)
     OPENWEATHER_API_KEY: str = ""
 
     # ML Config

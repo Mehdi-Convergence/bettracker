@@ -492,6 +492,31 @@ export interface AIScanMatch {
   total_line: number | null;
   h2h_surface: string | null;
   h2h_last3: string[];
+  // NBA advanced stats
+  home_fg_pct?: number | null;
+  away_fg_pct?: number | null;
+  home_three_pct?: number | null;
+  away_three_pct?: number | null;
+  home_ft_pct?: number | null;
+  away_ft_pct?: number | null;
+  home_rebounds_avg?: number | null;
+  away_rebounds_avg?: number | null;
+  home_assists_avg?: number | null;
+  away_assists_avg?: number | null;
+  home_turnovers_avg?: number | null;
+  away_turnovers_avg?: number | null;
+  home_steals_avg?: number | null;
+  away_steals_avg?: number | null;
+  home_blocks_avg?: number | null;
+  away_blocks_avg?: number | null;
+  home_conference?: string | null;
+  away_conference?: string | null;
+  home_conference_rank?: number | null;
+  away_conference_rank?: number | null;
+  home_season_record?: string | null;
+  away_season_record?: string | null;
+  home_last_5?: string | null;
+  away_last_5?: string | null;
   // Rugby fields
   rugby_ml_used: boolean;
   home_tries_avg_10: number | null;
@@ -506,6 +531,15 @@ export interface AIScanMatch {
   away_runs_allowed_10?: number;
   starter_home_name?: string;
   starter_away_name?: string;
+  // MLB advanced stats
+  home_batting_avg?: number | null;
+  away_batting_avg?: number | null;
+  home_era?: number | null;
+  away_era?: number | null;
+  home_division?: string | null;
+  away_division?: string | null;
+  home_division_rank?: number | null;
+  away_division_rank?: number | null;
   // Lineup
   fixture_id: number | null;
   lineup_status: "presumed" | "confirmed" | "unavailable";

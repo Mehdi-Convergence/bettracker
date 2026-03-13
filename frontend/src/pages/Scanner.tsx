@@ -213,6 +213,8 @@ export default function Scanner() {
   const [minDataScore] = useState<string>("");
   const [valueOnlyFilter, setValueOnlyFilter] = useState(false);
   const [nbaConference, setNbaConference] = useState<"all" | "est" | "ouest">("all");
+  const [mlbLeague, setMlbLeague] = useState<"all" | "al" | "nl">("all");
+  const [rugbyCompetition, setRugbyCompetition] = useState<"all" | "top14" | "premiership" | "urc" | "champions">("all");
 
   /* ── Scan ── */
   async function handleAIScan(forceRefresh = false, silent = false) {
@@ -221,28 +223,37 @@ export default function Scanner() {
       const timeframeMap: Record<string, string> = { today: "24h", "48h": "48h", "72h": "72h", week: "1w" };
       // Exclure PMU du scan normal (PMU a son propre endpoint)
       const sportList = [...sports].filter(s => s !== "pmu");
-      if (sportList.length === 0) {
+
+      // PMU: lance en parallele si selectionne
+      const pmuPromise = sports.has("pmu") ? handlePMUScan(forceRefresh || pmuHasScanned) : Promise.resolve();
+
+      if (sportList.length === 0 && !sports.has("pmu")) {
         if (!silent) setLoading(false);
         return;
       }
-      const results = await Promise.all(
-        sportList.map(s => aiScan({
-          sport: s,
-          leagues: s === "tennis" ? "ATP,WTA" : s === "nba" ? "NBA" : s === "rugby" ? "Rugby" : s === "mlb" ? "MLB" : "",
-          timeframe: timeframeMap[datePreset] || "48h",
-          force: forceRefresh || undefined,
-          cacheOnly: silent || undefined,
-        }))
-      );
-      const matches = results.flatMap(d => d.matches ?? []);
-      const first = results[0];
-      if (matches.length > 0 || !silent) {
-        setAiMatches(matches);
-        setAiDuration(first.research_duration_seconds);
-        setIsCached(first.cached);
-        setCachedAt(first.cached_at);
-        setHasScanned(matches.length > 0);
+
+      if (sportList.length > 0) {
+        const results = await Promise.all(
+          sportList.map(s => aiScan({
+            sport: s,
+            leagues: s === "tennis" ? "ATP,WTA" : s === "nba" ? "NBA" : s === "rugby" ? "Rugby" : s === "mlb" ? "MLB" : "",
+            timeframe: timeframeMap[datePreset] || "48h",
+            force: forceRefresh || undefined,
+            cacheOnly: silent || undefined,
+          }))
+        );
+        const matches = results.flatMap(d => d.matches ?? []);
+        const first = results[0];
+        if (matches.length > 0 || !silent) {
+          setAiMatches(matches);
+          setAiDuration(first.research_duration_seconds);
+          setIsCached(first.cached);
+          setCachedAt(first.cached_at);
+          setHasScanned(matches.length > 0);
+        }
       }
+
+      await pmuPromise;
     } catch (e) {
       if (!silent) setError((e as Error).message);
     }
@@ -293,6 +304,32 @@ export default function Scanner() {
         if (am.sport !== "nba") return true;
         const conf = nbaConference === "est" ? NBA_EAST : NBA_WEST;
         return conf.has(am.home_team || "") || conf.has(am.away_team || "");
+      });
+    }
+
+    // MLB league filter
+    if (sports.has("mlb") && mlbLeague !== "all") {
+      const MLB_AL = new Set(["New York Yankees","Boston Red Sox","Tampa Bay Rays","Toronto Blue Jays","Baltimore Orioles","Chicago White Sox","Cleveland Guardians","Detroit Tigers","Kansas City Royals","Minnesota Twins","Houston Astros","Los Angeles Angels","Oakland Athletics","Seattle Mariners","Texas Rangers"]);
+      const MLB_NL = new Set(["Atlanta Braves","Miami Marlins","New York Mets","Philadelphia Phillies","Washington Nationals","Chicago Cubs","Cincinnati Reds","Milwaukee Brewers","Pittsburgh Pirates","St. Louis Cardinals","Arizona Diamondbacks","Colorado Rockies","Los Angeles Dodgers","San Diego Padres","San Francisco Giants"]);
+      result = result.filter((am) => {
+        if (am.sport !== "mlb") return true;
+        const league = mlbLeague === "al" ? MLB_AL : MLB_NL;
+        return league.has(am.home_team || "") || league.has(am.away_team || "");
+      });
+    }
+
+    // Rugby competition filter
+    if (sports.has("rugby") && rugbyCompetition !== "all") {
+      const RUGBY_COMP_MAP: Record<string, string[]> = {
+        top14: ["Top 14"],
+        premiership: ["Premiership", "Gallagher Premiership"],
+        urc: ["URC", "United Rugby Championship"],
+        champions: ["Champions Cup", "European Rugby Champions Cup", "Challenge Cup"],
+      };
+      const patterns = RUGBY_COMP_MAP[rugbyCompetition] || [];
+      result = result.filter((am) => {
+        if (am.sport !== "rugby") return true;
+        return patterns.some((p) => (am.league || "").includes(p));
       });
     }
 
@@ -412,7 +449,7 @@ export default function Scanner() {
     });
 
     return result;
-  }, [aiMatches, searchTeam, activeLeagues, excludedTournaments, sports, dateFrom, dateTo, timeFrom, timeTo, sortBy, hiddenMatches, minEdge, minOdds, maxOdds, valueOnlyFilter, minDataScore, hideInTicket, tickets]);
+  }, [aiMatches, searchTeam, activeLeagues, excludedTournaments, sports, dateFrom, dateTo, timeFrom, timeTo, sortBy, hiddenMatches, minEdge, minOdds, maxOdds, valueOnlyFilter, minDataScore, hideInTicket, tickets, nbaConference, mlbLeague, rugbyCompetition]);
 
   /* ── League management ── */
   function toggleLeague(code: string) {
@@ -1000,6 +1037,60 @@ export default function Scanner() {
             </div>
           )}
 
+          {/* MLB filter bar */}
+          {sports.has("mlb") && (
+            <div className="flex items-center gap-3 flex-wrap mt-1">
+              <div className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px]">
+                <span className="text-[12px]">⚾</span>
+                <span className="text-[12px] font-semibold text-[#111318]">Ligue</span>
+              </div>
+              <div className="flex items-center gap-1">
+                {(["all", "al", "nl"] as const).map((l) => (
+                  <button key={l} onClick={() => setMlbLeague(l)}
+                    className={`text-[11px] font-semibold px-2.5 py-[5px] rounded-full transition-all ${mlbLeague === l ? "bg-[#dc2626] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+                    {l === "all" ? "Toutes" : l === "al" ? "American League" : "National League"}
+                  </button>
+                ))}
+              </div>
+              <div className="h-5 w-px bg-[#e3e6eb]" />
+              <button data-tour="value-toggle" onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
+                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+                <TrendingUp size={10} /> Value bets
+              </button>
+              <button onClick={() => setHideInTicket(!hideInTicket)}
+                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${hideInTicket ? "bg-[#3b5bdb] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+                <Shield size={10} /> Masquer en ticket
+              </button>
+            </div>
+          )}
+
+          {/* Rugby filter bar */}
+          {sports.has("rugby") && (
+            <div className="flex items-center gap-3 flex-wrap mt-1">
+              <div className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px]">
+                <span className="text-[12px]">🏉</span>
+                <span className="text-[12px] font-semibold text-[#111318]">Competition</span>
+              </div>
+              <div className="flex items-center gap-1">
+                {(["all", "top14", "premiership", "urc", "champions"] as const).map((c) => (
+                  <button key={c} onClick={() => setRugbyCompetition(c)}
+                    className={`text-[11px] font-semibold px-2.5 py-[5px] rounded-full transition-all ${rugbyCompetition === c ? "bg-[#15803d] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+                    {c === "all" ? "Toutes" : c === "top14" ? "Top 14" : c === "premiership" ? "Premiership" : c === "urc" ? "URC" : "Champions Cup"}
+                  </button>
+                ))}
+              </div>
+              <div className="h-5 w-px bg-[#e3e6eb]" />
+              <button data-tour="value-toggle" onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
+                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+                <TrendingUp size={10} /> Value bets
+              </button>
+              <button onClick={() => setHideInTicket(!hideInTicket)}
+                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${hideInTicket ? "bg-[#3b5bdb] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+                <Shield size={10} /> Masquer en ticket
+              </button>
+            </div>
+          )}
+
           {/* PMU filter bar */}
           {sports.has("pmu") && (
             <div className="flex items-center gap-3 flex-wrap mt-1">
@@ -1161,35 +1252,11 @@ export default function Scanner() {
 
       {/* Action Bar */}
       <div className="shrink-0 px-5 py-2 bg-[#f4f5f7] border-b border-[#e3e6eb] flex items-center gap-3">
-        {sports.has("pmu") && !sports.has("football") && !sports.has("tennis") && !sports.has("nba") && !sports.has("rugby") && !sports.has("mlb") ? (
-          // Mode PMU exclusif
-          <button
-            onClick={() => handlePMUScan(pmuHasScanned)}
-            disabled={pmuLoading}
-            className="bg-[#3b5bdb] hover:bg-[#2b4bc7] disabled:bg-[#b0b7c3] text-white px-4 py-[6px] rounded-lg text-[12px] flex items-center gap-1.5 font-semibold shadow-sm transition-colors"
-          >
-            <Search size={13} />
-            {pmuLoading ? "Scan PMU..." : "Scanner PMU"}
-          </button>
-        ) : (
-          <>
-            <button data-tour="refresh-btn" onClick={() => handleAIScan(!hasScanned)} disabled={loading}
-              className="bg-[#3b5bdb] hover:bg-[#2b4bc7] disabled:bg-[#b0b7c3] text-white px-4 py-[6px] rounded-lg text-[12px] flex items-center gap-1.5 font-semibold shadow-sm transition-colors">
-              <Search size={13} />
-              {loading ? "Scan..." : "Scanner"}
-            </button>
-            {sports.has("pmu") && (
-              <button
-                onClick={() => handlePMUScan(pmuHasScanned)}
-                disabled={pmuLoading}
-                className="px-3 py-[6px] rounded-lg text-[11px] flex items-center gap-1.5 bg-white text-[#3b5bdb] border border-[#3b5bdb]/30 hover:bg-[#3b5bdb]/5 transition-colors disabled:opacity-50"
-              >
-                <Search size={12} />
-                {pmuLoading ? "Scan PMU..." : "Scanner PMU"}
-              </button>
-            )}
-          </>
-        )}
+        <button data-tour="refresh-btn" onClick={() => handleAIScan(!hasScanned)} disabled={loading || pmuLoading}
+          className="bg-[#3b5bdb] hover:bg-[#2b4bc7] disabled:bg-[#b0b7c3] text-white px-4 py-[6px] rounded-lg text-[12px] flex items-center gap-1.5 font-semibold shadow-sm transition-colors">
+          <Search size={13} />
+          {loading || pmuLoading ? "Scan..." : "Scanner"}
+        </button>
         {hasScanned && isCached && cachedAt && (
           <button onClick={() => handleAIScan(true)} disabled={loading}
             className="px-3 py-[6px] rounded-lg text-[11px] flex items-center gap-1.5 bg-white text-[#8a919e] border border-[#e3e6eb] hover:bg-[#3b5bdb]/5 hover:text-[#3b5bdb] hover:border-[#3b5bdb]/30 transition-colors disabled:opacity-50"
@@ -1259,43 +1326,7 @@ export default function Scanner() {
             </div>
           )}
 
-          {/* ── PMU mode ── */}
-          {sports.has("pmu") && !sports.has("football") && !sports.has("tennis") && !sports.has("nba") && !sports.has("rugby") && !sports.has("mlb") ? (
-            <>
-              {pmuLoading && (
-                <div className="text-center py-12 text-[#8a919e]">
-                  <ScanSearch size={28} className="mx-auto mb-3 text-[#b0b7c3] animate-pulse" />
-                  <p className="text-[13px]">Scan des courses PMU en cours...</p>
-                </div>
-              )}
-              {!pmuLoading && pmuRaces.length > 0 && (
-                <div className="space-y-1.5">
-                  {pmuRaces
-                    .filter((r) => pmuRaceTypeFilter === "all" || r.race_type === pmuRaceTypeFilter)
-                    .map((race) => (
-                      <PMURaceCard
-                        key={race.race_id}
-                        race={race}
-                        expanded={pmuExpandedRace === race.race_id}
-                        onToggle={() => setPmuExpandedRace(prev => prev === race.race_id ? null : race.race_id)}
-                        onSelectRunner={(r, idx) => setPmuDetailRace({ race: r, runnerIndex: idx })}
-                      />
-                    ))
-                  }
-                </div>
-              )}
-              {!pmuLoading && pmuHasScanned && pmuRaces.length === 0 && (
-                <div className="text-center py-12 text-[#8a919e]">Aucune course trouvee. Relancez un scan PMU.</div>
-              )}
-              {!pmuLoading && !pmuHasScanned && (
-                <div className="text-center py-16 text-[#8a919e]">
-                  <ScanSearch size={32} className="mx-auto mb-3 text-[#b0b7c3]" />
-                  <p className="text-[13px] font-medium">Cliquez sur Scanner PMU pour charger les courses du jour</p>
-                </div>
-              )}
-            </>
-          ) : (
-            /* ── Matchs normaux ── */
+          {/* ── Unified results view ── */}
             <>
               {hiddenMatches.size > 0 && (
                 <button onClick={() => setHiddenMatches(new Set())}
@@ -1304,17 +1335,20 @@ export default function Scanner() {
                 </button>
               )}
 
-              {/* PMU races en supplement si mode mixte */}
+              {/* PMU races section */}
               {sports.has("pmu") && pmuRaces.length > 0 && (
                 <div className="mb-3">
                   <div className="flex items-center gap-2 mb-2 px-1">
                     <span className="text-[11px] font-bold text-[#8a919e] uppercase tracking-wider">Courses PMU</span>
-                    <span className="text-[10px] text-[#b0b7c3]">{pmuRaces.length} course{pmuRaces.length !== 1 ? "s" : ""}</span>
+                    <span className="text-[10px] text-[#b0b7c3]">{
+                      pmuRaceTypeFilter === "all"
+                        ? pmuRaces.length
+                        : pmuRaces.filter(r => r.race_type === pmuRaceTypeFilter).length
+                    } course{pmuRaces.length !== 1 ? "s" : ""}</span>
                   </div>
                   <div className="space-y-1.5">
                     {pmuRaces
                       .filter((r) => pmuRaceTypeFilter === "all" || r.race_type === pmuRaceTypeFilter)
-                      .slice(0, 5)
                       .map((race) => (
                         <PMURaceCard
                           key={race.race_id}
@@ -1326,7 +1360,13 @@ export default function Scanner() {
                       ))
                     }
                   </div>
-                  <div className="h-px bg-[#e3e6eb] mt-3 mb-2" />
+                  {filteredAiMatches.length > 0 && <div className="h-px bg-[#e3e6eb] mt-3 mb-2" />}
+                </div>
+              )}
+              {sports.has("pmu") && pmuLoading && (
+                <div className="text-center py-6 text-[#8a919e]">
+                  <ScanSearch size={24} className="mx-auto mb-2 text-[#b0b7c3] animate-pulse" />
+                  <p className="text-[12px]">Scan des courses PMU...</p>
                 </div>
               )}
 
@@ -1366,7 +1406,6 @@ export default function Scanner() {
                 </div>
               )}
             </>
-          )}
         </div>
 
         {/* Resize handle */}

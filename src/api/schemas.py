@@ -619,6 +619,31 @@ class AIScanMatch(BaseModel):
     odds_over: float | None = None
     odds_under: float | None = None
     total_line: float | None = None
+    # NBA enriched stats (from API-Sports)
+    home_fg_pct: float | None = None
+    away_fg_pct: float | None = None
+    home_three_pct: float | None = None
+    away_three_pct: float | None = None
+    home_ft_pct: float | None = None
+    away_ft_pct: float | None = None
+    home_rebounds_avg: float | None = None
+    away_rebounds_avg: float | None = None
+    home_assists_avg: float | None = None
+    away_assists_avg: float | None = None
+    home_turnovers_avg: float | None = None
+    away_turnovers_avg: float | None = None
+    home_steals_avg: float | None = None
+    away_steals_avg: float | None = None
+    home_blocks_avg: float | None = None
+    away_blocks_avg: float | None = None
+    home_conference: str | None = None
+    away_conference: str | None = None
+    home_conference_rank: int | None = None
+    away_conference_rank: int | None = None
+    home_season_record: str | None = None
+    away_season_record: str | None = None
+    home_last_5: list[dict] = []  # [{opponent, score, won, is_home}]
+    away_last_5: list[dict] = []
     h2h_surface: str | None = None
     h2h_last3: list[str] = []
     # Rugby fields
@@ -635,6 +660,14 @@ class AIScanMatch(BaseModel):
     away_runs_allowed_10: float | None = None
     starter_home_name: str | None = None
     starter_away_name: str | None = None
+    home_batting_avg: float | None = None
+    away_batting_avg: float | None = None
+    home_era: float | None = None
+    away_era: float | None = None
+    home_division: str | None = None
+    away_division: str | None = None
+    home_division_rank: int | None = None
+    away_division_rank: int | None = None
     # Lineup
     fixture_id: int | None = None
     lineup_status: str = "unavailable"     # "presumed" | "confirmed" | "unavailable"

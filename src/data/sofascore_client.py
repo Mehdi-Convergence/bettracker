@@ -50,6 +50,223 @@ class SofascoreClient:
         self._client.close()
 
     # ------------------------------------------------------------------
+    # Public: get tennis matches from SofaScore (primary source)
+    # ------------------------------------------------------------------
+
+    def get_tennis_matches(self, date_str: str | None = None, timeframe: str = "48h") -> list[dict]:
+        """Get tennis matches from SofaScore scheduled events.
+
+        Returns list of match dicts compatible with the tennis scanner:
+        {player1, player2, tournament, date, surface, round, venue,
+         odds: {winner: {P1: {bk: odds}, P2: {bk: odds}}},
+         p1_ranking, p2_ranking, ...}
+        """
+        if not date_str:
+            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        events = self._get_scheduled_events(date_str)
+
+        # Also fetch tomorrow if timeframe > 24h
+        if timeframe in ("48h", "72h"):
+            next_day = (datetime.strptime(date_str, "%Y-%m-%d").replace(
+                tzinfo=timezone.utc) + __import__("datetime").timedelta(days=1)).strftime("%Y-%m-%d")
+            events.extend(self._get_scheduled_events(next_day))
+
+        matches: list[dict] = []
+        seen_ids: set = set()
+
+        for ev in events:
+            try:
+                ev_id = ev.get("id")
+                if not ev_id or ev_id in seen_ids:
+                    continue
+
+                status_type = ev.get("status", {}).get("type", "")
+                if status_type in ("finished", "cancelled"):
+                    continue
+
+                # Filter: only ATP, WTA, Grand Slam, Challenger events
+                cat = ev.get("tournament", {}).get("category", {}).get("name", "")
+                if "Exhibition" in cat or "ITF" in cat:
+                    continue
+
+                home = ev.get("homeTeam", {})
+                away = ev.get("awayTeam", {})
+                p1_name = home.get("name", "")
+                p2_name = away.get("name", "")
+                if not p1_name or not p2_name:
+                    continue
+
+                # Tournament info
+                tourn = ev.get("tournament", {})
+                unique_tourn = tourn.get("uniqueTournament", {})
+                tournament_name = unique_tourn.get("name", tourn.get("name", ""))
+
+                # Surface
+                gt = ev.get("groundType", "")
+                surface = _SURFACE_MAP.get(gt, gt) if gt else None
+
+                # Round
+                round_info = ev.get("roundInfo", {})
+                round_name = round_info.get("name", f"R{round_info.get('round', '')}" if round_info.get("round") else None)
+
+                # Date
+                start_ts = ev.get("startTimestamp")
+                if start_ts:
+                    match_date = datetime.fromtimestamp(start_ts, tz=timezone.utc).isoformat()
+                else:
+                    match_date = ""
+
+                # Fetch odds from SofaScore
+                odds = self._get_event_odds(ev_id)
+
+                seen_ids.add(ev_id)
+                match = {
+                    "player1": p1_name,
+                    "player2": p2_name,
+                    "tournament": tournament_name,
+                    "date": match_date,
+                    "venue": None,
+                    "weather": None,
+                    "surface": surface,
+                    "round": round_name,
+                    "odds": odds,
+                    "p1_form": None,
+                    "p2_form": None,
+                    "p1_form_detail": [],
+                    "p2_form_detail": [],
+                    "p1_ranking": None,
+                    "p2_ranking": None,
+                    "p1_age": None,
+                    "p2_age": None,
+                    "p1_season_record": None,
+                    "p2_season_record": None,
+                    "p1_surface_record": None,
+                    "p2_surface_record": None,
+                    "p1_serve_pct": None,
+                    "p2_serve_pct": None,
+                    "p1_return_pct": None,
+                    "p2_return_pct": None,
+                    "p1_aces_avg": None,
+                    "p2_aces_avg": None,
+                    "p1_rest_days": None,
+                    "p2_rest_days": None,
+                    "p1_injuries": "RAS",
+                    "p2_injuries": "RAS",
+                    "h2h": None,
+                    "h2h_surface": None,
+                    "h2h_last3": [],
+                    "motivation": None,
+                    "context": None,
+                    "_sofa_event": ev,  # Keep for enrichment
+                }
+
+                # Immediate enrichment (player stats, H2H)
+                p1_id = home.get("id")
+                p2_id = away.get("id")
+                if p1_id:
+                    self._enrich_player(match, "p1", p1_id, surface)
+                if p2_id:
+                    self._enrich_player(match, "p2", p2_id, surface)
+                if p1_id and p2_id:
+                    h2h = self._get_h2h(p1_id, p2_id, surface)
+                    if h2h:
+                        match["h2h"] = h2h.get("summary")
+                        match["h2h_surface"] = h2h.get("surface_summary")
+                        match["h2h_last3"] = h2h.get("last3", [])
+
+                # Remove internal field before returning
+                match.pop("_sofa_event", None)
+                matches.append(match)
+
+                time.sleep(0.05)  # Rate limiting
+            except Exception as exc:
+                logger.debug("SofaScore event parse error: %s", exc)
+                continue
+
+        logger.info("SofaScore tennis matches: %d events for %s", len(matches), date_str)
+        return matches
+
+    def _get_event_odds(self, event_id: int) -> dict:
+        """Get odds for a tennis event from SofaScore.
+
+        Returns: {winner: {P1: {bk_name: odds}, P2: {bk_name: odds}}}
+        """
+        cache_key = f"odds_{event_id}"
+        cached = self._read_cache(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            # SofaScore odds endpoint: provider 1 = pre-match, winning market
+            resp = self._client.get(f"{API_BASE}/event/{event_id}/provider/1/winning")
+            if resp.status_code != 200:
+                # Fallback: try alternative odds endpoint
+                resp = self._client.get(f"{API_BASE}/event/{event_id}/odds/1/all")
+                if resp.status_code != 200:
+                    return {"winner": {"P1": {}, "P2": {}}}
+
+            data = resp.json()
+            odds_p1: dict[str, float] = {}
+            odds_p2: dict[str, float] = {}
+
+            # Parse odds from SofaScore response
+            markets = data.get("markets", [])
+            if not markets:
+                # Try alternative structure
+                markets = [data] if data.get("choices") else []
+
+            for market in markets:
+                choices = market.get("choices", [])
+                for choice in choices:
+                    name = choice.get("name", "")
+                    fractional = choice.get("fractionalValue", "")
+                    decimal_odds = choice.get("sourceValue")
+
+                    if decimal_odds is None and fractional:
+                        try:
+                            parts = fractional.split("/")
+                            decimal_odds = float(parts[0]) / float(parts[1]) + 1
+                        except Exception:
+                            continue
+
+                    if decimal_odds is None:
+                        continue
+
+                    try:
+                        decimal_odds = float(decimal_odds)
+                    except (ValueError, TypeError):
+                        continue
+
+                    if decimal_odds <= 1.0:
+                        continue
+
+                    # Determine which player (choice index or name matching)
+                    change = choice.get("change", 0)
+                    source_id = choice.get("sourceId", "")
+                    bk_name = market.get("bookmaker", {}).get("name", "SofaScore")
+
+                    # SofaScore typically lists home (P1) first, away (P2) second
+                    winning = choice.get("winning")
+                    if winning == "1" or choice.get("homeTeam"):
+                        odds_p1[bk_name] = decimal_odds
+                    elif winning == "2" or choice.get("awayTeam"):
+                        odds_p2[bk_name] = decimal_odds
+                    elif len(choices) == 2:
+                        idx = choices.index(choice)
+                        if idx == 0:
+                            odds_p1[bk_name] = decimal_odds
+                        else:
+                            odds_p2[bk_name] = decimal_odds
+
+            result = {"winner": {"P1": odds_p1, "P2": odds_p2}}
+            self._write_cache(cache_key, result, ttl=1800)  # 30min for odds
+            return result
+        except Exception as e:
+            logger.debug("SofaScore odds error for event %d: %s", event_id, e)
+            return {"winner": {"P1": {}, "P2": {}}}
+
+    # ------------------------------------------------------------------
     # Public: enrich a list of matches from tennis_client
     # ------------------------------------------------------------------
 

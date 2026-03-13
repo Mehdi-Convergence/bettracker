@@ -624,6 +624,40 @@ function IADataTab({ am, home, away }: { am: AIScanMatch; home: string; away: st
         </div>
       )}
 
+      {/* Marches secondaires (BTTS + Over 2.5) */}
+      {(am.btts_edge != null || am.over25_edge != null) && (
+        <div>
+          <div className="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1">
+            <Zap size={11} className="text-amber-500" />
+            Marches secondaires
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {am.btts_edge != null && (
+              <div className="bg-white border border-slate-200 rounded-lg p-3">
+                <div className="text-[10px] text-slate-500 font-medium mb-1">Les 2 equipes marquent</div>
+                {am.btts_model_prob != null && (
+                  <div className="text-sm font-semibold text-slate-700">{(am.btts_model_prob * 100).toFixed(1)}% (modele)</div>
+                )}
+                <div className={`text-xs font-bold mt-0.5 ${am.btts_edge > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                  Edge : {am.btts_edge > 0 ? "+" : ""}{(am.btts_edge * 100).toFixed(1)}%
+                </div>
+              </div>
+            )}
+            {am.over25_edge != null && (
+              <div className="bg-white border border-slate-200 rounded-lg p-3">
+                <div className="text-[10px] text-slate-500 font-medium mb-1">Plus de 2.5 buts</div>
+                {am.over25_model_prob != null && (
+                  <div className="text-sm font-semibold text-slate-700">{(am.over25_model_prob * 100).toFixed(1)}% (modele)</div>
+                )}
+                <div className={`text-xs font-bold mt-0.5 ${am.over25_edge > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                  Edge : {am.over25_edge > 0 ? "+" : ""}{(am.over25_edge * 100).toFixed(1)}%
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Context */}
       {am.context && (
         <div>
@@ -1814,26 +1848,94 @@ function NBAStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: 
     { label: "Differentiel pts", hv: am.home_pt_diff_10 != null ? (am.home_pt_diff_10 > 0 ? `+${am.home_pt_diff_10.toFixed(1)}` : am.home_pt_diff_10.toFixed(1)) : null, av: am.away_pt_diff_10 != null ? (am.away_pt_diff_10 > 0 ? `+${am.away_pt_diff_10.toFixed(1)}` : am.away_pt_diff_10.toFixed(1)) : null },
   ].filter(r => r.hv != null || r.av != null);
 
+  const advancedRows: { label: string; hv: string | null; av: string | null; lowerBetter?: boolean }[] = [
+    { label: "FG%", hv: am.home_fg_pct != null ? `${(am.home_fg_pct * 100).toFixed(1)}%` : null, av: am.away_fg_pct != null ? `${(am.away_fg_pct * 100).toFixed(1)}%` : null },
+    { label: "3P%", hv: am.home_three_pct != null ? `${(am.home_three_pct * 100).toFixed(1)}%` : null, av: am.away_three_pct != null ? `${(am.away_three_pct * 100).toFixed(1)}%` : null },
+    { label: "FT%", hv: am.home_ft_pct != null ? `${(am.home_ft_pct * 100).toFixed(1)}%` : null, av: am.away_ft_pct != null ? `${(am.away_ft_pct * 100).toFixed(1)}%` : null },
+    { label: "Rebonds/match", hv: am.home_rebounds_avg?.toFixed(1) ?? null, av: am.away_rebounds_avg?.toFixed(1) ?? null },
+    { label: "Assists/match", hv: am.home_assists_avg?.toFixed(1) ?? null, av: am.away_assists_avg?.toFixed(1) ?? null },
+    { label: "Turnovers/match", hv: am.home_turnovers_avg?.toFixed(1) ?? null, av: am.away_turnovers_avg?.toFixed(1) ?? null, lowerBetter: true },
+    { label: "Steals/match", hv: am.home_steals_avg?.toFixed(1) ?? null, av: am.away_steals_avg?.toFixed(1) ?? null },
+    { label: "Blocks/match", hv: am.home_blocks_avg?.toFixed(1) ?? null, av: am.away_blocks_avg?.toFixed(1) ?? null },
+  ].filter(r => r.hv != null || r.av != null);
+
+  const hasConference = am.home_conference != null || am.away_conference != null;
+  const hasSeasonRecord = am.home_season_record != null || am.away_season_record != null;
+  const hasLast5 = am.home_last_5 != null || am.away_last_5 != null;
+
   return (
     <div className="space-y-4">
-      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-        <div className="flex items-center gap-2 mb-3">
-          <TrendingUp size={15} className="text-orange-500" />
-          <h4 className="text-slate-900 font-semibold text-sm">Statistiques des equipes</h4>
+      {/* Bilan saison + conference */}
+      {(hasConference || hasSeasonRecord || hasLast5) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <Trophy size={15} className="text-orange-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Bilan saison</h4>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: home, conf: am.home_conference, confRank: am.home_conference_rank, record: am.home_season_record, last5: am.home_last_5, color: "blue" },
+              { label: away, conf: am.away_conference, confRank: am.away_conference_rank, record: am.away_season_record, last5: am.away_last_5, color: "red" },
+            ].map(({ label, conf, confRank, record, last5, color }) => (
+              <div key={label} className={`bg-${color === "blue" ? "blue" : "red"}-50 border border-${color === "blue" ? "blue" : "red"}-100 rounded-lg p-3`}>
+                <div className={`text-xs font-semibold text-${color === "blue" ? "blue" : "red"}-700 truncate mb-1`}>{label}</div>
+                {record != null && <div className="text-base font-bold text-slate-800">{record}</div>}
+                {conf != null && (
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    {conf}{confRank != null ? ` (${confRank}e)` : ""}
+                  </div>
+                )}
+                {last5 != null && <div className="text-[10px] text-slate-400 mt-0.5">5 derniers : {last5}</div>}
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-sm">
-          <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
-          <div className="text-center text-slate-400 text-xs">VS</div>
-          <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
-          {rows.map(({ label, hv, av, lowerBetter }) => {
-            const hNum = parseFloat(hv?.replace(/[^0-9.-]/g, "") ?? "");
-            const aNum = parseFloat(av?.replace(/[^0-9.-]/g, "") ?? "");
-            const canCompare = !isNaN(hNum) && !isNaN(aNum) && hNum !== aNum;
-            const homeBetter = canCompare ? (lowerBetter ? hNum < aNum : hNum > aNum) : undefined;
-            return <FormRow key={label} label={label} homeVal={hv ?? "-"} awayVal={av ?? "-"} homeBetter={homeBetter} />;
-          })}
+      )}
+
+      {/* Stats de base */}
+      {rows.length > 0 && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={15} className="text-orange-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Statistiques des equipes (10 derniers)</h4>
+          </div>
+          <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-sm">
+            <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
+            <div className="text-center text-slate-400 text-xs">VS</div>
+            <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
+            {rows.map(({ label, hv, av, lowerBetter }) => {
+              const hNum = parseFloat(hv?.replace(/[^0-9.-]/g, "") ?? "");
+              const aNum = parseFloat(av?.replace(/[^0-9.-]/g, "") ?? "");
+              const canCompare = !isNaN(hNum) && !isNaN(aNum) && hNum !== aNum;
+              const homeBetter = canCompare ? (lowerBetter ? hNum < aNum : hNum > aNum) : undefined;
+              return <FormRow key={label} label={label} homeVal={hv ?? "-"} awayVal={av ?? "-"} homeBetter={homeBetter} />;
+            })}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Stats avancees */}
+      {advancedRows.length > 0 && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <BarChart2 size={15} className="text-orange-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Stats avancees</h4>
+          </div>
+          <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-sm">
+            <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
+            <div className="text-center text-slate-400 text-xs">VS</div>
+            <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
+            {advancedRows.map(({ label, hv, av, lowerBetter }) => {
+              const hNum = parseFloat(hv?.replace(/[^0-9.-]/g, "") ?? "");
+              const aNum = parseFloat(av?.replace(/[^0-9.-]/g, "") ?? "");
+              const canCompare = !isNaN(hNum) && !isNaN(aNum) && hNum !== aNum;
+              const homeBetter = canCompare ? (lowerBetter ? hNum < aNum : hNum > aNum) : undefined;
+              return <FormRow key={label} label={label} homeVal={hv ?? "-"} awayVal={av ?? "-"} homeBetter={homeBetter} />;
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Total O/U context */}
       {(am.total_line != null || am.odds_over != null) && (
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
@@ -1845,6 +1947,26 @@ function NBAStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: 
             {am.total_line != null && <div className="flex justify-between"><span className="text-slate-500">Ligne O/U</span><span className="font-semibold">{am.total_line}</span></div>}
             {am.odds_over != null && <div className="flex justify-between"><span className="text-slate-500">Cote Over {am.total_line}</span><span className="font-semibold text-blue-600">{am.odds_over.toFixed(2)}</span></div>}
             {am.odds_under != null && <div className="flex justify-between"><span className="text-slate-500">Cote Under {am.total_line}</span><span className="font-semibold text-blue-600">{am.odds_under.toFixed(2)}</span></div>}
+          </div>
+        </div>
+      )}
+
+      {/* Absences NBA */}
+      {((am.key_absences_home?.length ?? 0) > 0 || (am.key_absences_away?.length ?? 0) > 0) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="text-xs font-semibold text-slate-600 mb-2">Blessures / Absences</div>
+          <div className="grid grid-cols-2 gap-3">
+            {[{ label: home, list: am.key_absences_home }, { label: away, list: am.key_absences_away }].map(({ label, list }) => (
+              <div key={label}>
+                <div className="text-[10px] text-slate-500 mb-1 font-medium truncate">{label}</div>
+                {list && list.length > 0 ? list.map((ab, i) => (
+                  <div key={i} className="flex items-start gap-1 text-[11px] text-red-600 mb-0.5">
+                    <span className="text-red-400 shrink-0 mt-0.5">-</span>
+                    <span>{ab}</span>
+                  </div>
+                )) : <span className="text-[11px] text-slate-300">Aucune absence</span>}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -1978,6 +2100,26 @@ function RugbyStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away
           })}
         </div>
       </div>
+      {/* Absences Rugby */}
+      {((am.key_absences_home?.length ?? 0) > 0 || (am.key_absences_away?.length ?? 0) > 0) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="text-xs font-semibold text-slate-600 mb-2">Blessures / Absences</div>
+          <div className="grid grid-cols-2 gap-3">
+            {[{ label: home, list: am.key_absences_home }, { label: away, list: am.key_absences_away }].map(({ label, list }) => (
+              <div key={label}>
+                <div className="text-[10px] text-slate-500 mb-1 font-medium truncate">{label}</div>
+                {list && list.length > 0 ? list.map((ab, i) => (
+                  <div key={i} className="flex items-start gap-1 text-[11px] text-red-600 mb-0.5">
+                    <span className="text-red-400 shrink-0 mt-0.5">-</span>
+                    <span>{ab}</span>
+                  </div>
+                )) : <span className="text-[11px] text-slate-300">Aucune absence</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Scoring guide */}
       <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
         <div className="text-xs font-semibold text-amber-700 mb-1.5">Systeme de points rugby</div>
@@ -2139,7 +2281,11 @@ function MLBStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: 
   const rows: { label: string; hv: string | null; av: string | null; lowerBetter?: boolean }[] = [
     { label: "Runs marques / match (10j)", hv: am.home_runs_avg_10 != null ? am.home_runs_avg_10.toFixed(2) : null, av: am.away_runs_avg_10 != null ? am.away_runs_avg_10.toFixed(2) : null },
     { label: "Runs encaisses / match (10j)", hv: am.home_runs_allowed_10 != null ? am.home_runs_allowed_10.toFixed(2) : null, av: am.away_runs_allowed_10 != null ? am.away_runs_allowed_10.toFixed(2) : null, lowerBetter: true },
+    { label: "Moyenne au baton (BA)", hv: am.home_batting_avg != null ? am.home_batting_avg.toFixed(3) : null, av: am.away_batting_avg != null ? am.away_batting_avg.toFixed(3) : null },
+    { label: "ERA (lanceur partant)", hv: am.home_era != null ? am.home_era.toFixed(2) : null, av: am.away_era != null ? am.away_era.toFixed(2) : null, lowerBetter: true },
   ].filter(r => r.hv != null || r.av != null);
+
+  const hasDivision = am.home_division != null || am.away_division != null;
 
   return (
     <div className="space-y-4">
@@ -2154,20 +2300,49 @@ function MLBStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: 
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-center">
               <div className="text-sm font-bold text-blue-700 truncate">{am.starter_home_name ?? "?"}</div>
               <div className="text-xs text-blue-500 mt-0.5 truncate">{home}</div>
+              {am.home_era != null && (
+                <div className="text-[10px] text-slate-500 mt-1">ERA : <span className="font-semibold text-slate-700">{am.home_era.toFixed(2)}</span></div>
+              )}
             </div>
             <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-center">
               <div className="text-sm font-bold text-red-700 truncate">{am.starter_away_name ?? "?"}</div>
               <div className="text-xs text-red-500 mt-0.5 truncate">{away}</div>
+              {am.away_era != null && (
+                <div className="text-[10px] text-slate-500 mt-1">ERA : <span className="font-semibold text-slate-700">{am.away_era.toFixed(2)}</span></div>
+              )}
             </div>
           </div>
         </div>
       )}
+
+      {/* Division */}
+      {hasDivision && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <Trophy size={15} className="text-orange-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Division MLB</h4>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: home, div: am.home_division, rank: am.home_division_rank, color: "blue" },
+              { label: away, div: am.away_division, rank: am.away_division_rank, color: "red" },
+            ].map(({ label, div, rank, color }) => (
+              <div key={label} className={`bg-${color === "blue" ? "blue" : "red"}-50 border border-${color === "blue" ? "blue" : "red"}-100 rounded-lg p-3`}>
+                <div className={`text-xs font-semibold text-${color === "blue" ? "blue" : "red"}-700 truncate mb-1`}>{label}</div>
+                {div != null && <div className="text-sm font-bold text-slate-800">{div}</div>}
+                {rank != null && <div className="text-[10px] text-slate-500 mt-0.5">{rank}e de la division</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Stats comparison */}
       {rows.length > 0 && (
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp size={15} className="text-orange-500" />
-            <h4 className="text-slate-900 font-semibold text-sm">Statistiques des equipes (10 derniers)</h4>
+            <h4 className="text-slate-900 font-semibold text-sm">Statistiques des equipes</h4>
           </div>
           <div className="grid grid-cols-3 gap-x-2 gap-y-1 text-sm">
             <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
@@ -2183,6 +2358,27 @@ function MLBStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: 
           </div>
         </div>
       )}
+
+      {/* Absences MLB */}
+      {((am.key_absences_home?.length ?? 0) > 0 || (am.key_absences_away?.length ?? 0) > 0) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="text-xs font-semibold text-slate-600 mb-2">Blessures / Absences</div>
+          <div className="grid grid-cols-2 gap-3">
+            {[{ label: home, list: am.key_absences_home }, { label: away, list: am.key_absences_away }].map(({ label, list }) => (
+              <div key={label}>
+                <div className="text-[10px] text-slate-500 mb-1 font-medium truncate">{label}</div>
+                {list && list.length > 0 ? list.map((ab, i) => (
+                  <div key={i} className="flex items-start gap-1 text-[11px] text-red-600 mb-0.5">
+                    <span className="text-red-400 shrink-0 mt-0.5">-</span>
+                    <span>{ab}</span>
+                  </div>
+                )) : <span className="text-[11px] text-slate-300">Aucune absence</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Scoring guide */}
       <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
         <div className="text-xs font-semibold text-orange-700 mb-1.5">Regles baseball (MLB)</div>
