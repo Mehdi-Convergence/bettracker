@@ -387,8 +387,17 @@ def build_rugby_live_features(
     odds_under: float | None,
     total_line: float | None,
     team_snapshot: dict,
+    rest_days_home: float | None = None,
+    rest_days_away: float | None = None,
 ) -> dict:
-    """Build a feature vector for a live rugby match using saved team stats snapshot."""
+    """Build a feature vector for a live rugby match using saved team stats snapshot.
+
+    Parameters
+    ----------
+    rest_days_home / rest_days_away:
+        Actual rest days computed from last game date (fetched by scan_worker).
+        Defaults to 7.0 (rugby typical — weekly schedule) when not provided.
+    """
     teams = team_snapshot.get("teams", {})
     elo_map = team_snapshot.get("elo", {})
 
@@ -436,12 +445,14 @@ def build_rugby_live_features(
     f["home_penalties_avg_10"] = _v(h, "penalties_avg_10")
     f["away_penalties_avg_10"] = _v(a, "penalties_avg_10")
 
-    # Rest — not available from live data, use reasonable defaults
-    f["home_rest_days"] = 7.0
-    f["away_rest_days"] = 7.0
-    f["rest_diff"] = 0.0
-    f["home_fatigue"] = 0.0
-    f["away_fatigue"] = 0.0
+    # Rest days — use real values when provided, otherwise fall back to rugby typical (7 days)
+    _home_rest = float(rest_days_home) if rest_days_home is not None else 7.0
+    _away_rest = float(rest_days_away) if rest_days_away is not None else 7.0
+    f["home_rest_days"] = _home_rest
+    f["away_rest_days"] = _away_rest
+    f["rest_diff"] = _home_rest - _away_rest
+    f["home_fatigue"] = 1.0 if _home_rest <= 5.0 else 0.0
+    f["away_fatigue"] = 1.0 if _away_rest <= 5.0 else 0.0
 
     # Home/away win rates
     f["home_home_win_rate"] = _v(h, "home_win_rate")

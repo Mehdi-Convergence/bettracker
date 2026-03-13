@@ -523,6 +523,8 @@ class TennisFeatureBuilder:
         rest_days_p2: int | None,
         series: str | None,
         player_snapshot: dict,
+        h2h: str | None = None,
+        h2h_surface: str | None = None,
     ) -> dict:
         """Build a feature vector for a live match using saved player stats.
 
@@ -585,11 +587,26 @@ class TennisFeatureBuilder:
         else:
             f["surface_win_rate_diff"] = np.nan
 
-        # H2H — not available from live data
-        f["p1_h2h_win_rate"] = np.nan
-        f["h2h_count"] = np.nan
-        f["p1_h2h_surface_win_rate"] = np.nan
-        f["h2h_surface_count"] = np.nan
+        # H2H — parsed from SofaScore summary strings ("3W 1L", "2W 0L on Hard")
+        h2h_parsed = _parse_h2h_summary(h2h)
+        if h2h_parsed is not None:
+            wins, losses = h2h_parsed
+            total = wins + losses
+            f["p1_h2h_win_rate"] = wins / total if total > 0 else 0.5
+            f["h2h_count"] = float(total)
+        else:
+            f["p1_h2h_win_rate"] = np.nan
+            f["h2h_count"] = np.nan
+
+        h2h_surf_parsed = _parse_h2h_summary(h2h_surface)
+        if h2h_surf_parsed is not None:
+            wins_s, losses_s = h2h_surf_parsed
+            total_s = wins_s + losses_s
+            f["p1_h2h_surface_win_rate"] = wins_s / total_s if total_s > 0 else 0.5
+            f["h2h_surface_count"] = float(total_s)
+        else:
+            f["p1_h2h_surface_win_rate"] = np.nan
+            f["h2h_surface_count"] = np.nan
 
         # Rest days
         f["p1_rest_days"] = float(rest_days_p1) if rest_days_p1 is not None else np.nan
@@ -656,6 +673,8 @@ def build_tennis_live_features(
     rest_days_p2: int | None,
     series: str | None,
     player_snapshot: dict,
+    h2h: str | None = None,
+    h2h_surface: str | None = None,
 ) -> dict:
     """Standalone wrapper around TennisFeatureBuilder.build_live_feature_vector."""
     dummy = object.__new__(TennisFeatureBuilder)
@@ -665,7 +684,28 @@ def build_tennis_live_features(
         ranking_p1=ranking_p1, ranking_p2=ranking_p2,
         rest_days_p1=rest_days_p1, rest_days_p2=rest_days_p2,
         series=series, player_snapshot=player_snapshot,
+        h2h=h2h, h2h_surface=h2h_surface,
     )
+
+
+def _parse_h2h_summary(summary: str | None) -> tuple[int, int] | None:
+    """Parse a SofaScore H2H summary string into (p1_wins, p2_losses).
+
+    Accepted formats:
+      "3W 1L"                   -> (3, 1)
+      "2W 0L on Hard"           -> (2, 0)
+      "3W 1L 1D" (with draws)   -> (3, 1)  draws ignored
+
+    Returns None if the string cannot be parsed or is empty.
+    """
+    import re
+
+    if not summary or not isinstance(summary, str):
+        return None
+    m = re.search(r"(\d+)\s*W\s+(\d+)\s*L", summary, re.IGNORECASE)
+    if m:
+        return int(m.group(1)), int(m.group(2))
+    return None
 
 
 def _normalize_player_name(name: str) -> str:
@@ -688,19 +728,64 @@ def _normalize_player_name(name: str) -> str:
     return f"{last} {first[0]}."
 
 
+_GRAND_SLAM_NAMES = frozenset([
+    "australian open", "roland garros", "french open", "wimbledon", "us open",
+])
+
+_MASTERS_1000_NAMES = frozenset([
+    "indian wells", "miami open", "miami", "monte-carlo", "monte carlo",
+    "madrid open", "madrid", "rome", "italian open", "internazionali",
+    "canada", "canadian open", "montreal", "toronto", "cincinnati",
+    "western & southern", "western and southern", "shanghai", "paris",
+    "paris masters", "rolex paris masters",
+])
+
+_ATP_500_NAMES = frozenset([
+    "rotterdam", "dubai", "barcelona", "open de barcelona",
+    "hamburg", "halle", "queens", "queen's club",
+    "washington", "citi open", "beijing", "china open",
+    "tokyo", "rakuten japan open", "vienna", "erste bank open",
+    "basel", "swiss indoors",
+])
+
+
 def _series_level(series: str | None) -> int:
+    """Return series level integer from series string or known tournament name.
+
+    Level 4 = Grand Slam, 3 = Masters 1000, 2 = ATP 500, 1 = ATP 250, 0 = unknown.
+    Handles both the old CSV format ("Grand Slam", "Masters 1000", "ATP250") and
+    the SofaScore format ("Australian Open", "Roland Garros", etc.).
+    """
     if not series:
         return 0
-    s = series.lower()
+    s = series.lower().strip()
+
+    # Old CSV format (direct keyword match)
     if "grand slam" in s:
         return 4
-    if "masters" in s:
+    if "masters 1000" in s or "masters series" in s:
         return 3
     if "500" in s:
         return 2
     if "250" in s:
         return 1
-    return 0
+    # Catch "Masters" without "1000" (e.g. "ATP Masters")
+    if "masters" in s:
+        return 3
+
+    # SofaScore / named tournament format
+    for name in _GRAND_SLAM_NAMES:
+        if name in s:
+            return 4
+    for name in _MASTERS_1000_NAMES:
+        if name in s:
+            return 3
+    for name in _ATP_500_NAMES:
+        if name in s:
+            return 2
+
+    # Everything else defaults to ATP 250 level (lowest ATP tier)
+    return 1
 
 
 # Feature columns used by the model (excluding metadata / odds columns)

@@ -1892,6 +1892,36 @@ function NBAStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: 
         </div>
       )}
 
+      {/* Forme recente */}
+      {(am.form_home || am.form_away) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={15} className="text-orange-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Forme recente</h4>
+          </div>
+          <div className="grid grid-cols-3 gap-x-2 gap-y-1">
+            <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
+            <div className="text-center text-slate-400 text-xs">5 derniers</div>
+            <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
+            <div className="flex justify-end gap-0.5">
+              {(am.form_home ?? "").split("").slice(0, 5).map((c, i) => (
+                <span key={i} className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white ${
+                  c === "V" || c === "W" ? "bg-emerald-500" : c === "N" || c === "D" ? "bg-amber-400" : "bg-red-500"
+                }`}>{c === "W" ? "V" : c === "L" ? "D" : c}</span>
+              ))}
+            </div>
+            <div />
+            <div className="flex gap-0.5">
+              {(am.form_away ?? "").split("").slice(0, 5).map((c, i) => (
+                <span key={i} className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white ${
+                  c === "V" || c === "W" ? "bg-emerald-500" : c === "N" || c === "D" ? "bg-amber-400" : "bg-red-500"
+                }`}>{c === "W" ? "V" : c === "L" ? "D" : c}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stats de base */}
       {rows.length > 0 && (
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
@@ -2082,6 +2112,35 @@ function RugbyStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away
 
   return (
     <div className="space-y-4">
+      {/* Forme recente */}
+      {(am.form_home || am.form_away) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={15} className="text-green-600" />
+            <h4 className="text-slate-900 font-semibold text-sm">Forme recente</h4>
+          </div>
+          <div className="grid grid-cols-3 gap-x-2 gap-y-1">
+            <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
+            <div className="text-center text-slate-400 text-xs">5 derniers</div>
+            <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
+            <div className="flex justify-end gap-0.5">
+              {(am.form_home ?? "").split("").slice(0, 5).map((c, i) => (
+                <span key={i} className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white ${
+                  c === "V" || c === "W" ? "bg-emerald-500" : c === "N" || c === "D" ? "bg-amber-400" : "bg-red-500"
+                }`}>{c === "W" ? "V" : c === "L" ? "D" : c}</span>
+              ))}
+            </div>
+            <div />
+            <div className="flex gap-0.5">
+              {(am.form_away ?? "").split("").slice(0, 5).map((c, i) => (
+                <span key={i} className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white ${
+                  c === "V" || c === "W" ? "bg-emerald-500" : c === "N" || c === "D" ? "bg-amber-400" : "bg-red-500"
+                }`}>{c === "W" ? "V" : c === "L" ? "D" : c}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp size={15} className="text-green-600" />
@@ -2180,11 +2239,17 @@ function MLBAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-center">
-              <div className="text-sm font-bold text-blue-700 truncate">{am.starter_home_name ?? "?"}</div>
+              {am.starter_home_name
+                ? <div className="text-sm font-bold text-blue-700 truncate">{am.starter_home_name}</div>
+                : <div className="text-sm text-slate-400 italic">Non disponible</div>
+              }
               <div className="text-xs text-blue-500 mt-0.5 truncate">{home}</div>
             </div>
             <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-center">
-              <div className="text-sm font-bold text-red-700 truncate">{am.starter_away_name ?? "?"}</div>
+              {am.starter_away_name
+                ? <div className="text-sm font-bold text-red-700 truncate">{am.starter_away_name}</div>
+                : <div className="text-sm text-slate-400 italic">Non disponible</div>
+              }
               <div className="text-xs text-red-500 mt-0.5 truncate">{away}</div>
             </div>
           </div>
@@ -2298,14 +2363,20 @@ function MLBStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: 
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-center">
-              <div className="text-sm font-bold text-blue-700 truncate">{am.starter_home_name ?? "?"}</div>
+              {am.starter_home_name
+                ? <div className="text-sm font-bold text-blue-700 truncate">{am.starter_home_name}</div>
+                : <div className="text-sm text-slate-400 italic">Non disponible</div>
+              }
               <div className="text-xs text-blue-500 mt-0.5 truncate">{home}</div>
               {am.home_era != null && (
                 <div className="text-[10px] text-slate-500 mt-1">ERA : <span className="font-semibold text-slate-700">{am.home_era.toFixed(2)}</span></div>
               )}
             </div>
             <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-center">
-              <div className="text-sm font-bold text-red-700 truncate">{am.starter_away_name ?? "?"}</div>
+              {am.starter_away_name
+                ? <div className="text-sm font-bold text-red-700 truncate">{am.starter_away_name}</div>
+                : <div className="text-sm text-slate-400 italic">Non disponible</div>
+              }
               <div className="text-xs text-red-500 mt-0.5 truncate">{away}</div>
               {am.away_era != null && (
                 <div className="text-[10px] text-slate-500 mt-1">ERA : <span className="font-semibold text-slate-700">{am.away_era.toFixed(2)}</span></div>
@@ -2333,6 +2404,36 @@ function MLBStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: 
                 {rank != null && <div className="text-[10px] text-slate-500 mt-0.5">{rank}e de la division</div>}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Forme recente */}
+      {(am.form_home || am.form_away) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={15} className="text-orange-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Forme recente</h4>
+          </div>
+          <div className="grid grid-cols-3 gap-x-2 gap-y-1">
+            <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
+            <div className="text-center text-slate-400 text-xs">5 derniers</div>
+            <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
+            <div className="flex justify-end gap-0.5">
+              {(am.form_home ?? "").split("").slice(0, 5).map((c, i) => (
+                <span key={i} className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white ${
+                  c === "V" || c === "W" ? "bg-emerald-500" : c === "N" || c === "D" ? "bg-amber-400" : "bg-red-500"
+                }`}>{c === "W" ? "V" : c === "L" ? "D" : c}</span>
+              ))}
+            </div>
+            <div />
+            <div className="flex gap-0.5">
+              {(am.form_away ?? "").split("").slice(0, 5).map((c, i) => (
+                <span key={i} className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white ${
+                  c === "V" || c === "W" ? "bg-emerald-500" : c === "N" || c === "D" ? "bg-amber-400" : "bg-red-500"
+                }`}>{c === "W" ? "V" : c === "L" ? "D" : c}</span>
+              ))}
+            </div>
           </div>
         </div>
       )}

@@ -684,6 +684,8 @@ async def run_tennis_scan():
                         rest_days_p2=m.get("p2_rest_days"),
                         series=m.get("series") or m.get("tournament"),
                         player_snapshot=tennis_snapshot,
+                        h2h=m.get("h2h"),
+                        h2h_surface=m.get("h2h_surface"),
                     )
                     feat_array = np.array([[feat_dict.get(col, np.nan) for col in TENNIS_FEATURE_COLUMNS]])
                     # NaN fill with training medians
@@ -905,6 +907,10 @@ async def run_nba_scan():
                         odds_under=odds_under,
                         total_line=total_line,
                         team_snapshot=nba_snapshot,
+                        rest_days_home=h_live.get("rest_days"),
+                        rest_days_away=a_live.get("rest_days"),
+                        is_b2b_home=h_live.get("is_b2b"),
+                        is_b2b_away=a_live.get("is_b2b"),
                     )
                     feat_array = np.array([[feat_dict.get(col, np.nan) for col in NBA_FEATURE_COLUMNS]])
                     for col_idx in range(feat_array.shape[1]):
@@ -1100,6 +1106,7 @@ async def run_rugby_scan():
             away_id = fix.get("away_id")
             game_id = fix.get("game_id")
             league = fix.get("league", "Rugby Union")
+            league_id = fix.get("league_id")
 
             # Fetch odds
             odds_data = await rugby_api.get_odds(game_id) if game_id else {}
@@ -1123,8 +1130,11 @@ async def run_rugby_scan():
             h_standing = standings_by_id.get(home_id, {})
             a_standing = standings_by_id.get(away_id, {})
 
-            h_live = rugby_api.compute_live_stats(h_last, h_standing, None)
-            a_live = rugby_api.compute_live_stats(a_last, a_standing, None)
+            h_team_stats = await rugby_api.get_team_stats(home_id, league_id) if home_id and league_id else {}
+            a_team_stats = await rugby_api.get_team_stats(away_id, league_id) if away_id and league_id else {}
+
+            h_live = rugby_api.compute_live_stats(h_last, h_standing, h_team_stats)
+            a_live = rugby_api.compute_live_stats(a_last, a_standing, a_team_stats)
 
             h_snap = teams_data.get(home, {})
             a_snap = teams_data.get(away, {})
@@ -1159,6 +1169,8 @@ async def run_rugby_scan():
                         odds_under=odds_under,
                         total_line=total_line,
                         team_snapshot=rugby_snapshot,
+                        rest_days_home=h_live.get("rest_days"),
+                        rest_days_away=a_live.get("rest_days"),
                     )
                     feat_array = np.array([[feat_dict.get(col, np.nan) for col in RUGBY_FEATURE_COLUMNS]])
                     for col_idx in range(feat_array.shape[1]):
@@ -1391,6 +1403,8 @@ async def run_mlb_scan():
                         odds_home=odds_home,
                         odds_away=odds_away,
                         team_snapshot=mlb_snapshot,
+                        rest_days_home=h_live.get("rest_days"),
+                        rest_days_away=a_live.get("rest_days"),
                     )
                     feat_array = np.array([[feat_dict.get(col, np.nan) for col in MLB_FEATURE_COLUMNS]])
                     for col_idx in range(feat_array.shape[1]):

@@ -350,8 +350,17 @@ def build_mlb_live_features(
     odds_home: float,
     odds_away: float,
     team_snapshot: dict,
+    rest_days_home: float | None = None,
+    rest_days_away: float | None = None,
 ) -> dict:
-    """Build a feature vector for a live game using saved team stats snapshot."""
+    """Build a feature vector for a live game using saved team stats snapshot.
+
+    Parameters
+    ----------
+    rest_days_home / rest_days_away:
+        Actual rest days computed from last game date (fetched by scan_worker).
+        Defaults to 1.0 (MLB typical — teams play nearly daily) when not provided.
+    """
     teams = team_snapshot.get("teams", {})
     elo_map = team_snapshot.get("elo", {})
 
@@ -387,10 +396,12 @@ def build_mlb_live_features(
         else np.nan
     )
 
-    # Rest — not available from live data, use defaults
-    f["home_rest_days"] = 1.0
-    f["away_rest_days"] = 1.0
-    f["rest_diff"] = 0.0
+    # Rest days — use real values when provided, otherwise fall back to MLB typical (1 day)
+    _home_rest = float(rest_days_home) if rest_days_home is not None else 1.0
+    _away_rest = float(rest_days_away) if rest_days_away is not None else 1.0
+    f["home_rest_days"] = _home_rest
+    f["away_rest_days"] = _away_rest
+    f["rest_diff"] = _home_rest - _away_rest
 
     # Home/away win rates
     f["home_home_win_rate"] = _v(h, "home_win_rate")

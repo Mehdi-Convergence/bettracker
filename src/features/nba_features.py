@@ -350,8 +350,22 @@ def build_nba_live_features(
     odds_under: float | None,
     total_line: float | None,
     team_snapshot: dict,
+    rest_days_home: float | None = None,
+    rest_days_away: float | None = None,
+    is_b2b_home: bool | None = None,
+    is_b2b_away: bool | None = None,
 ) -> dict:
-    """Build a feature vector for a live game using saved team stats snapshot."""
+    """Build a feature vector for a live game using saved team stats snapshot.
+
+    Parameters
+    ----------
+    rest_days_home / rest_days_away:
+        Actual rest days computed from last game date (fetched by scan_worker).
+        Defaults to 2.0 (NBA average) when not provided.
+    is_b2b_home / is_b2b_away:
+        True when the team plays on back-to-back nights (rest_days <= 1).
+        Defaults to False when not provided.
+    """
     teams = team_snapshot.get("teams", {})
     elo_map = team_snapshot.get("elo", {})
 
@@ -391,13 +405,22 @@ def build_nba_live_features(
     f["home_pace_10"] = _v(h, "pace_10")
     f["away_pace_10"] = _v(a, "pace_10")
 
-    # Rest — not available from live data, use defaults
-    f["home_rest_days"] = 2.0
-    f["away_rest_days"] = 2.0
-    f["rest_diff"] = 0.0
-    f["home_b2b"] = 0.0
-    f["away_b2b"] = 0.0
-    f["b2b_diff"] = 0.0
+    # Rest days — use real values when provided, otherwise fall back to NBA average (2 days)
+    _home_rest = float(rest_days_home) if rest_days_home is not None else 2.0
+    _away_rest = float(rest_days_away) if rest_days_away is not None else 2.0
+    f["home_rest_days"] = _home_rest
+    f["away_rest_days"] = _away_rest
+    f["rest_diff"] = _home_rest - _away_rest
+    # Back-to-back: use explicit flag when provided, else derive from rest_days
+    if is_b2b_home is not None:
+        f["home_b2b"] = 1.0 if is_b2b_home else 0.0
+    else:
+        f["home_b2b"] = 1.0 if _home_rest <= 1.0 else 0.0
+    if is_b2b_away is not None:
+        f["away_b2b"] = 1.0 if is_b2b_away else 0.0
+    else:
+        f["away_b2b"] = 1.0 if _away_rest <= 1.0 else 0.0
+    f["b2b_diff"] = f["home_b2b"] - f["away_b2b"]
 
     # Home/away win rates
     f["home_home_win_rate"] = _v(h, "home_win_rate")

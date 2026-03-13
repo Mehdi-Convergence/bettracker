@@ -515,8 +515,8 @@ export interface AIScanMatch {
   away_conference_rank?: number | null;
   home_season_record?: string | null;
   away_season_record?: string | null;
-  home_last_5?: string | null;
-  away_last_5?: string | null;
+  home_last_5?: { opponent: string; score: string | null; won: boolean; is_home: boolean }[] | null;
+  away_last_5?: { opponent: string; score: string | null; won: boolean; is_home: boolean }[] | null;
   // Rugby fields
   rugby_ml_used: boolean;
   home_tries_avg_10: number | null;
