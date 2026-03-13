@@ -1,6 +1,8 @@
 """Collecteur de resultats PMU via l'API semi-officielle turfinfo.
 
 Endpoint de base: https://online.turfinfo.api.pmu.fr/rest/client/1/programme/
+Format date: DDMMYYYY
+Participants: appel separe par course /programme/{date}/R{num}/C{num}/participants
 """
 
 import json
@@ -9,14 +11,12 @@ import time
 from datetime import date, timedelta
 
 import requests
-from rich.console import Console
 from sqlalchemy.orm import Session
 
 from src.database import SessionLocal
 from src.models.pmu_race import PMURace, PMURunner
 
 logger = logging.getLogger(__name__)
-console = Console()
 
 PMU_API_BASE = "https://online.turfinfo.api.pmu.fr/rest/client/1/programme"
 
@@ -25,8 +25,7 @@ _HEADERS = {
     "Accept": "application/json",
 }
 
-# Delai entre chaque requete (respecter les serveurs PMU)
-REQUEST_DELAY = 2.0
+REQUEST_DELAY = 1.5
 
 
 class PMUCollector:
@@ -37,51 +36,41 @@ class PMUCollector:
         self.session = requests.Session()
         self.session.headers.update(_HEADERS)
 
-    # ------------------------------------------------------------------
-    # API publique
-    # ------------------------------------------------------------------
-
-    def collect_day(self, date_str: str) -> list[dict]:
-        """Recupere toutes les courses pour un jour donne (format YYYYMMDD).
+    def collect_day(self, day: date) -> list[dict]:
+        """Recupere toutes les courses pour un jour donne.
 
         Retourne une liste de dicts course avec leurs partants.
-        Retourne une liste vide en cas d'echec.
         """
+        date_str = day.strftime("%d%m%Y")
         url = f"{PMU_API_BASE}/{date_str}"
         try:
             resp = self.session.get(url, timeout=15)
             resp.raise_for_status()
             data = resp.json()
         except requests.RequestException as e:
-            logger.error("Echec recuperation programme PMU pour %s: %s", date_str, e)
+            logger.error("Echec programme PMU pour %s: %s", date_str, e)
             return []
-        except ValueError as e:
-            logger.error("Reponse PMU invalide (non-JSON) pour %s: %s", date_str, e)
+        except ValueError:
+            logger.error("Reponse PMU non-JSON pour %s", date_str)
             return []
 
         reunions = data.get("programme", {}).get("reunions", [])
         if not reunions:
-            # Certaines API retournent directement une liste de reunions
             reunions = data.get("reunions", [])
-
         if not reunions:
-            logger.warning("Aucune reunion trouvee pour %s", date_str)
+            logger.warning("Aucune reunion pour %s", date_str)
             return []
 
         all_races: list[dict] = []
         for reunion in reunions:
-            races = self._parse_reunion(reunion, date_str)
+            races = self._parse_reunion(reunion, day, date_str)
             all_races.extend(races)
-            time.sleep(self.request_delay)
 
         logger.info("%d courses recuperees pour %s", len(all_races), date_str)
         return all_races
 
     def collect_range(self, start_date: date, end_date: date) -> dict:
-        """Collecte et ingere les courses sur une plage de dates.
-
-        Retourne un dict avec les statistiques d'ingestion.
-        """
+        """Collecte et ingere les courses sur une plage de dates."""
         db = SessionLocal()
         total_races = 0
         total_runners = 0
@@ -89,10 +78,8 @@ class PMUCollector:
 
         try:
             while current <= end_date:
-                date_str = current.strftime("%Y%m%d")
-                console.print(f"[dim]Collecte PMU {date_str}...[/dim]")
-
-                races = self.collect_day(date_str)
+                logger.info("Collecte PMU %s...", current.isoformat())
+                races = self.collect_day(current)
                 for race_data in races:
                     inserted = self.save_race(race_data, db)
                     if inserted:
@@ -104,20 +91,13 @@ class PMUCollector:
         finally:
             db.close()
 
-        console.print(
-            f"[bold green]PMU: {total_races} courses, "
-            f"{total_runners} partants inseres[/bold green]"
-        )
+        logger.info("PMU: %d courses, %d partants inseres", total_races, total_runners)
         return {"total_races": total_races, "total_runners": total_runners}
 
     def save_race(self, race_data: dict, db: Session) -> bool:
-        """Insere une course et ses partants en base (dedup sur race_id).
-
-        Retourne True si insere, False si existant ou erreur.
-        """
+        """Insere une course et ses partants en base (dedup sur race_id)."""
         race_id = race_data.get("race_id")
         if not race_id:
-            logger.warning("Course sans race_id, ignoree")
             return False
 
         existing = db.query(PMURace).filter(PMURace.race_id == race_id).first()
@@ -139,7 +119,7 @@ class PMUCollector:
                 is_quinteplus=race_data.get("is_quinteplus", False),
             )
             db.add(race)
-            db.flush()  # obtenir l'id avant d'inserer les runners
+            db.flush()
 
             for runner_data in race_data.get("runners", []):
                 runner = PMURunner(
@@ -171,12 +151,12 @@ class PMUCollector:
     # Parsing interne
     # ------------------------------------------------------------------
 
-    def _parse_reunion(self, reunion: dict, date_str: str) -> list[dict]:
+    def _parse_reunion(self, reunion: dict, day: date, date_str: str) -> list[dict]:
         """Parse une reunion PMU et retourne ses courses normalisees."""
         hippodrome = (
             reunion.get("hippodrome", {}).get("libelleCourt")
             or reunion.get("hippodrome", {}).get("libelleLong")
-            or reunion.get("libelle", "Inconnu")
+            or "Inconnu"
         )
         reunion_num = reunion.get("numOfficiel", reunion.get("numero", 0))
 
@@ -185,7 +165,7 @@ class PMUCollector:
 
         for course in courses:
             try:
-                parsed = self._parse_course(course, hippodrome, reunion_num, date_str)
+                parsed = self._parse_course(course, hippodrome, reunion_num, day, date_str)
                 if parsed:
                     races.append(parsed)
             except Exception as e:
@@ -198,35 +178,24 @@ class PMUCollector:
         course: dict,
         hippodrome: str,
         reunion_num: int,
+        day: date,
         date_str: str,
     ) -> dict | None:
-        """Parse une course individuelle."""
-        course_num = course.get("numOfficiel", course.get("numero", 0))
-        race_id = f"{date_str}-R{reunion_num}-C{course_num}"
-
-        # Date
-        race_date = date(
-            int(date_str[:4]),
-            int(date_str[4:6]),
-            int(date_str[6:8]),
-        )
+        """Parse une course et recupere les partants via appel API separe."""
+        course_num = course.get("numOrdre", course.get("numOfficiel", 0))
+        race_id = f"{day.isoformat()}-R{reunion_num}-C{course_num}"
 
         # Heure de depart
         heure_depart = course.get("heureDepart")
         race_time = self._parse_heure(heure_depart)
 
         # Type de course
-        discipline = course.get("discipline", "PLAT").upper()
-        race_type = self._normalize_discipline(discipline)
+        discipline = course.get("discipline", course.get("specialite", "PLAT"))
+        race_type = self._normalize_discipline(str(discipline).upper())
 
         # Terrain
-        terrain_raw = course.get("terrain", course.get("etatPiste"))
+        terrain_raw = course.get("conditionSol") or course.get("terrain") or course.get("etatPiste")
         terrain = self._normalize_terrain(terrain_raw)
-
-        # Partants
-        participants = course.get("participants", [])
-        runners = [self._parse_participant(p) for p in participants]
-        runners = [r for r in runners if r is not None]
 
         # Quinte+
         is_quinteplus = bool(
@@ -234,72 +203,83 @@ class PMUCollector:
             or course.get("quinteplus")
         )
 
+        # Recuperer les partants via appel separe
+        participants = self._fetch_participants(date_str, reunion_num, course_num)
+        runners = [self._parse_participant(p) for p in participants]
+        runners = [r for r in runners if r is not None]
+
         return {
             "race_id": race_id,
-            "race_date": race_date,
+            "race_date": day,
             "race_time": race_time,
             "hippodrome": hippodrome,
             "race_number": course_num,
             "race_type": race_type,
             "distance": course.get("distance", 0),
             "terrain": terrain,
-            "prize_pool": course.get("montantPrix", course.get("allocations")),
+            "prize_pool": course.get("montantPrix"),
             "num_runners": len(runners) or course.get("nombreDeclaresPartants"),
             "is_quinteplus": is_quinteplus,
             "runners": runners,
         }
 
-    def _parse_participant(self, participant: dict) -> dict | None:
+    def _fetch_participants(self, date_str: str, reunion_num: int, course_num: int) -> list[dict]:
+        """Recupere les partants d'une course via l'endpoint dedie."""
+        url = f"{PMU_API_BASE}/{date_str}/R{reunion_num}/C{course_num}/participants"
+        time.sleep(self.request_delay)
+        try:
+            resp = self.session.get(url, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("participants", [])
+        except requests.RequestException as e:
+            logger.debug("Echec participants R%d/C%d: %s", reunion_num, course_num, e)
+            return []
+        except ValueError:
+            return []
+
+    def _parse_participant(self, p: dict) -> dict | None:
         """Parse un partant (cheval)."""
-        horse_name = (
-            participant.get("nom")
-            or participant.get("cheval", {}).get("nom")
-        )
+        horse_name = p.get("nom")
         if not horse_name:
             return None
 
-        number = participant.get("numPmu", participant.get("numero", 0))
+        number = p.get("numPmu", 0)
 
-        jockey = (
-            participant.get("jockey", {}).get("nom")
-            or participant.get("nomJockey")
-        )
-        trainer = (
-            participant.get("entraineur", {}).get("nom")
-            or participant.get("nomEntraineur")
-        )
+        # Jockey/Driver
+        jockey = p.get("driver") or p.get("jockey")
 
-        # Cotes
-        cote_final = participant.get("cote", participant.get("coteDirect"))
-        cote_matin = participant.get("coteMatin", participant.get("coteOuverture"))
+        # Entraineur
+        trainer = p.get("entraineur")
 
-        # Forme: convertir la liste de derniers resultats en string JSON
-        derniers_resultats = participant.get("dernieresCourses", [])
-        positions = self._extract_last_positions(derniers_resultats)
-        last_5_positions = json.dumps(positions) if positions else None
-
-        # Forme string PMU (ex: "1a3p2p")
-        form_string = participant.get("ordreArrivee", participant.get("formule"))
+        # Forme musicale (ex: "1a3p2p0a")
+        musique = p.get("musique")
 
         # Non-partant
         is_scratched = bool(
-            participant.get("nonPartant")
-            or participant.get("statut") == "NON_PARTANT"
+            p.get("nonPartant")
+            or p.get("statut") == "NON_PARTANT"
         )
 
         # Age et poids
-        age = participant.get("age")
-        if age is None:
-            age = participant.get("cheval", {}).get("age")
-        poids = participant.get("poidsConditionMontee", participant.get("poids"))
+        age = p.get("age")
+        poids = p.get("handicapValeur") or p.get("poidsConditionMontee")
 
-        # Position d'arrivee (resultat si course terminee)
-        finish_position = participant.get("ordreArrivee")
+        # Cotes — rapport direct (live) et probable (matin)
+        odds_final = self._to_float(p.get("coteDirect") or p.get("dernierRapportDirect", {}).get("rapport"))
+        odds_morning = self._to_float(p.get("rapportProbable"))
+
+        # Position d'arrivee (si course terminee)
+        finish_position = p.get("ordreArrivee")
         if isinstance(finish_position, str):
             try:
                 finish_position = int(finish_position)
             except ValueError:
                 finish_position = None
+
+        # Dernieres positions depuis la musique
+        last_5 = self._parse_musique_positions(musique)
+        last_5_json = json.dumps(last_5) if last_5 else None
 
         return {
             "number": number,
@@ -308,50 +288,51 @@ class PMUCollector:
             "trainer_name": str(trainer).strip() if trainer else None,
             "age": int(age) if age is not None else None,
             "weight": float(poids) if poids is not None else None,
-            "odds_final": self._to_float(cote_final),
-            "odds_morning": self._to_float(cote_matin),
+            "odds_final": odds_final,
+            "odds_morning": odds_morning,
             "finish_position": finish_position,
             "is_scratched": is_scratched,
-            "form_string": str(form_string).strip() if form_string else None,
-            "last_5_positions": last_5_positions,
+            "form_string": str(musique).strip() if musique else None,
+            "last_5_positions": last_5_json,
         }
 
     # ------------------------------------------------------------------
-    # Helpers de normalisation
+    # Helpers
     # ------------------------------------------------------------------
 
     @staticmethod
     def _parse_heure(heure_depart) -> str | None:
-        """Convertit un timestamp ou string heure en format 'HHhMM'."""
         if heure_depart is None:
             return None
-        if isinstance(heure_depart, int):
-            # Timestamp en millisecondes depuis minuit
-            total_minutes = heure_depart // 60000
-            hours = total_minutes // 60
-            minutes = total_minutes % 60
-            return f"{hours:02d}h{minutes:02d}"
+        if isinstance(heure_depart, (int, float)):
+            from datetime import datetime
+            try:
+                dt = datetime.fromtimestamp(heure_depart / 1000)
+                return dt.strftime("%Hh%M")
+            except (OSError, ValueError):
+                return None
         if isinstance(heure_depart, str):
             return heure_depart[:5].replace(":", "h")
         return None
 
     @staticmethod
     def _normalize_discipline(discipline: str) -> str:
-        """Convertit la discipline PMU vers les constantes internes."""
         mapping = {
             "PLAT": "plat",
             "TROT_ATTELE": "trot_attele",
             "TROT_MONTE": "trot_monte",
+            "ATTELE": "trot_attele",
+            "MONTE": "trot_monte",
             "OBSTACLE": "obstacle",
             "HAIES": "obstacle",
             "STEEPLE": "obstacle",
+            "STEEPLE_CHASE": "obstacle",
             "CROSS": "obstacle",
         }
         return mapping.get(discipline.upper(), "plat")
 
     @staticmethod
     def _normalize_terrain(terrain_raw) -> str | None:
-        """Normalise le terrain vers les constantes internes."""
         if not terrain_raw:
             return None
         terrain_str = str(terrain_raw).upper()
@@ -369,17 +350,34 @@ class PMUCollector:
         return mapping.get(terrain_str, terrain_str.lower())
 
     @staticmethod
-    def _extract_last_positions(derniers_resultats: list) -> list[int]:
-        """Extrait les 5 dernieres positions d'arrivee depuis la liste PMU."""
-        positions = []
-        for r in derniers_resultats[:5]:
-            pos = r.get("ordreArrivee") if isinstance(r, dict) else None
-            if pos is not None:
-                try:
-                    positions.append(int(pos))
-                except (ValueError, TypeError):
-                    pass
-        return positions
+    def _parse_musique_positions(musique: str | None) -> list[int]:
+        """Extrait les positions des 5 dernieres courses depuis la musique PMU.
+
+        Format musique: '1a3p2p0a5a' -> [1, 3, 2, 0, 5]
+        Les lettres indiquent le type de piste (a=attele, p=plat, etc.)
+        """
+        if not musique:
+            return []
+        positions: list[int] = []
+        current = ""
+        for char in str(musique):
+            if char.isdigit():
+                current += char
+            else:
+                if current:
+                    try:
+                        positions.append(int(current))
+                    except ValueError:
+                        pass
+                    current = ""
+                if len(positions) >= 5:
+                    break
+        if current and len(positions) < 5:
+            try:
+                positions.append(int(current))
+            except ValueError:
+                pass
+        return positions[:5]
 
     @staticmethod
     def _to_float(val) -> float | None:
