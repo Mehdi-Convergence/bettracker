@@ -50,6 +50,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
+            export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
             cd /opt/bettracker
 
             echo "-> Installing Python dependencies..."
