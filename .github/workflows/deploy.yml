@@ -81,6 +81,12 @@ jobs:
             echo "-> Running DB migrations..."
             uv run alembic upgrade head || echo "WARNING: migrations skipped"
 
+            echo "-> Installing systemd services..."
+            sudo cp deploy/bettracker-api.service /etc/systemd/system/
+            sudo cp deploy/bettracker-worker.service /etc/systemd/system/
+            sudo systemctl daemon-reload
+            sudo systemctl enable bettracker-api bettracker-worker
+
             echo "-> Restarting services..."
             sudo systemctl restart bettracker-api
             sudo systemctl restart bettracker-worker || echo "WARNING: worker restart skipped"
