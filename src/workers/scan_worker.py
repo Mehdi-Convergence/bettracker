@@ -369,6 +369,7 @@ async def run_football_scan(league_list: list[str] | None = None):
                         h2h_raw=h2h_raw, home_id=home_id,
                         odds_1x2=odds.get("1x2", {}),
                         league_name=league_name, fixture_dt=fixture_dt,
+                        home_team_name=home_name, away_team_name=away_name,
                         home_rest_days=home_rest, away_rest_days=away_rest,
                         weather=weather_data,
                         key_player_absent_home=key_absent_home,

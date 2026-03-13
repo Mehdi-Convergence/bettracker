@@ -6,8 +6,58 @@ shots per match, CLV) are set to NaN and filled with 0 at prediction time —
 identical to how the model was trained with fillna(0).
 """
 
+import json
+import logging
 import numpy as np
 from datetime import datetime
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# ELO snapshot (built by scripts/build_elo_snapshot.py)
+# Loaded once at module level; thread-safe for reads.
+# ---------------------------------------------------------------------------
+_ELO_SNAPSHOT: dict[str, float] | None = None
+_ELO_SNAPSHOT_LOADED: bool = False
+_ELO_SNAPSHOT_PATH = Path(__file__).parent.parent.parent / "models" / "football" / "elo_ratings.json"
+
+
+def _load_elo_snapshot() -> dict[str, float]:
+    """Load ELO snapshot from JSON (lazy, cached at module level)."""
+    global _ELO_SNAPSHOT, _ELO_SNAPSHOT_LOADED
+    if _ELO_SNAPSHOT_LOADED:
+        return _ELO_SNAPSHOT or {}
+    _ELO_SNAPSHOT_LOADED = True
+    try:
+        with open(_ELO_SNAPSHOT_PATH, encoding="utf-8") as f:
+            _ELO_SNAPSHOT = json.load(f)
+        logger.info("ELO snapshot charge: %d equipes depuis %s", len(_ELO_SNAPSHOT), _ELO_SNAPSHOT_PATH)
+    except FileNotFoundError:
+        logger.warning(
+            "ELO snapshot introuvable (%s). "
+            "Lancez 'uv run python scripts/build_elo_snapshot.py' pour le generer. "
+            "Fallback sur approximation rank-based.",
+            _ELO_SNAPSHOT_PATH,
+        )
+        _ELO_SNAPSHOT = None
+    except Exception as exc:
+        logger.warning("Erreur lors du chargement du snapshot ELO: %s", exc)
+        _ELO_SNAPSHOT = None
+    return _ELO_SNAPSHOT or {}
+
+
+def _get_elo(team_name: str | None, rank: int | None) -> float:
+    """Lookup ELO from snapshot; fallback to rank-based approximation."""
+    snapshot = _load_elo_snapshot()
+    if team_name and snapshot:
+        elo = snapshot.get(team_name)
+        if elo is not None:
+            return float(elo)
+    # Fallback: crude rank approximation (used when snapshot unavailable or team unknown)
+    if rank:
+        return 1600.0 - (rank - 1) * 9
+    return 1500.0
 
 # Historical league draw rates (from training data 2019-2025)
 LEAGUE_DRAW_RATES: dict[str, float] = {
@@ -77,6 +127,8 @@ def build_live_features(
     odds_1x2: dict,
     league_name: str,
     fixture_dt: datetime,
+    home_team_name: str | None = None,
+    away_team_name: str | None = None,
     **kwargs,
 ) -> dict[str, float]:
     """Return dict mapping MODEL_FEATURES names → float values.
@@ -108,10 +160,11 @@ def build_live_features(
     agc = stats_a.get("goals_conceded_avg_away") or stats_a.get("goals_conceded_avg_total") or 1.2
 
     # ------------------------------------------------------------------ #
-    # 1. ELO (proxy: rank 1 ≈ 1600, rank 20 ≈ 1431, step ≈ 9pts)
+    # 1. ELO — lookup from persistent snapshot (scripts/build_elo_snapshot.py)
+    #    Fallback: rank-based approximation if snapshot unavailable or team unknown.
     # ------------------------------------------------------------------ #
-    h_elo = 1600.0 - (home_rank - 1) * 9 if home_rank else 1500.0
-    a_elo = 1600.0 - (away_rank - 1) * 9 if away_rank else 1500.0
+    h_elo = _get_elo(home_team_name, home_rank)
+    a_elo = _get_elo(away_team_name, away_rank)
     f["home_elo"] = h_elo
     f["away_elo"] = a_elo
     f["elo_diff"] = h_elo - a_elo
@@ -341,9 +394,23 @@ def build_live_features(
     else:
         f["away_xg_diff_5"] = np.nan
 
-    # xG overperformance: not available from season stats (need per-match data)
-    # Set to 0.0 as neutral prior (no evidence of over/under performance)
-    f["home_xg_overperformance"] = 0.0
-    f["away_xg_overperformance"] = 0.0
+    # xG overperformance: goals scored - xG (season average as proxy for rolling-5)
+    # Positive = team scores more than expected (hot streak or elite finishing)
+    # Negative = team scores less than expected (cold streak, regression candidate)
+    # Uses season-level goals/xG from /teams/statistics when available.
+    h_goals_scored_avg = stats_h.get("goals_scored_avg_total") or stats_h.get("goals_scored_avg_home")
+    a_goals_scored_avg = stats_a.get("goals_scored_avg_total") or stats_a.get("goals_scored_avg_away")
+    h_xg_for_overperf = stats_h.get("home_xg_avg") or stats_h.get("away_xg_avg")  # season home xG avg
+    a_xg_for_overperf = stats_a.get("away_xg_avg") or stats_a.get("home_xg_avg")  # season away xG avg
+
+    if h_goals_scored_avg is not None and h_xg_for_overperf is not None:
+        f["home_xg_overperformance"] = float(h_goals_scored_avg) - float(h_xg_for_overperf)
+    else:
+        f["home_xg_overperformance"] = 0.0
+
+    if a_goals_scored_avg is not None and a_xg_for_overperf is not None:
+        f["away_xg_overperformance"] = float(a_goals_scored_avg) - float(a_xg_for_overperf)
+    else:
+        f["away_xg_overperformance"] = 0.0
 
     return f
