@@ -215,6 +215,10 @@ export default function Scanner() {
   const [nbaConference, setNbaConference] = useState<"all" | "est" | "ouest">("all");
   const [mlbLeague, setMlbLeague] = useState<"all" | "al" | "nl">("all");
   const [rugbyCompetition, setRugbyCompetition] = useState<"all" | "top14" | "premiership" | "urc" | "champions">("all");
+  const [showNbaConf, setShowNbaConf] = useState(false);
+  const [showMlbLeague, setShowMlbLeague] = useState(false);
+  const [showRugbyComp, setShowRugbyComp] = useState(false);
+  const [showPmuType, setShowPmuType] = useState(false);
 
   /* ── Scan ── */
   async function handleAIScan(forceRefresh = false, silent = false) {
@@ -941,19 +945,6 @@ export default function Scanner() {
                   {activeLeagues.size > 6 && <span className="text-[10px] text-[#8a919e]">+{activeLeagues.size - 6}</span>}
                 </div>
               )}
-              {!sports.has("tennis") && (
-                <>
-                  <div className="h-5 w-px bg-[#e3e6eb]" />
-                  <button data-tour="value-toggle" onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
-                    className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
-                    <TrendingUp size={10} /> Value bets
-                  </button>
-                  <button onClick={() => setHideInTicket(!hideInTicket)}
-                    className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${hideInTicket ? "bg-[#3b5bdb] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
-                    <Shield size={10} /> Masquer en ticket
-                  </button>
-                </>
-              )}
             </div>
           )}
 
@@ -997,132 +988,298 @@ export default function Scanner() {
                   {activeTennisCount > 6 && <span className="text-[10px] text-[#8a919e]">+{activeTennisCount - 6}</span>}
                 </div>
               )}
-              <div className="h-5 w-px bg-[#e3e6eb]" />
-              <button data-tour="value-toggle" onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
-                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
-                <TrendingUp size={10} /> Value bets
-              </button>
-              <button onClick={() => setHideInTicket(!hideInTicket)}
-                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${hideInTicket ? "bg-[#3b5bdb] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
-                <Shield size={10} /> Masquer en ticket
-              </button>
             </div>
           )}
-
 
           {/* NBA filter bar */}
-          {sports.has("nba") && (
-            <div className="flex items-center gap-3 flex-wrap mt-1">
-              <div className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px]">
-                <span className="text-[12px]">🏀</span>
-                <span className="text-[12px] font-semibold text-[#111318]">Conference</span>
-              </div>
-              <div className="flex items-center gap-1">
-                {(["all", "est", "ouest"] as const).map((c) => (
-                  <button key={c} onClick={() => setNbaConference(c)}
-                    className={`text-[11px] font-semibold px-2.5 py-[5px] rounded-full transition-all ${nbaConference === c ? "bg-[#f97316] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
-                    {c === "all" ? "Toutes" : c === "est" ? "Est" : "Ouest"}
+          {sports.has("nba") && (() => {
+            const NBA_EAST = ["Atlanta Hawks","Boston Celtics","Brooklyn Nets","Charlotte Hornets","Chicago Bulls","Cleveland Cavaliers","Detroit Pistons","Indiana Pacers","Miami Heat","Milwaukee Bucks","New York Knicks","Orlando Magic","Philadelphia 76ers","Toronto Raptors","Washington Wizards"];
+            const NBA_WEST = ["Dallas Mavericks","Denver Nuggets","Golden State Warriors","Houston Rockets","LA Clippers","Los Angeles Lakers","Memphis Grizzlies","Minnesota Timberwolves","New Orleans Pelicans","Oklahoma City Thunder","Phoenix Suns","Portland Trail Blazers","Sacramento Kings","San Antonio Spurs","Utah Jazz"];
+            return (
+              <div className="mt-1">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={() => setShowNbaConf(!showNbaConf)}
+                    className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
+                  >
+                    <Trophy size={12} className="text-[#f97316]" />
+                    <span className="font-semibold">Conference</span>
+                    <span className="text-[10px] text-[#f97316] bg-[#f97316]/10 px-1.5 py-0.5 rounded-full font-bold">
+                      {nbaConference === "all" ? "Toutes" : nbaConference === "est" ? "Est" : "Ouest"}
+                    </span>
+                    <ChevronDown size={12} className={`text-[#8a919e] transition-transform ${showNbaConf ? "rotate-180" : ""}`} />
                   </button>
-                ))}
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setNbaConference("all")}
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${nbaConference === "all" ? "text-[#f97316]" : "text-[#8a919e]"} hover:bg-[#f97316]/8 hover:text-[#f97316]`}>
+                      Toutes
+                    </button>
+                    <button onClick={() => setNbaConference("est")}
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${nbaConference === "est" ? "text-[#f97316]" : "text-[#8a919e]"} hover:bg-[#f97316]/8 hover:text-[#f97316]`}>
+                      + Est
+                    </button>
+                    <button onClick={() => setNbaConference("ouest")}
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${nbaConference === "ouest" ? "text-[#f97316]" : "text-[#8a919e]"} hover:bg-[#f97316]/8 hover:text-[#f97316]`}>
+                      + Ouest
+                    </button>
+                  </div>
+                </div>
+                {showNbaConf && (
+                  <div className="mt-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-xl p-4">
+                    <div className="flex gap-6">
+                      {[
+                        { label: "Eastern Conference", teams: NBA_EAST, key: "est" as const },
+                        { label: "Western Conference", teams: NBA_WEST, key: "ouest" as const },
+                      ].map(({ label, teams, key }) => (
+                        <div key={key} className="flex-1 min-w-0">
+                          <button
+                            onClick={() => setNbaConference(nbaConference === key ? "all" : key)}
+                            className="flex items-center gap-2 mb-1.5 pb-1.5 border-b border-[#e3e6eb] w-full group"
+                          >
+                            <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
+                              nbaConference === key ? "bg-[#f97316] border-[#f97316]" : "border-[#cdd1d9]"
+                            }`}>
+                              {nbaConference === key && <span className="text-white text-[8px] font-bold">v</span>}
+                            </div>
+                            <span className="text-[11px] font-bold text-[#111318] group-hover:text-[#f97316] transition-colors">{label}</span>
+                          </button>
+                          <div className="space-y-0.5">
+                            {teams.map((team) => (
+                              <div key={team} className="flex items-center gap-2 py-0.5">
+                                <div className={`w-3 h-3 rounded border flex items-center justify-center transition-colors ${
+                                  nbaConference === key ? "bg-[#f97316] border-[#f97316]" : "border-[#cdd1d9]"
+                                }`}>
+                                  {nbaConference === key && <span className="text-white text-[8px] font-bold">v</span>}
+                                </div>
+                                <span className={`text-[11px] ${nbaConference === key ? "text-[#111318] font-medium" : "text-[#8a919e]"}`}>{team}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="h-5 w-px bg-[#e3e6eb]" />
-              <button data-tour="value-toggle" onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
-                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
-                <TrendingUp size={10} /> Value bets
-              </button>
-              <button onClick={() => setHideInTicket(!hideInTicket)}
-                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${hideInTicket ? "bg-[#3b5bdb] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
-                <Shield size={10} /> Masquer en ticket
-              </button>
-            </div>
-          )}
+            );
+          })()}
 
           {/* MLB filter bar */}
-          {sports.has("mlb") && (
-            <div className="flex items-center gap-3 flex-wrap mt-1">
-              <div className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px]">
-                <span className="text-[12px]">⚾</span>
-                <span className="text-[12px] font-semibold text-[#111318]">Ligue</span>
-              </div>
-              <div className="flex items-center gap-1">
-                {(["all", "al", "nl"] as const).map((l) => (
-                  <button key={l} onClick={() => setMlbLeague(l)}
-                    className={`text-[11px] font-semibold px-2.5 py-[5px] rounded-full transition-all ${mlbLeague === l ? "bg-[#dc2626] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
-                    {l === "all" ? "Toutes" : l === "al" ? "American League" : "National League"}
+          {sports.has("mlb") && (() => {
+            const MLB_AL = ["New York Yankees","Boston Red Sox","Tampa Bay Rays","Toronto Blue Jays","Baltimore Orioles","Chicago White Sox","Cleveland Guardians","Detroit Tigers","Kansas City Royals","Minnesota Twins","Houston Astros","Los Angeles Angels","Oakland Athletics","Seattle Mariners","Texas Rangers"];
+            const MLB_NL = ["Atlanta Braves","Miami Marlins","New York Mets","Philadelphia Phillies","Washington Nationals","Chicago Cubs","Cincinnati Reds","Milwaukee Brewers","Pittsburgh Pirates","St. Louis Cardinals","Arizona Diamondbacks","Colorado Rockies","Los Angeles Dodgers","San Diego Padres","San Francisco Giants"];
+            return (
+              <div className="mt-1">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={() => setShowMlbLeague(!showMlbLeague)}
+                    className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
+                  >
+                    <Trophy size={12} className="text-[#dc2626]" />
+                    <span className="font-semibold">Ligue</span>
+                    <span className="text-[10px] text-[#dc2626] bg-[#dc2626]/10 px-1.5 py-0.5 rounded-full font-bold">
+                      {mlbLeague === "all" ? "Toutes" : mlbLeague === "al" ? "AL" : "NL"}
+                    </span>
+                    <ChevronDown size={12} className={`text-[#8a919e] transition-transform ${showMlbLeague ? "rotate-180" : ""}`} />
                   </button>
-                ))}
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setMlbLeague("all")}
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${mlbLeague === "all" ? "text-[#dc2626]" : "text-[#8a919e]"} hover:bg-[#dc2626]/8 hover:text-[#dc2626]`}>
+                      Toutes
+                    </button>
+                    <button onClick={() => setMlbLeague("al")}
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${mlbLeague === "al" ? "text-[#dc2626]" : "text-[#8a919e]"} hover:bg-[#dc2626]/8 hover:text-[#dc2626]`}>
+                      + AL
+                    </button>
+                    <button onClick={() => setMlbLeague("nl")}
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${mlbLeague === "nl" ? "text-[#dc2626]" : "text-[#8a919e]"} hover:bg-[#dc2626]/8 hover:text-[#dc2626]`}>
+                      + NL
+                    </button>
+                  </div>
+                </div>
+                {showMlbLeague && (
+                  <div className="mt-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-xl p-4">
+                    <div className="flex gap-6">
+                      {[
+                        { label: "American League", teams: MLB_AL, key: "al" as const },
+                        { label: "National League", teams: MLB_NL, key: "nl" as const },
+                      ].map(({ label, teams, key }) => (
+                        <div key={key} className="flex-1 min-w-0">
+                          <button
+                            onClick={() => setMlbLeague(mlbLeague === key ? "all" : key)}
+                            className="flex items-center gap-2 mb-1.5 pb-1.5 border-b border-[#e3e6eb] w-full group"
+                          >
+                            <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
+                              mlbLeague === key ? "bg-[#dc2626] border-[#dc2626]" : "border-[#cdd1d9]"
+                            }`}>
+                              {mlbLeague === key && <span className="text-white text-[8px] font-bold">v</span>}
+                            </div>
+                            <span className="text-[11px] font-bold text-[#111318] group-hover:text-[#dc2626] transition-colors">{label}</span>
+                          </button>
+                          <div className="space-y-0.5">
+                            {teams.map((team) => (
+                              <div key={team} className="flex items-center gap-2 py-0.5">
+                                <div className={`w-3 h-3 rounded border flex items-center justify-center transition-colors ${
+                                  mlbLeague === key ? "bg-[#dc2626] border-[#dc2626]" : "border-[#cdd1d9]"
+                                }`}>
+                                  {mlbLeague === key && <span className="text-white text-[8px] font-bold">v</span>}
+                                </div>
+                                <span className={`text-[11px] ${mlbLeague === key ? "text-[#111318] font-medium" : "text-[#8a919e]"}`}>{team}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="h-5 w-px bg-[#e3e6eb]" />
-              <button data-tour="value-toggle" onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
-                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
-                <TrendingUp size={10} /> Value bets
-              </button>
-              <button onClick={() => setHideInTicket(!hideInTicket)}
-                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${hideInTicket ? "bg-[#3b5bdb] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
-                <Shield size={10} /> Masquer en ticket
-              </button>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Rugby filter bar */}
-          {sports.has("rugby") && (
-            <div className="flex items-center gap-3 flex-wrap mt-1">
-              <div className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px]">
-                <span className="text-[12px]">🏉</span>
-                <span className="text-[12px] font-semibold text-[#111318]">Competition</span>
-              </div>
-              <div className="flex items-center gap-1">
-                {(["all", "top14", "premiership", "urc", "champions"] as const).map((c) => (
-                  <button key={c} onClick={() => setRugbyCompetition(c)}
-                    className={`text-[11px] font-semibold px-2.5 py-[5px] rounded-full transition-all ${rugbyCompetition === c ? "bg-[#15803d] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
-                    {c === "all" ? "Toutes" : c === "top14" ? "Top 14" : c === "premiership" ? "Premiership" : c === "urc" ? "URC" : "Champions Cup"}
+          {sports.has("rugby") && (() => {
+            const RUGBY_COMPS = [
+              { key: "top14" as const, label: "Top 14", flag: "🇫🇷" },
+              { key: "premiership" as const, label: "Premiership", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+              { key: "urc" as const, label: "URC", flag: "🏆" },
+              { key: "champions" as const, label: "Champions Cup", flag: "⭐" },
+            ];
+            return (
+              <div className="mt-1">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={() => setShowRugbyComp(!showRugbyComp)}
+                    className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
+                  >
+                    <Trophy size={12} className="text-[#15803d]" />
+                    <span className="font-semibold">Competition</span>
+                    <span className="text-[10px] text-[#15803d] bg-[#15803d]/10 px-1.5 py-0.5 rounded-full font-bold">
+                      {rugbyCompetition === "all" ? "Toutes" : rugbyCompetition === "top14" ? "Top 14" : rugbyCompetition === "premiership" ? "Premiership" : rugbyCompetition === "urc" ? "URC" : "Champions Cup"}
+                    </span>
+                    <ChevronDown size={12} className={`text-[#8a919e] transition-transform ${showRugbyComp ? "rotate-180" : ""}`} />
                   </button>
-                ))}
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setRugbyCompetition("all")}
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${rugbyCompetition === "all" ? "text-[#15803d]" : "text-[#8a919e]"} hover:bg-[#15803d]/8 hover:text-[#15803d]`}>
+                      Toutes
+                    </button>
+                    {RUGBY_COMPS.map(({ key, label }) => (
+                      <button key={key} onClick={() => setRugbyCompetition(rugbyCompetition === key ? "all" : key)}
+                        className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${rugbyCompetition === key ? "text-[#15803d]" : "text-[#8a919e]"} hover:bg-[#15803d]/8 hover:text-[#15803d]`}>
+                        {rugbyCompetition === key ? `- ${label}` : `+ ${label}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {showRugbyComp && (
+                  <div className="mt-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-xl p-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {RUGBY_COMPS.map(({ key, label, flag }) => (
+                        <div key={key}>
+                          <button
+                            onClick={() => setRugbyCompetition(rugbyCompetition === key ? "all" : key)}
+                            className="flex items-center gap-2 mb-1.5 w-full group"
+                          >
+                            <span className="text-base">{flag}</span>
+                            <span className="text-[11px] font-semibold text-[#111318] group-hover:text-[#15803d] transition-colors">{label}</span>
+                            <div className={`w-3 h-3 rounded border ml-auto flex items-center justify-center transition-colors ${
+                              rugbyCompetition === key ? "bg-[#15803d] border-[#15803d]" : "border-[#cdd1d9]"
+                            }`}>
+                              {rugbyCompetition === key && <span className="text-white text-[8px] font-bold">v</span>}
+                            </div>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="h-5 w-px bg-[#e3e6eb]" />
-              <button data-tour="value-toggle" onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
-                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
-                <TrendingUp size={10} /> Value bets
-              </button>
-              <button onClick={() => setHideInTicket(!hideInTicket)}
-                className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${hideInTicket ? "bg-[#3b5bdb] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
-                <Shield size={10} /> Masquer en ticket
-              </button>
-            </div>
-          )}
+            );
+          })()}
 
           {/* PMU filter bar */}
-          {sports.has("pmu") && (
-            <div className="flex items-center gap-3 flex-wrap mt-1">
-              <div className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px]">
-                <span className="text-[12px]">🐎</span>
-                <span className="text-[12px] font-semibold text-[#111318]">Type</span>
-              </div>
-              <div className="flex items-center gap-1">
-                {(["all", "Plat", "Trot", "Obstacle"] as const).map((t) => (
-                  <button key={t} onClick={() => setPmuRaceTypeFilter(t)}
-                    className={`text-[11px] font-semibold px-2.5 py-[5px] rounded-full transition-all ${
-                      pmuRaceTypeFilter === t
-                        ? "bg-[#3b5bdb] text-white"
-                        : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
-                    }`}>
-                    {t === "all" ? "Toutes" : t}
+          {sports.has("pmu") && (() => {
+            const PMU_TYPES = [
+              { key: "Plat", label: "Plat", flag: "🏇" },
+              { key: "Trot", label: "Trot", flag: "🐎" },
+              { key: "Obstacle", label: "Obstacle", flag: "🚧" },
+            ];
+            const activePmuCount = pmuRaceTypeFilter === "all"
+              ? pmuRaces.length
+              : pmuRaces.filter(r => r.race_type === pmuRaceTypeFilter).length;
+            return (
+              <div className="mt-1">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={() => setShowPmuType(!showPmuType)}
+                    className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
+                  >
+                    <Trophy size={12} className="text-[#3b5bdb]" />
+                    <span className="font-semibold">Type</span>
+                    {pmuRaces.length > 0 && (
+                      <span className="text-[10px] text-[#3b5bdb] bg-[#3b5bdb]/10 px-1.5 py-0.5 rounded-full font-bold">
+                        {activePmuCount}/{pmuRaces.length}
+                      </span>
+                    )}
+                    <ChevronDown size={12} className={`text-[#8a919e] transition-transform ${showPmuType ? "rotate-180" : ""}`} />
                   </button>
-                ))}
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setPmuRaceTypeFilter("all")}
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${pmuRaceTypeFilter === "all" ? "text-[#3b5bdb]" : "text-[#8a919e]"} hover:bg-[#3b5bdb]/8 hover:text-[#3b5bdb]`}>
+                      Toutes
+                    </button>
+                    {PMU_TYPES.map(({ key, label }) => (
+                      <button key={key} onClick={() => setPmuRaceTypeFilter(pmuRaceTypeFilter === key ? "all" : key)}
+                        className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${pmuRaceTypeFilter === key ? "text-[#3b5bdb]" : "text-[#8a919e]"} hover:bg-[#3b5bdb]/8 hover:text-[#3b5bdb]`}>
+                        {pmuRaceTypeFilter === key ? `- ${label}` : `+ ${label}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {showPmuType && (
+                  <div className="mt-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-xl p-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      {PMU_TYPES.map(({ key, label, flag }) => (
+                        <div key={key}>
+                          <button
+                            onClick={() => setPmuRaceTypeFilter(pmuRaceTypeFilter === key ? "all" : key)}
+                            className="flex items-center gap-2 mb-1.5 w-full group"
+                          >
+                            <span className="text-base">{flag}</span>
+                            <span className="text-[11px] font-semibold text-[#111318] group-hover:text-[#3b5bdb] transition-colors">{label}</span>
+                            <div className={`w-3 h-3 rounded border ml-auto flex items-center justify-center transition-colors ${
+                              pmuRaceTypeFilter === key ? "bg-[#3b5bdb] border-[#3b5bdb]" : "border-[#cdd1d9]"
+                            }`}>
+                              {pmuRaceTypeFilter === key && <span className="text-white text-[8px] font-bold">v</span>}
+                            </div>
+                          </button>
+                          {pmuRaces.length > 0 && (
+                            <p className="text-[10px] text-[#8a919e] pl-7">
+                              {pmuRaces.filter(r => r.race_type === key).length} course{pmuRaces.filter(r => r.race_type === key).length !== 1 ? "s" : ""}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              {pmuRaces.length > 0 && (
-                <span className="text-[11px] text-[#8a919e]">
-                  <span className="text-[#111318] font-semibold">{
-                    pmuRaceTypeFilter === "all"
-                      ? pmuRaces.length
-                      : pmuRaces.filter(r => r.race_type === pmuRaceTypeFilter).length
-                  }</span> course{pmuRaces.length !== 1 ? "s" : ""}
-                </span>
-              )}
-            </div>
-          )}
+            );
+          })()}
 
-          {/* Leagues dropdown panel */}
+          {/* Shared: Value bets + Masquer en ticket */}
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#f0f1f3]">
+            <button data-tour="value-toggle" onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
+              className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+              <TrendingUp size={10} /> Value bets
+            </button>
+            <button onClick={() => setHideInTicket(!hideInTicket)}
+              className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${hideInTicket ? "bg-[#3b5bdb] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
+              <Shield size={10} /> Masquer en ticket
+            </button>
+          </div>
+
           {/* Leagues dropdown panel (football) */}
           {showLeagues && sports.has("football") && (
             <div className="mt-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-xl p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
