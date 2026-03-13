@@ -1893,7 +1893,7 @@ function NBAStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: 
                     {conf}{confRank != null ? ` (${confRank}e)` : ""}
                   </div>
                 )}
-                {last5 != null && <div className="text-[10px] text-slate-400 mt-0.5">5 derniers : {last5}</div>}
+                {last5 != null && <div className="text-[10px] text-slate-400 mt-0.5">5 derniers : {Array.isArray(last5) ? last5.map((g: { won: boolean }) => g.won ? "W" : "L").join("") : String(last5)}</div>}
               </div>
             ))}
           </div>
