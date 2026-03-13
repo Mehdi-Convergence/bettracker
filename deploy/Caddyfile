@@ -1,0 +1,24 @@
+betracker.fr {
+    # Frontend statique
+    root * /opt/bettracker/frontend/dist
+    file_server
+
+    # API proxy
+    handle /api/* {
+        reverse_proxy localhost:8000
+    }
+
+    # Routes backend directes
+    handle /health {
+        reverse_proxy localhost:8000
+    }
+    handle /docs {
+        reverse_proxy localhost:8000
+    }
+    handle /openapi.json {
+        reverse_proxy localhost:8000
+    }
+
+    # SPA fallback
+    try_files {path} /index.html
+}

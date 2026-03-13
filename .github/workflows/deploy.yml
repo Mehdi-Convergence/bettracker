@@ -81,11 +81,15 @@ jobs:
             echo "-> Running DB migrations..."
             uv run alembic upgrade head || echo "WARNING: migrations skipped"
 
-            echo "-> Installing systemd services..."
+            echo "-> Installing systemd services + Caddy config..."
             sudo cp deploy/bettracker-api.service /etc/systemd/system/
             sudo cp deploy/bettracker-worker.service /etc/systemd/system/
             sudo systemctl daemon-reload
             sudo systemctl enable bettracker-api bettracker-worker
+            if command -v caddy &>/dev/null; then
+              sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+              sudo systemctl reload caddy || sudo systemctl restart caddy
+            fi
 
             echo "-> Restarting services..."
             sudo systemctl restart bettracker-api
