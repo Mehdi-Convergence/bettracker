@@ -36,11 +36,30 @@ jobs:
             --exclude='*.pyc' \
             --exclude='.env*' \
             --exclude='data/' \
+            --exclude='models/' \
             --exclude='frontend/node_modules' \
             --exclude='frontend/dist' \
-            --exclude='bettracker.db' \
+            --exclude='*.db' \
+            --exclude='*.db-shm' \
+            --exclude='*.db-wal' \
+            --exclude='*.db-journal' \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/bettracker/
+
+      - name: Backup database before deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            mkdir -p /opt/bettracker/backups
+            if [ -f /opt/bettracker/bettracker.db ]; then
+              cp /opt/bettracker/bettracker.db "/opt/bettracker/backups/bettracker_$(date +%Y%m%d_%H%M%S).db"
+              echo "DB backed up"
+              # Keep only last 5 backups
+              ls -t /opt/bettracker/backups/bettracker_*.db | tail -n +6 | xargs rm -f 2>/dev/null || true
+            fi
 
       - name: Install, build, and restart services
         uses: appleboy/ssh-action@v1.0.3
