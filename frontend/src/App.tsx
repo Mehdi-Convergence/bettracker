@@ -47,9 +47,8 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 function LandingRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
   if (loading) return <PageLoader />;
-  if (user) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
