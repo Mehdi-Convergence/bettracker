@@ -84,7 +84,7 @@ def main():
         print("Not enough training data.")
         sys.exit(1)
 
-    X_train = train_df[RUGBY_FEATURE_COLUMNS].values
+    X_train = train_df[RUGBY_FEATURE_COLUMNS].values.copy()
     y_train = train_df["target"].values
 
     col_medians = np.nanmedian(X_train, axis=0)
@@ -97,7 +97,7 @@ def main():
     print("Training complete.")
 
     if not test_df.empty:
-        X_test = test_df[RUGBY_FEATURE_COLUMNS].values
+        X_test = test_df[RUGBY_FEATURE_COLUMNS].values.copy()
         y_test = test_df["target"].values
         for col_idx in range(X_test.shape[1]):
             X_test[:, col_idx] = np.where(np.isnan(X_test[:, col_idx]), col_medians[col_idx], X_test[:, col_idx])
