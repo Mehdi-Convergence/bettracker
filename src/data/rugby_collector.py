@@ -4,12 +4,12 @@ API base: https://v1.rugby.api-sports.io/
 The same API key (API_FOOTBALL_KEY) is used — same platform (api-sports.io).
 
 Leagues collected:
-  - Top 14 (France)            league_id = 61
-  - Premiership (England)      league_id = 45
-  - URC (United Rugby Championship) league_id = 111
-  - Champions Cup              league_id = 21
+  - Top 14 (France)            league_id = 16
+  - Premiership (England)      league_id = 13
+  - URC (United Rugby Championship) league_id = 76
+  - Champions Cup              league_id = 54
 
-Seasons: 2019 to 2024
+Seasons: 2019 to 2025
 
 Usage:
     uv run python -m src.data.rugby_collector
@@ -31,13 +31,13 @@ API_BASE = "https://v1.rugby.api-sports.io"
 
 # Rugby league IDs on api-sports.io
 RUGBY_LEAGUES: dict[int, str] = {
-    61:  "Top 14",
-    45:  "Premiership",
-    111: "URC",
-    21:  "Champions Cup",
+    16:  "Top 14",
+    13:  "Premiership",
+    76:  "URC",
+    54:  "Champions Cup",
 }
 
-SEASONS = [2019, 2020, 2021, 2022, 2023, 2024]
+SEASONS = [2019, 2020, 2021, 2022, 2023, 2024, 2025]
 
 _REQUEST_DELAY = 1.0  # seconds between API calls (free tier is rate-limited)
 
@@ -91,15 +91,18 @@ class RugbyCollector:
         return response
 
     def parse_game(self, raw: dict, league_id: int, season: int) -> dict | None:
-        """Parse a raw API-Sports game response into a dict for RugbyMatch."""
+        """Parse a raw API-Sports game response into a dict for RugbyMatch.
+
+        The API returns fields at the top level (no "game" wrapper key):
+          raw["id"], raw["date"], raw["status"], raw["teams"], raw["scores"]
+        """
         try:
-            game = raw.get("game", {})
             teams = raw.get("teams", {})
             scores = raw.get("scores", {})
 
-            game_id = str(game.get("id", ""))
-            date_str = game.get("date", "")
-            status = game.get("status", {}).get("short", "")
+            game_id = str(raw.get("id", ""))
+            date_str = raw.get("date", "")
+            status = raw.get("status", {}).get("short", "")
 
             # Only process finished games
             if status not in ("FT", "WO"):
@@ -127,9 +130,10 @@ class RugbyCollector:
             home_score_val = scores.get("home")
             away_score_val = scores.get("away")
 
-            # Scoring breakdown (may not be available in all tiers)
-            home_data = raw.get("statistics", {}).get("home", {}) or {}
-            away_data = raw.get("statistics", {}).get("away", {}) or {}
+            # Half-time scores (available via "periods" key)
+            periods = raw.get("periods", {}) or {}
+            home_ht = _safe_int(periods.get("first", {}).get("home") if isinstance(periods.get("first"), dict) else None)
+            away_ht = _safe_int(periods.get("first", {}).get("away") if isinstance(periods.get("first"), dict) else None)
 
             return {
                 "match_id": game_id,
@@ -143,15 +147,15 @@ class RugbyCollector:
                 "away_team_id": away_id,
                 "home_score": _safe_int(home_score_val),
                 "away_score": _safe_int(away_score_val),
-                # Scoring breakdown (optional — may be None if not in API response)
-                "home_tries": _safe_int(home_data.get("Tries")),
-                "away_tries": _safe_int(away_data.get("Tries")),
-                "home_conversions": _safe_int(home_data.get("Conversions")),
-                "away_conversions": _safe_int(away_data.get("Conversions")),
-                "home_penalties": _safe_int(home_data.get("Penalty Goals")),
-                "away_penalties": _safe_int(away_data.get("Penalty Goals")),
-                "home_drop_goals": _safe_int(home_data.get("Drop Goals")),
-                "away_drop_goals": _safe_int(away_data.get("Drop Goals")),
+                # Scoring breakdown — not available in base API tier, left as None
+                "home_tries": None,
+                "away_tries": None,
+                "home_conversions": None,
+                "away_conversions": None,
+                "home_penalties": None,
+                "away_penalties": None,
+                "home_drop_goals": None,
+                "away_drop_goals": None,
             }
         except Exception as e:
             logger.debug("Failed to parse game: %s", e)

@@ -61,21 +61,41 @@ def _safe_int(val) -> int | None:
 
 
 def collect_season(season: str, season_type: str = "Regular Season") -> list[dict]:
-    """Fetch all games for a season via LeagueGameFinder."""
+    """Fetch all games for a season via LeagueGameFinder.
+
+    Retries up to 3 times with exponential backoff to handle VPS timeouts.
+    """
     logger.info("Fetching %s %s...", season, season_type)
     time.sleep(_REQUEST_DELAY)
-    try:
-        finder = leaguegamefinder.LeagueGameFinder(
-            season_nullable=season,
-            season_type_nullable=season_type,
-            league_id_nullable="00",  # NBA
-        )
-        df = finder.get_data_frames()[0]
-    except Exception as e:
-        logger.warning("LeagueGameFinder failed for %s %s: %s", season, season_type, e)
-        return []
 
-    if df.empty:
+    max_attempts = 3
+    df = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            finder = leaguegamefinder.LeagueGameFinder(
+                season_nullable=season,
+                season_type_nullable=season_type,
+                league_id_nullable="00",  # NBA
+                timeout=60,
+            )
+            df = finder.get_data_frames()[0]
+            break
+        except Exception as e:
+            if attempt < max_attempts:
+                wait = 2 ** attempt  # 2s, 4s
+                logger.warning(
+                    "LeagueGameFinder attempt %d/%d failed for %s %s: %s — retrying in %ds",
+                    attempt, max_attempts, season, season_type, e, wait,
+                )
+                time.sleep(wait)
+            else:
+                logger.warning(
+                    "LeagueGameFinder failed after %d attempts for %s %s: %s",
+                    max_attempts, season, season_type, e,
+                )
+                return []
+
+    if df is None or df.empty:
         logger.info("  No games found for %s %s", season, season_type)
         return []
 
