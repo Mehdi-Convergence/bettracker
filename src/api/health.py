@@ -80,7 +80,7 @@ def health_deep():
 
     # DB check
     try:
-        from src.models.base import SessionLocal
+        from src.database import SessionLocal
         from sqlalchemy import text
 
         db = SessionLocal()
