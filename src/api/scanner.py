@@ -134,8 +134,10 @@ async def ai_scan(
         return _read_pmu_scan()  # type: ignore[return-value]
 
     # --- Football: read from cache ---
-    # Build the same cache key the worker uses (no league filter = "all" key)
-    scan_key = hashlib.md5(f"football__{timeframe}".encode()).hexdigest()[:12]
+    # Worker always scans with timeframe="48h", so always read that cache key.
+    # Then filter by date in memory based on the requested timeframe.
+    worker_timeframe = "48h"
+    scan_key = hashlib.md5(f"football__{worker_timeframe}".encode()).hexdigest()[:12]
     cache_redis_key = f"scan:football:{scan_key}"
     file_pattern = f"scan_result_{scan_key}.json"
 

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { NavLink, Outlet, useLocation, Link } from "react-router-dom";
-import FooterLegal from "@/components/FooterLegal";
 import {
   LayoutDashboard,
   ScanSearch,
@@ -453,7 +452,6 @@ export default function Layout() {
             <BreadcrumbProvider>
               <Outlet />
             </BreadcrumbProvider>
-            <FooterLegal />
           </main>
         </div>
       </TourProvider>
