@@ -204,7 +204,7 @@ export default function Scanner() {
   const [timeFrom, setTimeFrom] = useState("");
   const [timeTo, setTimeTo] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("prob");
-  const [datePreset, setDatePreset] = useState<string>("48h");
+  const [datePreset, setDatePreset] = useState<string>("24h");
   const [minEdge, setMinEdge] = useState<string>("");
   const [minOdds, setMinOdds] = useState<string>("");
   const [maxOdds, setMaxOdds] = useState<string>("");
@@ -224,7 +224,7 @@ export default function Scanner() {
   async function handleAIScan(forceRefresh = false, silent = false) {
     if (!silent) { setLoading(true); setError(""); }
     try {
-      const timeframeMap: Record<string, string> = { today: "24h", "48h": "48h", "72h": "72h", week: "1w" };
+      const timeframeMap: Record<string, string> = { "12h": "12h", "24h": "24h", "36h": "36h", "48h": "48h" };
       // Exclure PMU du scan normal (PMU a son propre endpoint)
       const sportList = [...sports].filter(s => s !== "pmu");
 
@@ -540,10 +540,10 @@ export default function Scanner() {
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
     const from = fmt(today);
     const add = (days: number) => { const d = new Date(today); d.setDate(d.getDate() + days); return fmt(d); };
-    if (preset === "today") { setDateFrom(from); setDateTo(from); return; }
+    if (preset === "12h") { setDateFrom(from); setDateTo(from); return; }
+    if (preset === "24h") { setDateFrom(from); setDateTo(add(1)); return; }
+    if (preset === "36h") { setDateFrom(from); setDateTo(add(1)); return; }
     if (preset === "48h") { setDateFrom(from); setDateTo(add(2)); return; }
-    if (preset === "72h") { setDateFrom(from); setDateTo(add(3)); return; }
-    if (preset === "week") { setDateFrom(from); setDateTo(add(7)); return; }
   }
 
   /* ── AI match -> TicketLeg conversion ── */
@@ -827,14 +827,14 @@ export default function Scanner() {
                 <Calendar size={9} className="inline mr-0.5" />Periode
               </label>
               <div className="flex gap-1">
-                {(["today", "48h", "72h", "week"] as const).map((p) => (
+                {(["12h", "24h", "36h", "48h"] as const).map((p) => (
                   <button key={p} onClick={() => applyDatePreset(p)}
                     className={`px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${
                       datePreset === p
                         ? "bg-[#3b5bdb] text-white shadow-sm"
                         : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
                     }`}>
-                    {p === "today" ? "Auj." : p === "week" ? "7j" : p}
+                    {p}
                   </button>
                 ))}
               </div>
