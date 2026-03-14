@@ -2,6 +2,7 @@
 
 import logging
 import secrets
+import threading
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -69,7 +70,7 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
     db.refresh(user)
 
     from src.services.email import send_welcome_email
-    send_welcome_email(user.email, user.display_name)
+    threading.Thread(target=send_welcome_email, args=(user.email, user.display_name), daemon=True).start()
 
     return _user_to_response(user)
 
@@ -170,7 +171,7 @@ def forgot_password(
         db.commit()
         from src.services.email import send_reset_password_email
         reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
-        send_reset_password_email(user.email, user.display_name, reset_url)
+        threading.Thread(target=send_reset_password_email, args=(user.email, user.display_name, reset_url), daemon=True).start()
         logger.info("Password reset requested for user_id=%d", user.id)
     return MessageResponse(message="Si un compte existe avec cet email, un lien de reinitialisation a ete envoye.")
 
