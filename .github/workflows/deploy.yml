@@ -28,24 +28,6 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Sync code to VPS
-        run: |
-          rsync -az --delete \
-            --exclude='.git' \
-            --exclude='__pycache__' \
-            --exclude='*.pyc' \
-            --exclude='.env*' \
-            --exclude='data/' \
-            --exclude='models/' \
-            --exclude='frontend/node_modules' \
-            --exclude='frontend/dist' \
-            --exclude='*.db' \
-            --exclude='*.db-shm' \
-            --exclude='*.db-wal' \
-            --exclude='*.db-journal' \
-            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/bettracker/
-
       - name: Backup database before deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -57,11 +39,32 @@ jobs:
             if [ -f /opt/bettracker/bettracker.db ]; then
               cp /opt/bettracker/bettracker.db "/opt/bettracker/backups/bettracker_$(date +%Y%m%d_%H%M%S).db"
               echo "DB backed up"
-              # Keep only last 5 backups
-              ls -t /opt/bettracker/backups/bettracker_*.db | tail -n +6 | xargs rm -f 2>/dev/null || true
+              # Keep only last 10 backups
+              ls -t /opt/bettracker/backups/bettracker_*.db | tail -n +11 | xargs rm -f 2>/dev/null || true
             fi
 
-      - name: Install, build, and restart services
+      - name: Sync code to VPS
+        run: |
+          rsync -az --delete \
+            --exclude='.git' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='.env*' \
+            --exclude='data/' \
+            --exclude='models/' \
+            --exclude='backups/' \
+            --exclude='logs/' \
+            --exclude='*.log' \
+            --exclude='frontend/node_modules' \
+            --exclude='frontend/dist' \
+            --exclude='*.db' \
+            --exclude='*.db-shm' \
+            --exclude='*.db-wal' \
+            --exclude='*.db-journal' \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/bettracker/
+
+      - name: Install dependencies and build
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -97,8 +100,8 @@ jobs:
             echo "-> Building frontend..."
             cd frontend && npm ci && npm run build && cd ..
 
-            echo "-> Running DB migrations..."
-            uv run alembic upgrade head || echo "WARNING: migrations skipped"
+            echo "-> Running DB migrations (STRICT - fails deploy on error)..."
+            uv run alembic upgrade head
 
             echo "-> Installing systemd services + Caddy config..."
             sudo cp deploy/bettracker-api.service /etc/systemd/system/
@@ -110,12 +113,102 @@ jobs:
               sudo systemctl reload caddy || sudo systemctl restart caddy
             fi
 
+            echo "-> Build phase complete"
+
+      - name: Deploy with rollback protection
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
+            cd /opt/bettracker
+
+            # Save current state for rollback
+            PREV_COMMIT=$(git log --format="%H" -1 2>/dev/null || echo "none")
+            echo "-> Previous commit: $PREV_COMMIT"
+
             echo "-> Restarting services..."
             sudo systemctl restart bettracker-api
-            sudo systemctl restart bettracker-worker || echo "WARNING: worker restart skipped"
+            sudo systemctl restart bettracker-worker || true
 
-            echo "-> Health check..."
-            sleep 3
-            curl -sf http://localhost:8000/health || echo "WARNING: health check failed"
+            echo "-> Health check (3 attempts, 5s apart)..."
+            HEALTHY=false
+            for i in 1 2 3; do
+              sleep 5
+              if curl -sf http://localhost:8000/health/deep > /tmp/health_result.json 2>&1; then
+                STATUS=$(python3 -c "import json; print(json.load(open('/tmp/health_result.json'))['status'])" 2>/dev/null || echo "unknown")
+                if [ "$STATUS" = "ok" ]; then
+                  HEALTHY=true
+                  echo "Deep health check PASSED (attempt $i)"
+                  cat /tmp/health_result.json
+                  break
+                else
+                  echo "Health check returned status=$STATUS (attempt $i/3)"
+                  cat /tmp/health_result.json
+                fi
+              else
+                echo "Health check FAILED (attempt $i/3)"
+              fi
+            done
 
-            echo "-> Deployment complete"
+            if [ "$HEALTHY" = false ]; then
+              echo ""
+              echo "=========================================="
+              echo "CRITICAL: HEALTH CHECK FAILED - ROLLING BACK"
+              echo "=========================================="
+              echo ""
+
+              # Show recent logs for debugging
+              echo "-> Recent API logs:"
+              sudo journalctl -u bettracker-api --since "30 seconds ago" --no-pager 2>/dev/null || true
+
+              # Restore DB from latest backup
+              LATEST_BACKUP=$(ls -t /opt/bettracker/backups/bettracker_*.db 2>/dev/null | head -1)
+              if [ -n "$LATEST_BACKUP" ]; then
+                cp "$LATEST_BACKUP" /opt/bettracker/bettracker.db
+                echo "-> DB restored from $LATEST_BACKUP"
+              fi
+
+              # Rollback code to previous commit
+              if [ "$PREV_COMMIT" != "none" ]; then
+                git checkout "$PREV_COMMIT" -- . 2>/dev/null || true
+                echo "-> Code rolled back to $PREV_COMMIT"
+              fi
+
+              # Re-install deps and restart with old code
+              export NVM_DIR="$HOME/.nvm"
+              [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+              uv sync --no-dev 2>/dev/null || true
+              cd frontend && npm ci && npm run build 2>/dev/null && cd .. || cd /opt/bettracker
+              sudo systemctl restart bettracker-api
+              sudo systemctl restart bettracker-worker || true
+              sleep 5
+
+              # Verify rollback
+              if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+                echo "-> Rollback successful - previous version running"
+              else
+                echo "-> CRITICAL: Rollback ALSO failed - manual intervention required"
+              fi
+
+              exit 1
+            fi
+
+            echo ""
+            echo "-> Smoke tests..."
+
+            # Verify frontend dist
+            test -f /opt/bettracker/frontend/dist/index.html || { echo "FAIL: frontend dist/index.html missing"; exit 1; }
+
+            # Verify external access
+            if command -v caddy &>/dev/null; then
+              curl -sf https://betracker.fr > /dev/null 2>&1 && echo "External HTTPS: OK" || echo "WARNING: External HTTPS check failed (may be DNS/network)"
+            fi
+
+            echo ""
+            echo "=========================================="
+            echo "DEPLOYMENT SUCCESSFUL"
+            echo "=========================================="

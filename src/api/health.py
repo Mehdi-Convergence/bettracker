@@ -69,6 +69,61 @@ def _get_model_info() -> dict:
     return {"version": None}
 
 
+@router.get("/health/deep")
+def health_deep():
+    """Deep health check for deploy validation.
+
+    Verifies DB connectivity, critical tables, ML models, and frontend build.
+    Returns 503 if any check fails so the deploy pipeline can rollback.
+    """
+    errors = []
+
+    # DB check
+    try:
+        from src.models.base import SessionLocal
+        from sqlalchemy import text
+
+        db = SessionLocal()
+        tables = [
+            r[0]
+            for r in db.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table'")
+            ).fetchall()
+        ]
+        db.close()
+        if len(tables) < 5:
+            errors.append(f"Only {len(tables)} tables found (expected >= 5)")
+        required_tables = ["users", "campaigns", "bets"]
+        for t in required_tables:
+            if t not in tables:
+                errors.append(f"Missing critical table: {t}")
+    except Exception as e:
+        errors.append(f"DB connection error: {e}")
+
+    # ML model check
+    football_model = Path("models/football/model.joblib")
+    if not football_model.exists():
+        errors.append("Football model missing (models/football/model.joblib)")
+
+    # Frontend build check
+    frontend_dist = Path("frontend/dist/index.html")
+    if not frontend_dist.exists():
+        errors.append("Frontend build missing (frontend/dist/index.html)")
+
+    from starlette.responses import JSONResponse
+
+    status = "ok" if not errors else "degraded"
+    code = 200 if not errors else 503
+    return JSONResponse(
+        status_code=code,
+        content={
+            "status": status,
+            "errors": errors,
+            "tables_count": len(tables) if 'tables' in locals() else 0,
+        },
+    )
+
+
 @router.get("/scanner/model-info")
 def model_info():
     """Return ML model version and metadata."""
