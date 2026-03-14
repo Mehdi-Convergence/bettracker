@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import {
   Search, AlertTriangle, Filter, Calendar, Clock, HelpCircle,
-  X, Eye, Star, ChevronDown, Trophy, RefreshCw,
+  X, Eye, Star, ChevronDown, RefreshCw,
   ScanSearch, TrendingUp, Shield, CheckCircle2,
 } from "lucide-react";
 import { aiScan, pmuScan } from "@/services/api";
@@ -907,7 +907,7 @@ export default function Scanner() {
                 onClick={() => setShowLeagues(!showLeagues)}
                 className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
               >
-                <Trophy size={12} className="text-[#3b5bdb]" />
+                <span className="text-[12px]">⚽</span>
                 <span className="font-semibold">Competitions</span>
                 <span className="text-[10px] text-[#3b5bdb] bg-[#3b5bdb]/10 px-1.5 py-0.5 rounded-full font-bold">
                   {activeLeagues.size}/{ALL_LEAGUE_CODES.length}
@@ -955,7 +955,7 @@ export default function Scanner() {
                 onClick={() => setShowCircuits(!showCircuits)}
                 className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
               >
-                <Trophy size={12} className="text-[#f79009]" />
+                <span className="text-[12px]">🎾</span>
                 <span className="font-semibold">Circuits</span>
                 <span className="text-[10px] text-[#f79009] bg-[#f79009]/10 px-1.5 py-0.5 rounded-full font-bold">
                   {activeTennisCount}/{allTennisNames.length}
@@ -1002,7 +1002,7 @@ export default function Scanner() {
                     onClick={() => setShowNbaConf(!showNbaConf)}
                     className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
                   >
-                    <Trophy size={12} className="text-[#f97316]" />
+                    <span className="text-[12px]">🏀</span>
                     <span className="font-semibold">Conference</span>
                     <span className="text-[10px] text-[#f97316] bg-[#f97316]/10 px-1.5 py-0.5 rounded-full font-bold">
                       {nbaConference === "all" ? "Toutes" : nbaConference === "est" ? "Est" : "Ouest"}
@@ -1075,7 +1075,7 @@ export default function Scanner() {
                     onClick={() => setShowMlbLeague(!showMlbLeague)}
                     className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
                   >
-                    <Trophy size={12} className="text-[#dc2626]" />
+                    <span className="text-[12px]">⚾</span>
                     <span className="font-semibold">Ligue</span>
                     <span className="text-[10px] text-[#dc2626] bg-[#dc2626]/10 px-1.5 py-0.5 rounded-full font-bold">
                       {mlbLeague === "all" ? "Toutes" : mlbLeague === "al" ? "AL" : "NL"}
@@ -1152,7 +1152,7 @@ export default function Scanner() {
                     onClick={() => setShowRugbyComp(!showRugbyComp)}
                     className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
                   >
-                    <Trophy size={12} className="text-[#15803d]" />
+                    <span className="text-[12px]">🏉</span>
                     <span className="font-semibold">Competition</span>
                     <span className="text-[10px] text-[#15803d] bg-[#15803d]/10 px-1.5 py-0.5 rounded-full font-bold">
                       {rugbyCompetition === "all" ? "Toutes" : rugbyCompetition === "top14" ? "Top 14" : rugbyCompetition === "premiership" ? "Premiership" : rugbyCompetition === "urc" ? "URC" : "Champions Cup"}
@@ -1215,7 +1215,7 @@ export default function Scanner() {
                     onClick={() => setShowPmuType(!showPmuType)}
                     className="flex items-center gap-1.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-full px-3 py-[5px] text-[12px] text-[#111318] hover:bg-[#eceef1] transition-colors"
                   >
-                    <Trophy size={12} className="text-[#3b5bdb]" />
+                    <span className="text-[12px]">🐴</span>
                     <span className="font-semibold">Type</span>
                     {pmuRaces.length > 0 && (
                       <span className="text-[10px] text-[#3b5bdb] bg-[#3b5bdb]/10 px-1.5 py-0.5 rounded-full font-bold">
