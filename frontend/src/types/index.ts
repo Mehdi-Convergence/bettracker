@@ -477,6 +477,11 @@ export interface AIScanMatch {
   p1_serve_stats: Record<string, number> | null;
   p2_serve_stats: Record<string, number> | null;
   tennis_ml_used: boolean;
+  // Tennis H2H live (calcule depuis la DB tennis_matches)
+  h2h_total: number | null;
+  h2h_p1_wins: number | null;
+  h2h_p2_wins: number | null;
+  h2h_p1_win_rate: number | null;
   // NBA fields
   nba_ml_used: boolean;
   home_win_rate_10: number | null;
@@ -527,6 +532,12 @@ export interface AIScanMatch {
   away_tries_avg_10: number | null;
   home_penalties_avg_10: number | null;
   away_penalties_avg_10: number | null;
+  home_yellow_cards_avg?: number | null;
+  away_yellow_cards_avg?: number | null;
+  home_red_cards_avg?: number | null;
+  away_red_cards_avg?: number | null;
+  home_conversions_avg?: number | null;
+  away_conversions_avg?: number | null;
   // MLB fields
   mlb_ml_used?: boolean;
   home_runs_avg_10?: number;
@@ -540,6 +551,12 @@ export interface AIScanMatch {
   away_batting_avg?: number | null;
   home_era?: number | null;
   away_era?: number | null;
+  home_obp?: number | null;
+  away_obp?: number | null;
+  home_slg?: number | null;
+  away_slg?: number | null;
+  home_ops?: number | null;
+  away_ops?: number | null;
   home_division?: string | null;
   away_division?: string | null;
   home_division_rank?: number | null;
@@ -662,6 +679,16 @@ export interface PMURunnerCard {
   edge_place: number | null;
   form: string | null;
   last_5: number[] | null;
+  horse_win_rate: number | null;
+  horse_place_rate: number | null;
+  horse_runs: number | null;
+  rest_days: number | null;
+  jockey_win_rate: number | null;
+  jockey_place_rate: number | null;
+  jockey_runs: number | null;
+  trainer_win_rate: number | null;
+  trainer_place_rate: number | null;
+  trainer_runs: number | null;
 }
 
 export interface PMURaceCard {

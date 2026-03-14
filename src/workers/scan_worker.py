@@ -657,6 +657,99 @@ def _load_tennis_model():
         return None, None
 
 
+def _compute_tennis_h2h_from_db(p1_name: str, p2_name: str) -> dict:
+    """Query tennis_matches to compute H2H stats between two players.
+
+    Normalizes player names to handle slight spelling differences between
+    SofaScore and tennis-data.co.uk.  Returns a dict with:
+      h2h_total, h2h_p1_wins, h2h_p2_wins, h2h_p1_win_rate,
+      h2h_summary (string e.g. "8 matchs : Djokovic N. 5V - 3D Murray A.")
+    Returns an empty dict on any error.
+    """
+    try:
+        from src.database import SessionLocal
+        from src.models.tennis_match import TennisMatch
+        from src.features.tennis_features import _normalize_player_name
+        from sqlalchemy import or_, and_
+
+        p1_norm = _normalize_player_name(p1_name) if p1_name else p1_name
+        p2_norm = _normalize_player_name(p2_name) if p2_name else p2_name
+
+        if not p1_norm or not p2_norm:
+            return {}
+
+        db = SessionLocal()
+        try:
+            # Find all matches where either player is winner/loser against the other
+            # Try normalized names first, then raw names as fallback
+            def _fetch(n1: str, n2: str):
+                return db.query(TennisMatch).filter(
+                    or_(
+                        and_(TennisMatch.winner == n1, TennisMatch.loser == n2),
+                        and_(TennisMatch.winner == n2, TennisMatch.loser == n1),
+                    )
+                ).all()
+
+            h2h_matches = _fetch(p1_norm, p2_norm)
+            # Fallback: try raw names if normalized gives nothing
+            if not h2h_matches and (p1_norm != p1_name or p2_norm != p2_name):
+                h2h_matches = _fetch(p1_name, p2_name)
+            # Fallback: try partial surname matching if still nothing
+            if not h2h_matches:
+                p1_surname = p1_norm.split()[0] if p1_norm else ""
+                p2_surname = p2_norm.split()[0] if p2_norm else ""
+                if p1_surname and p2_surname:
+                    candidates = db.query(TennisMatch).filter(
+                        or_(
+                            TennisMatch.winner.like(f"{p1_surname}%"),
+                            TennisMatch.loser.like(f"{p1_surname}%"),
+                        )
+                    ).filter(
+                        or_(
+                            TennisMatch.winner.like(f"{p2_surname}%"),
+                            TennisMatch.loser.like(f"{p2_surname}%"),
+                        )
+                    ).all()
+                    h2h_matches = [
+                        row for row in candidates
+                        if (row.winner.startswith(p1_surname) or row.loser.startswith(p1_surname))
+                        and (row.winner.startswith(p2_surname) or row.loser.startswith(p2_surname))
+                    ]
+        finally:
+            db.close()
+
+        if not h2h_matches:
+            return {}
+
+        # Determine which player is p1 in the DB (pick the name found most often)
+        p1_name_in_db = p1_norm if any(
+            r.winner == p1_norm or r.loser == p1_norm for r in h2h_matches
+        ) else (p1_name if any(
+            r.winner == p1_name or r.loser == p1_name for r in h2h_matches
+        ) else p1_norm)
+
+        p1_wins = sum(1 for r in h2h_matches if r.winner == p1_name_in_db)
+        total = len(h2h_matches)
+        p2_wins = total - p1_wins
+        win_rate = round(p1_wins / total, 3) if total > 0 else 0.5
+
+        # Build display names (short form for summary string)
+        p1_display = p1_norm or p1_name or "P1"
+        p2_display = p2_norm or p2_name or "P2"
+        summary = f"{total} match{'s' if total > 1 else ''} : {p1_display} {p1_wins}V - {p2_wins}D {p2_display}"
+
+        return {
+            "h2h_total": total,
+            "h2h_p1_wins": p1_wins,
+            "h2h_p2_wins": p2_wins,
+            "h2h_p1_win_rate": win_rate,
+            "h2h_summary": summary,
+        }
+    except Exception as exc:
+        logger.debug("Tennis H2H DB lookup failed: %s", exc)
+        return {}
+
+
 async def run_tennis_scan():
     """Run a full tennis scan and store results in cache."""
     from src.data.sofascore_client import SofascoreClient
@@ -778,6 +871,14 @@ async def run_tennis_scan():
                 except Exception as ml_exc:
                     logger.debug("Tennis ML prediction failed: %s", ml_exc)
 
+            # H2H live depuis la DB (non-blocking — erreur silencieuse)
+            _db_h2h = _compute_tennis_h2h_from_db(
+                m.get("player1", ""),
+                m.get("player2", ""),
+            )
+            # Priorite aux donnees DB sur le texte SofaScore
+            _h2h_summary = _db_h2h.get("h2h_summary") or m.get("h2h")
+
             matches.append(AIScanMatch(
                 sport="tennis",
                 player1=m.get("player1"), player2=m.get("player2"),
@@ -787,7 +888,7 @@ async def run_tennis_scan():
                 form_home_detail=m.get("p1_form_detail", []) or [],
                 form_away_detail=m.get("p2_form_detail", []) or [],
                 key_absences_home=abs_p1, key_absences_away=abs_p2,
-                h2h_summary=m.get("h2h"), context=m.get("context"),
+                h2h_summary=_h2h_summary, context=m.get("context"),
                 motivation=m.get("motivation"), weather=m.get("weather"),
                 surface=m.get("surface"), round=m.get("round"),
                 ranking_p1=m.get("p1_ranking"), ranking_p2=m.get("p2_ranking"),
@@ -806,6 +907,10 @@ async def run_tennis_scan():
                 edges=calc.edges, data_quality=calc.data_quality, data_score=calc.data_score,
                 p1_serve_stats=_p1_serve_stats, p2_serve_stats=_p2_serve_stats,
                 tennis_ml_used=_tennis_ml_used,
+                h2h_total=_db_h2h.get("h2h_total"),
+                h2h_p1_wins=_db_h2h.get("h2h_p1_wins"),
+                h2h_p2_wins=_db_h2h.get("h2h_p2_wins"),
+                h2h_p1_win_rate=_db_h2h.get("h2h_p1_win_rate"),
             ))
         except Exception:
             continue
@@ -1299,6 +1404,12 @@ async def run_rugby_scan():
                 away_tries_avg_10=_pick(a_live, a_snap, "tries_avg_10"),
                 home_penalties_avg_10=_pick(h_live, h_snap, "penalties_avg_10"),
                 away_penalties_avg_10=_pick(a_live, a_snap, "penalties_avg_10"),
+                home_yellow_cards_avg=_pick(h_live, h_snap, "season_yellow_cards_avg"),
+                away_yellow_cards_avg=_pick(a_live, a_snap, "season_yellow_cards_avg"),
+                home_red_cards_avg=_pick(h_live, h_snap, "season_red_cards_avg"),
+                away_red_cards_avg=_pick(a_live, a_snap, "season_red_cards_avg"),
+                home_conversions_avg=_pick(h_live, h_snap, "season_conversions_avg"),
+                away_conversions_avg=_pick(a_live, a_snap, "season_conversions_avg"),
                 home_streak=h_live.get("streak") or h_snap.get("streak"),
                 away_streak=a_live.get("streak") or a_snap.get("streak"),
                 home_rest_days=h_live.get("rest_days"),
@@ -1539,6 +1650,12 @@ async def run_mlb_scan():
                 away_batting_avg=a_live.get("batting_avg"),
                 home_era=h_live.get("era"),
                 away_era=a_live.get("era"),
+                home_obp=h_live.get("obp"),
+                away_obp=a_live.get("obp"),
+                home_slg=h_live.get("slg"),
+                away_slg=a_live.get("slg"),
+                home_ops=h_live.get("ops"),
+                away_ops=a_live.get("ops"),
                 home_division=h_live.get("division"),
                 away_division=a_live.get("division"),
                 home_division_rank=h_live.get("division_rank"),
@@ -1673,27 +1790,134 @@ async def run_pmu_scan():
             # Enrichir avec ML si disponible
             if win_model and place_model and runner_dicts:
                 try:
-                    from src.features.pmu_features import PMU_FEATURE_COLUMNS
+                    from src.features.pmu_features import PMUFeatureBuilder, PMU_FEATURE_COLUMNS
                     import numpy as np
+                    import json as _json
 
-                    # Construire features live de maniere simplifiee
-                    # (pas d'historique: on utilise uniquement les features disponibles)
+                    # Charger les medians du modele pour imputer les NaN
+                    metadata_path = Path("models/pmu/win_model/metadata.json")
+                    col_medians = None
+                    if metadata_path.exists():
+                        meta = _json.loads(metadata_path.read_text())
+                        col_medians = np.array(meta.get("col_medians", []))
+
+                    # Construire le feature builder avec l'historique complet
+                    builder = PMUFeatureBuilder()
+
+                    # Charger les courses passees pour construire les caches
+                    db2 = SessionLocal()
+                    past_races = (
+                        db2.query(PMURace)
+                        .filter(PMURace.race_date < today)
+                        .order_by(PMURace.race_date)
+                        .all()
+                    )
+                    past_race_ids = {r.id for r in past_races}
+                    past_runners = (
+                        db2.query(PMURunner)
+                        .filter(PMURunner.race_id.in_(past_race_ids), PMURunner.is_scratched.is_(False))
+                        .all()
+                    )
+                    db2.close()
+
+                    # Alimenter les caches du builder avec les courses passees
+                    past_runners_by_race: dict[int, list] = {}
+                    for ru in past_runners:
+                        past_runners_by_race.setdefault(ru.race_id, []).append(ru)
+
+                    for pr in past_races:
+                        for ru in past_runners_by_race.get(pr.id, []):
+                            finish = ru.finish_position
+                            if finish is None:
+                                continue
+                            builder._update_cache(
+                                runner={
+                                    "horse_name": ru.horse_name,
+                                    "jockey_name": ru.jockey_name,
+                                    "trainer_name": ru.trainer_name,
+                                    "finish_position": finish,
+                                    "weight": ru.weight,
+                                },
+                                race_date=pr.race_date,
+                                hippodrome=pr.hippodrome,
+                                race_type=pr.race_type,
+                                distance=pr.distance or 0,
+                                terrain=pr.terrain or "",
+                                prize_pool=pr.prize_pool or 0,
+                            )
+
+                    logger.info(
+                        "PMU feature builder: %d horses, %d jockeys, %d trainers in cache",
+                        len(builder.horse_history),
+                        len(builder.jockey_history),
+                        len(builder.trainer_history),
+                    )
+
+                    # Construire les features pour les runners du jour
                     feat_rows = []
                     for rd in runner_dicts:
-                        odds_val = rd.get("odds")
-                        implied = (1.0 / float(odds_val)) if odds_val and float(odds_val) > 1.0 else np.nan
-                        row = {col: np.nan for col in PMU_FEATURE_COLUMNS}
-                        row["odds_implied_prob"] = implied
-                        row["num_runners"] = float(len(runner_dicts))
-                        row["post_position"] = float(rd["number"])
-                        row["is_quinteplus"] = float(race.is_quinteplus)
-                        if rd.get("weight"):
-                            row["age"] = np.nan  # pas d'age en live
-                        feat_rows.append(row)
+                        horse = rd.get("horse_name", "")
+                        jockey = rd.get("jockey", "")
+                        trainer = rd.get("trainer", "")
+                        h_hist = builder.horse_history.get(horse, [])
+                        j_hist = builder.jockey_history.get(jockey, [])
+                        t_hist = builder.trainer_history.get(trainer, [])
+                        c_hist = builder.combo_history.get((horse, jockey), [])
 
-                    X = np.array([[r[col] for col in PMU_FEATURE_COLUMNS] for r in feat_rows], dtype=float)
-                    # Imputer NaN avec 0
-                    X = np.where(np.isnan(X), 0.0, X)
+                        if h_hist:  # cheval a de l'historique
+                            f = builder._build_features(
+                                runner={
+                                    "horse_name": horse,
+                                    "jockey_name": jockey,
+                                    "trainer_name": trainer,
+                                    "weight": rd.get("weight"),
+                                    "age": None,  # pas dispo en live
+                                    "number": rd.get("number"),
+                                    "odds_final": rd.get("odds"),
+                                },
+                                horse=horse,
+                                jockey=jockey,
+                                trainer=trainer,
+                                h_hist=h_hist,
+                                j_hist=j_hist,
+                                t_hist=t_hist,
+                                c_hist=c_hist,
+                                race_date=race.race_date,
+                                hippodrome=race.hippodrome or "",
+                                race_type=race.race_type or "",
+                                distance=race.distance or 0,
+                                terrain=race.terrain or "",
+                                prize_pool=race.prize_pool or 0,
+                                num_runners_race=len(runner_dicts),
+                                is_quinteplus=int(bool(race.is_quinteplus)),
+                            )
+                        else:  # pas d'historique - features minimales
+                            odds_val = rd.get("odds")
+                            implied = (1.0 / float(odds_val)) if odds_val and float(odds_val) > 1.0 else np.nan
+                            f = {col: np.nan for col in PMU_FEATURE_COLUMNS}
+                            f["odds_implied_prob"] = implied
+                            f["num_runners"] = float(len(runner_dicts))
+                            f["post_position"] = float(rd.get("number", 0))
+                            f["is_quinteplus"] = float(int(bool(race.is_quinteplus)))
+                            # Remplir jockey/trainer stats meme sans historique cheval
+                            if j_hist:
+                                f["jockey_win_rate_20"] = builder._win_rate(j_hist, 20)
+                                f["jockey_place_rate_20"] = builder._place_rate(j_hist, 20)
+                            if t_hist:
+                                f["trainer_win_rate_20"] = builder._win_rate(t_hist, 20)
+                                f["trainer_place_rate_20"] = builder._place_rate(t_hist, 20)
+
+                        feat_rows.append(f)
+
+                    X = np.array([[r.get(col, np.nan) for col in PMU_FEATURE_COLUMNS] for r in feat_rows], dtype=float)
+
+                    # Imputer NaN avec les medians du training (pas 0!)
+                    if col_medians is not None and len(col_medians) == X.shape[1]:
+                        for col_idx in range(X.shape[1]):
+                            mask = np.isnan(X[:, col_idx])
+                            X[mask, col_idx] = col_medians[col_idx]
+                    else:
+                        X = np.where(np.isnan(X), 0.0, X)
 
                     proba_win = win_model.predict_proba(X)
                     proba_place = place_model.predict_proba(X)
@@ -1701,8 +1925,35 @@ async def run_pmu_scan():
                     for i, rd in enumerate(runner_dicts):
                         rd["model_prob_win"] = round(float(proba_win[i]), 4)
                         rd["model_prob_place"] = round(float(proba_place[i]), 4)
+                        # Stocker le nb de features non-NaN pour data quality
+                        rd["_features_available"] = int(np.sum(~np.isnan(np.array([feat_rows[i].get(c, np.nan) for c in PMU_FEATURE_COLUMNS]))))
+
+                    # Enrichir avec stats pour le frontend
+                    for i, rd in enumerate(runner_dicts):
+                        horse = rd.get("horse_name", "")
+                        jockey = rd.get("jockey", "")
+                        trainer = rd.get("trainer", "")
+                        h_hist = builder.horse_history.get(horse, [])
+                        j_hist = builder.jockey_history.get(jockey, [])
+                        t_hist = builder.trainer_history.get(trainer, [])
+
+                        if h_hist:
+                            rd["horse_win_rate"] = round(builder._win_rate(h_hist, 10), 3)
+                            rd["horse_place_rate"] = round(builder._place_rate(h_hist, 10), 3)
+                            rest = builder._rest_days(h_hist, race.race_date)
+                            rd["rest_days"] = rest
+                            rd["horse_runs"] = len(h_hist)
+                        if j_hist:
+                            rd["jockey_win_rate"] = round(builder._win_rate(j_hist, 20), 3)
+                            rd["jockey_place_rate"] = round(builder._place_rate(j_hist, 20), 3)
+                            rd["jockey_runs"] = len(j_hist)
+                        if t_hist:
+                            rd["trainer_win_rate"] = round(builder._win_rate(t_hist, 20), 3)
+                            rd["trainer_place_rate"] = round(builder._place_rate(t_hist, 20), 3)
+                            rd["trainer_runs"] = len(t_hist)
+
                 except Exception as ml_exc:
-                    logger.debug("PMU ML enrichment failed: %s", ml_exc)
+                    logger.error("PMU ML enrichment failed: %s", ml_exc, exc_info=True)
 
             # Calculer edges via probability_calculator
             enriched = calculate_pmu(runner_dicts)

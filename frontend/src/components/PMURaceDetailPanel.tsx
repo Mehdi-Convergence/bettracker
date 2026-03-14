@@ -208,6 +208,30 @@ export default function PMURaceDetailPanel({ race, runnerIndex, onClose }: Props
             </section>
           )}
 
+          {/* Stats cheval */}
+          {(runner.horse_win_rate != null || runner.horse_place_rate != null || runner.horse_runs != null || runner.rest_days != null) && (
+            <section>
+              <h4 className="text-xs font-bold text-[#8a919e] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <TrendingUp size={12} />
+                Stats cheval
+              </h4>
+              <div className="bg-[#f8f9fa] rounded-xl p-4 space-y-0">
+                {runner.horse_win_rate != null && (
+                  <StatRow label="Victoires" value={`${(runner.horse_win_rate * 100).toFixed(1)}%`} />
+                )}
+                {runner.horse_place_rate != null && (
+                  <StatRow label="Places" value={`${(runner.horse_place_rate * 100).toFixed(1)}%`} />
+                )}
+                {runner.horse_runs != null && (
+                  <StatRow label="Courses" value={runner.horse_runs} />
+                )}
+                {runner.rest_days != null && (
+                  <StatRow label="Repos" value={`${runner.rest_days}j`} />
+                )}
+              </div>
+            </section>
+          )}
+
           {/* Stats jockey */}
           {runner.jockey && (
             <section>
@@ -215,9 +239,23 @@ export default function PMURaceDetailPanel({ race, runnerIndex, onClose }: Props
                 <User size={12} />
                 Jockey — {runner.jockey}
               </h4>
-              <div className="bg-[#f8f9fa] rounded-xl p-4 text-[12px] text-[#8a919e] italic">
-                Statistiques jockey disponibles apres integration de la source PMU
-              </div>
+              {(runner.jockey_win_rate != null || runner.jockey_place_rate != null || runner.jockey_runs != null) ? (
+                <div className="bg-[#f8f9fa] rounded-xl p-4 space-y-0">
+                  {runner.jockey_win_rate != null && (
+                    <StatRow label="Victoires" value={`${(runner.jockey_win_rate * 100).toFixed(1)}%`} />
+                  )}
+                  {runner.jockey_place_rate != null && (
+                    <StatRow label="Places" value={`${(runner.jockey_place_rate * 100).toFixed(1)}%`} />
+                  )}
+                  {runner.jockey_runs != null && (
+                    <StatRow label="Courses" value={runner.jockey_runs} />
+                  )}
+                </div>
+              ) : (
+                <div className="bg-[#f8f9fa] rounded-xl p-4 text-[12px] text-[#8a919e] italic">
+                  Statistiques non disponibles
+                </div>
+              )}
             </section>
           )}
 
@@ -228,9 +266,23 @@ export default function PMURaceDetailPanel({ race, runnerIndex, onClose }: Props
                 <Award size={12} />
                 Entraineur — {runner.trainer}
               </h4>
-              <div className="bg-[#f8f9fa] rounded-xl p-4 text-[12px] text-[#8a919e] italic">
-                Statistiques entraineur disponibles apres integration de la source PMU
-              </div>
+              {(runner.trainer_win_rate != null || runner.trainer_place_rate != null || runner.trainer_runs != null) ? (
+                <div className="bg-[#f8f9fa] rounded-xl p-4 space-y-0">
+                  {runner.trainer_win_rate != null && (
+                    <StatRow label="Victoires" value={`${(runner.trainer_win_rate * 100).toFixed(1)}%`} />
+                  )}
+                  {runner.trainer_place_rate != null && (
+                    <StatRow label="Places" value={`${(runner.trainer_place_rate * 100).toFixed(1)}%`} />
+                  )}
+                  {runner.trainer_runs != null && (
+                    <StatRow label="Courses" value={runner.trainer_runs} />
+                  )}
+                </div>
+              ) : (
+                <div className="bg-[#f8f9fa] rounded-xl p-4 text-[12px] text-[#8a919e] italic">
+                  Statistiques non disponibles
+                </div>
+              )}
             </section>
           )}
 

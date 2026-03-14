@@ -1013,12 +1013,43 @@ function TennisStatsTab({ am, home, away }: { am: AIScanMatch; home: string; awa
       )}
 
       {/* H2H */}
-      {(am.h2h_summary || (am.h2h_last3 && am.h2h_last3.length > 0)) && (
+      {(am.h2h_summary || am.h2h_total != null || (am.h2h_last3 && am.h2h_last3.length > 0)) && (
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
           <div className="flex items-center gap-2 mb-3">
             <Trophy size={15} className="text-amber-500" />
             <h4 className="text-slate-900 font-semibold text-sm">Confrontations directes</h4>
+            {am.h2h_total != null && (
+              <span className="ml-auto text-[10px] text-slate-400">{am.h2h_total} match{am.h2h_total > 1 ? "s" : ""} en DB</span>
+            )}
           </div>
+
+          {/* Barre visuelle H2H live */}
+          {am.h2h_total != null && am.h2h_total > 0 && am.h2h_p1_wins != null && am.h2h_p2_wins != null && (
+            <div className="mb-3">
+              <div className="flex justify-between text-[11px] font-semibold mb-1">
+                <span className="text-blue-600">{home} — {am.h2h_p1_wins}V</span>
+                <span className="text-slate-400 text-[10px] self-center">{am.h2h_total} matchs</span>
+                <span className="text-red-500">{am.h2h_p2_wins}V — {away}</span>
+              </div>
+              <div className="flex h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-blue-500 transition-all"
+                  style={{ width: `${((am.h2h_p1_wins / am.h2h_total) * 100).toFixed(1)}%` }}
+                />
+                <div
+                  className="bg-red-400 transition-all"
+                  style={{ width: `${((am.h2h_p2_wins / am.h2h_total) * 100).toFixed(1)}%` }}
+                />
+              </div>
+              {am.h2h_p1_win_rate != null && (
+                <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                  <span>{(am.h2h_p1_win_rate * 100).toFixed(0)}%</span>
+                  <span>{((1 - am.h2h_p1_win_rate) * 100).toFixed(0)}%</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {am.h2h_summary && <p className="text-xs text-slate-600 mb-2">{am.h2h_summary}</p>}
           {am.h2h_surface && (
             <p className="text-xs text-slate-500 mb-2">
@@ -2116,6 +2147,9 @@ function RugbyStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away
     { label: "Differentiel pts", hv: am.home_pt_diff_10 != null ? (am.home_pt_diff_10 > 0 ? `+${am.home_pt_diff_10.toFixed(1)}` : am.home_pt_diff_10.toFixed(1)) : null, av: am.away_pt_diff_10 != null ? (am.away_pt_diff_10 > 0 ? `+${am.away_pt_diff_10.toFixed(1)}` : am.away_pt_diff_10.toFixed(1)) : null },
     { label: "Essais / match (10j)", hv: am.home_tries_avg_10?.toFixed(1) ?? null, av: am.away_tries_avg_10?.toFixed(1) ?? null },
     { label: "Penalites / match (10j)", hv: am.home_penalties_avg_10?.toFixed(1) ?? null, av: am.away_penalties_avg_10?.toFixed(1) ?? null, lowerBetter: true },
+    { label: "Cartons jaunes / match", hv: am.home_yellow_cards_avg != null ? am.home_yellow_cards_avg.toFixed(2) : null, av: am.away_yellow_cards_avg != null ? am.away_yellow_cards_avg.toFixed(2) : null, lowerBetter: true },
+    { label: "Cartons rouges / match", hv: am.home_red_cards_avg != null ? am.home_red_cards_avg.toFixed(2) : null, av: am.away_red_cards_avg != null ? am.away_red_cards_avg.toFixed(2) : null, lowerBetter: true },
+    { label: "Conversions / match", hv: am.home_conversions_avg != null ? am.home_conversions_avg.toFixed(1) : null, av: am.away_conversions_avg != null ? am.away_conversions_avg.toFixed(1) : null },
   ].filter(r => r.hv != null || r.av != null);
 
   return (
@@ -2355,6 +2389,9 @@ function MLBStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: 
     { label: "Runs marques / match (10j)", hv: am.home_runs_avg_10 != null ? am.home_runs_avg_10.toFixed(2) : null, av: am.away_runs_avg_10 != null ? am.away_runs_avg_10.toFixed(2) : null },
     { label: "Runs encaisses / match (10j)", hv: am.home_runs_allowed_10 != null ? am.home_runs_allowed_10.toFixed(2) : null, av: am.away_runs_allowed_10 != null ? am.away_runs_allowed_10.toFixed(2) : null, lowerBetter: true },
     { label: "Moyenne au baton (BA)", hv: am.home_batting_avg != null ? am.home_batting_avg.toFixed(3) : null, av: am.away_batting_avg != null ? am.away_batting_avg.toFixed(3) : null },
+    { label: "OBP (On-Base %)", hv: am.home_obp != null ? am.home_obp.toFixed(3) : null, av: am.away_obp != null ? am.away_obp.toFixed(3) : null },
+    { label: "SLG (Slugging)", hv: am.home_slg != null ? am.home_slg.toFixed(3) : null, av: am.away_slg != null ? am.away_slg.toFixed(3) : null },
+    { label: "OPS (OBP + SLG)", hv: am.home_ops != null ? am.home_ops.toFixed(3) : null, av: am.away_ops != null ? am.away_ops.toFixed(3) : null },
     { label: "ERA (equipe, saison)", hv: am.home_era != null ? am.home_era.toFixed(2) : null, av: am.away_era != null ? am.away_era.toFixed(2) : null, lowerBetter: true },
   ].filter(r => r.hv != null || r.av != null);
 

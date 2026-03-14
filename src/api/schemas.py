@@ -606,6 +606,11 @@ class AIScanMatch(BaseModel):
     p1_serve_stats: dict | None = None  # {ace_rate, df_rate, 1st_serve_in, 1st_serve_won, 2nd_serve_won, bp_save}
     p2_serve_stats: dict | None = None
     tennis_ml_used: bool = False
+    # Tennis H2H live (calculé depuis la DB tennis_matches)
+    h2h_total: int | None = None
+    h2h_p1_wins: int | None = None
+    h2h_p2_wins: int | None = None
+    h2h_p1_win_rate: float | None = None
     # NBA fields
     nba_ml_used: bool = False
     home_win_rate_10: float | None = None
@@ -656,6 +661,12 @@ class AIScanMatch(BaseModel):
     away_tries_avg_10: float | None = None
     home_penalties_avg_10: float | None = None
     away_penalties_avg_10: float | None = None
+    home_yellow_cards_avg: float | None = None
+    away_yellow_cards_avg: float | None = None
+    home_red_cards_avg: float | None = None
+    away_red_cards_avg: float | None = None
+    home_conversions_avg: float | None = None
+    away_conversions_avg: float | None = None
     # MLB fields
     mlb_ml_used: bool = False
     home_runs_avg_10: float | None = None
@@ -668,6 +679,12 @@ class AIScanMatch(BaseModel):
     away_batting_avg: float | None = None
     home_era: float | None = None
     away_era: float | None = None
+    home_obp: float | None = None
+    away_obp: float | None = None
+    home_slg: float | None = None
+    away_slg: float | None = None
+    home_ops: float | None = None
+    away_ops: float | None = None
     home_division: str | None = None
     away_division: str | None = None
     home_division_rank: int | None = None
@@ -789,6 +806,16 @@ class PMURunnerCard(BaseModel):
     edge_place: float | None = None
     form: str | None = None
     last_5: list[int] | None = None
+    horse_win_rate: float | None = None
+    horse_place_rate: float | None = None
+    horse_runs: int | None = None
+    rest_days: int | None = None
+    jockey_win_rate: float | None = None
+    jockey_place_rate: float | None = None
+    jockey_runs: int | None = None
+    trainer_win_rate: float | None = None
+    trainer_place_rate: float | None = None
+    trainer_runs: int | None = None
 
 
 class PMURaceCard(BaseModel):

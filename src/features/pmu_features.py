@@ -26,7 +26,7 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
-_MIN_HISTORY = 3  # minimum runs needed before building features (horses race less often)
+_MIN_HISTORY = 1  # minimum runs needed before building features
 _DISTANCE_TOLERANCE = 300  # metres — similar distance window
 
 
