@@ -149,7 +149,7 @@ export default function Dashboard() {
   const betGroups = useMemo(() => groupBets(recentBets).slice(0, 5), [recentBets]);
 
   return (
-    <div className="flex flex-col gap-2 animate-fade-up h-full overflow-hidden max-md:h-auto max-md:overflow-visible">
+    <div className="flex flex-col gap-2 animate-fade-up h-full overflow-hidden max-md:h-auto max-md:overflow-visible max-md:overflow-x-hidden">
       {/* ── HEADER ── */}
       <div className="flex items-end justify-between max-md:flex-col max-md:items-start max-md:gap-2">
         <div>
@@ -157,7 +157,7 @@ export default function Dashboard() {
           <p className="text-[12.5px] text-[#8a919e] mt-0.5">Voici un aperçu de vos performances · Semaine {getWeekNumber()}</p>
         </div>
         <div className="flex flex-col gap-1.5 items-end max-md:items-start max-md:w-full" data-tour="period-selector">
-          <div className="flex gap-1 bg-[#f4f5f7] border border-[#e3e6eb] rounded-[9px] p-[3px]">
+          <div className="flex flex-wrap gap-1 bg-[#f4f5f7] border border-[#e3e6eb] rounded-[9px] p-[3px]">
             {PERIODS.filter((p) => p.key !== "custom").map((p) => (
               <button key={p.key} onClick={() => { setPeriod(p.key); setShowCustom(false); }}
                 className={`px-3.5 py-[5px] rounded-[7px] text-[12px] font-medium cursor-pointer transition-all border-none whitespace-nowrap ${period === p.key ? "bg-white text-[#111318] font-semibold shadow-[0_1px_3px_rgba(16,24,40,0.06)]" : "bg-transparent text-[#8a919e] hover:text-[#3c4149]"}`}>

@@ -255,7 +255,7 @@ export default function AIAnalyste() {
 
   /* ── Render ── */
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem)] -mx-6 -my-5 bg-white">
+    <div className="flex flex-col h-[calc(100vh-3.5rem)] -mx-6 -my-5 bg-white overflow-x-hidden">
 
       {/* ══ HEADER ══ */}
       <div className="shrink-0 px-5 py-3 bg-white border-b border-[#e3e6eb] flex items-center justify-between">
@@ -299,7 +299,7 @@ export default function AIAnalyste() {
                 )}
 
                 {/* Content */}
-                <div className={`max-w-[80%] flex flex-col gap-1.5 ${msg.role === "user" ? "items-end" : ""}`}>
+                <div className={`max-w-[80%] max-sm:max-w-[92%] flex flex-col gap-1.5 ${msg.role === "user" ? "items-end" : ""}`}>
                   <div
                     className={`px-3.5 py-[11px] text-[13.5px] leading-relaxed ${
                       msg.role === "assistant"
@@ -403,7 +403,7 @@ export default function AIAnalyste() {
         </div>
 
         {/* ── CONTEXT PANEL ── */}
-        <div className="w-[320px] min-w-[320px] border-l border-[#e3e6eb] bg-white flex flex-col overflow-hidden">
+        <div className="w-[320px] min-w-[320px] border-l border-[#e3e6eb] bg-white flex flex-col overflow-hidden max-md:hidden">
 
           {/* Context header */}
           <div className="shrink-0 px-4 py-3.5 border-b border-[#e3e6eb] flex items-center justify-between">

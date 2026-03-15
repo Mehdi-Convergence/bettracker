@@ -183,7 +183,7 @@ export default function Campaign() {
   const inputCls = "w-full bg-white border border-[#e3e6eb] rounded-lg px-3 py-1.5 text-sm text-[#111318] focus:outline-none focus:ring-2 focus:ring-[#3b5bdb] focus:border-[#3b5bdb]";
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 overflow-x-hidden">
       {/* ── Header ── */}
       <div className="flex items-start justify-between">
         <div>
@@ -333,7 +333,7 @@ export default function Campaign() {
 
                   {/* KPI row */}
                   {cStats ? (
-                    <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[#e3e6eb]">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-3 border-t border-[#e3e6eb]">
                       <KpiCell label="ROI" value={`${cStats.roi_pct >= 0 ? "+" : ""}${cStats.roi_pct.toFixed(1)}%`}
                         color={cStats.roi_pct >= 0 ? GREEN : RED} />
                       <KpiCell label="Paris" value={`${cStats.total_bets}`} />
@@ -486,7 +486,7 @@ function CampaignKanban({ campaigns, campaignStats, onSelectCampaign }: {
             </div>
 
             {s ? (
-              <div className="grid grid-cols-3 gap-1 pt-2 border-t border-[#e3e6eb]">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 pt-2 border-t border-[#e3e6eb]">
                 <KpiCell label="ROI" value={`${s.roi_pct >= 0 ? "+" : ""}${s.roi_pct.toFixed(1)}%`}
                   color={s.roi_pct >= 0 ? GREEN : RED} />
                 <KpiCell label="Paris" value={`${s.total_bets}`} />
@@ -713,7 +713,7 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-xs font-medium text-[#8a919e] mb-2">Icône</label>
                   <div className="flex flex-wrap gap-1.5">
@@ -746,7 +746,7 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
           {/* ── STEP 2: Bankroll & Mise ── */}
           {step === 1 && (
             <>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Bankroll initiale (\u20AC)</label>
                   <input type="number" value={form.initial_bankroll}
@@ -763,7 +763,7 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
 
               <div>
                 <label className="block text-xs font-medium text-[#8a919e] mb-2">Stratégie de mise</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {STAKING_STRATEGIES.map((st) => (
                     <button key={st.key} onClick={() => setExtForm({ ...extForm, staking_strategy: st.key })}
                       className={`text-left p-3 rounded-xl border-2 transition-all cursor-pointer ${
@@ -778,7 +778,7 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-[#8a919e] mb-1.5">
                     {extForm.staking_strategy === "flat" ? "Mise (%)" : "Fraction"}
@@ -806,7 +806,7 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
                   <Shield size={14} className="text-red-500" />
                   <span className="text-sm font-semibold text-[#111318]">Protection du capital</span>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Stop-loss journalier (\u20AC)</label>
                     <input type="number" placeholder="désactivé" value={extForm.stop_loss_daily ?? ""}
@@ -841,7 +841,7 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
           {/* ── STEP 3: Filtres & Combis ── */}
           {step === 2 && (
             <>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-[#8a919e] mb-1.5">
                     Confiance min : <strong className="text-[#111318]">{(form.min_model_prob * 100).toFixed(0)}%</strong>
@@ -860,7 +860,7 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Cote min</label>
                   <input type="number" step="0.1" placeholder="tout" value={form.min_odds ?? ""}
@@ -899,7 +899,7 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label className="flex items-center gap-2 text-sm text-[#111318] cursor-pointer">
                   <input type="checkbox" checked={extForm.anti_duplicate}
                     onChange={(e) => setExtForm({ ...extForm, anti_duplicate: e.target.checked })}
@@ -924,7 +924,7 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
                   Mode Combis
                 </label>
                 {form.combo_mode && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Max legs</label>
                       <input type="number" min={2} max={4} value={form.combo_max_legs}
@@ -958,7 +958,7 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
           {/* ── STEP 4: Planning & Récap ── */}
           {step === 3 && (
             <>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Date de début</label>
                   <input type="date" value={extForm.start_date}

@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Plus, X, Loader2, Search, Layers, Download, Clock, CheckCircle2,
   XCircle, AlertCircle,
-  Trash2,
+  Trash2, ChevronDown, ChevronUp, SlidersHorizontal,
 } from "lucide-react";
 import {
   getPortfolioStats, getPortfolioBets, getCampaigns, createBet, aiScan,
@@ -122,6 +122,7 @@ export default function Portfolio() {
 
   // ── View state ──
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
+  const [filtersCollapsed, setFiltersCollapsed] = useState(window.innerWidth < 768);
 
   // Initialise la vue depuis les preferences utilisateur
   useEffect(() => {
@@ -492,31 +493,31 @@ export default function Portfolio() {
   }
 
   return (
-    <div className="flex flex-col gap-3.5 h-[calc(100vh-64px)]" style={{ animation: "fu .3s ease both" }}>
+    <div className="flex flex-col gap-3.5 h-[calc(100vh-64px)] overflow-x-hidden" style={{ animation: "fu .3s ease both" }}>
 
       {/* ══════ HEADER ══════ */}
-      <div className="flex items-end justify-between">
-        <div>
+      <div className="flex items-end justify-between gap-2 flex-wrap">
+        <div className="min-w-0">
           <h1 className="text-xl font-extrabold text-[#111318] tracking-tight">Tickets & Portfolio</h1>
-          <p className="text-[12.5px] text-[#8a919e] mt-0.5">Vue globale de tous vos paris, campagnes et hors campagne</p>
+          <p className="text-[12.5px] text-[#8a919e] mt-0.5 max-md:hidden">Vue globale de tous vos paris, campagnes et hors campagne</p>
         </div>
         <div className="flex items-center gap-2">
           {viewMode !== "kanban" && (
             <button onClick={() => exportCsv(periodBets, "tickets-export.csv")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-white text-[#8a919e] text-xs font-medium hover:border-[rgba(18,183,106,.2)] hover:text-[#12b76a] transition-colors cursor-pointer">
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-white text-[#8a919e] text-xs font-medium hover:border-[rgba(18,183,106,.2)] hover:text-[#12b76a] transition-colors cursor-pointer max-md:hidden">
               <Download size={12} /> Export CSV
             </button>
           )}
           <button data-tour="add-bet-btn" onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-[9px] bg-[#3b5bdb] text-white text-[13px] font-semibold shadow-[0_1px_3px_rgba(59,91,219,.3)] hover:bg-[#2f4ac7] transition-colors cursor-pointer">
-            <Plus size={13} /> Nouveau ticket
+            className="flex items-center gap-1.5 px-3 md:px-4 py-1.5 md:py-2 rounded-[9px] bg-[#3b5bdb] text-white text-[12px] md:text-[13px] font-semibold shadow-[0_1px_3px_rgba(59,91,219,.3)] hover:bg-[#2f4ac7] transition-colors cursor-pointer">
+            <Plus size={13} /> <span className="max-sm:hidden">Nouveau ticket</span><span className="sm:hidden">Ajouter</span>
           </button>
         </div>
       </div>
 
       {/* ══════ KPI STRIP ══════ */}
       {stats && (
-        <div data-tour="kpis" className="grid grid-cols-4 lg:grid-cols-8 gap-2.5" style={{ animation: "fu .3s ease both", animationDelay: ".03s" }}>
+        <div data-tour="kpis" className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2" style={{ animation: "fu .3s ease both", animationDelay: ".03s" }}>
           <KpiCard label="ROI global" value={`${stats.roi_pct >= 0 ? "+" : ""}${stats.roi_pct.toFixed(1)}%`}
             color={stats.roi_pct >= 0 ? C.green : C.red} sub="30 derniers jours" />
           {(() => {
@@ -564,46 +565,55 @@ export default function Portfolio() {
       )}
 
       {/* ══════ VIEW TABS + FILTERS ══════ */}
-      <div className="flex items-center justify-between gap-3 flex-wrap" style={{ animation: "fu .3s ease both", animationDelay: ".06s" }}>
-        {/* Tabs */}
-        <div data-tour="view-toggle" className="flex gap-0 bg-white border border-[#e3e6eb] rounded-[10px] p-1 w-fit">
-          {([
-            { id: "kanban" as const, label: "Kanban", icon: <Columns3Icon /> },
-            { id: "list" as const, label: "Liste / Historique", icon: <ListIcon /> },
-            { id: "camp" as const, label: "Par campagne", icon: <FlagIcon /> },
-          ] as const).map((tab) => (
-            <button key={tab.id} onClick={() => { setViewMode(tab.id); setPage(1); }}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-[7px] text-[13px] font-medium whitespace-nowrap transition-all cursor-pointer ${
-                viewMode === tab.id
-                  ? "bg-[#3b5bdb] text-white font-semibold shadow-[0_1px_4px_rgba(59,91,219,.25)]"
-                  : "text-[#8a919e] hover:text-[#3c4149]"
-              }`}>
-              {tab.icon} {tab.label}
-            </button>
-          ))}
+      <div className="flex flex-col gap-2" style={{ animation: "fu .3s ease both", animationDelay: ".06s" }}>
+        <div className="flex items-center justify-between gap-2 flex-wrap overflow-x-hidden">
+          {/* Tabs */}
+          <div data-tour="view-toggle" className="flex gap-0 bg-white border border-[#e3e6eb] rounded-[10px] p-1 w-fit overflow-x-auto max-w-full">
+            {([
+              { id: "kanban" as const, label: "Kanban", shortLabel: "Kanban", icon: <Columns3Icon /> },
+              { id: "list" as const, label: "Liste / Historique", shortLabel: "Liste", icon: <ListIcon /> },
+              { id: "camp" as const, label: "Par campagne", shortLabel: "Campagne", icon: <FlagIcon /> },
+            ] as const).map((tab) => (
+              <button key={tab.id} onClick={() => { setViewMode(tab.id); setPage(1); }}
+                className={`flex items-center gap-1 px-2.5 md:px-4 py-1.5 rounded-[7px] text-[12px] md:text-[13px] font-medium whitespace-nowrap transition-all cursor-pointer ${
+                  viewMode === tab.id
+                    ? "bg-[#3b5bdb] text-white font-semibold shadow-[0_1px_4px_rgba(59,91,219,.25)]"
+                    : "text-[#8a919e] hover:text-[#3c4149]"
+                }`}>
+                {tab.icon} <span className="md:hidden">{tab.shortLabel}</span><span className="max-md:hidden">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Collapse toggle for filters on mobile */}
+          <button onClick={() => setFiltersCollapsed(!filtersCollapsed)}
+            className="md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-white text-[12px] text-[#8a919e] font-medium cursor-pointer">
+            <SlidersHorizontal size={13} /> Filtres
+            {filtersCollapsed ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+          </button>
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-2 flex-nowrap">
-          <div data-tour="search-bar" className="relative min-w-[190px]">
+        {/* Filters — collapsible on mobile */}
+        <div className={`flex items-center gap-2 flex-wrap overflow-x-hidden ${filtersCollapsed ? "max-md:hidden" : ""}`}>
+          <div data-tour="search-bar" className="relative min-w-[140px] md:min-w-[190px] flex-1 md:flex-none">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#b0b7c3] pointer-events-none" />
             <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Match, joueur, équipe…"
+              placeholder="Match, equipe..."
               className="w-full pl-8 pr-3 py-1.5 border border-[#e3e6eb] rounded-lg bg-white text-[12.5px] text-[#111318] outline-none focus:border-[#3b5bdb] focus:shadow-[0_0_0_3px_rgba(59,91,219,.07)] transition-all placeholder:text-[#b0b7c3]" />
           </div>
           <select value={sportFilter} onChange={(e) => setSportFilter(e.target.value)}
-            className="px-2.5 py-1.5 border border-[#e3e6eb] rounded-lg bg-white text-[12.5px] text-[#3c4149] outline-none cursor-pointer">
-            <option value="all">Tous les sports</option>
-            <option value="football">⚽ Football</option>
-            <option value="tennis">🎾 Tennis</option>
+            className="px-2.5 py-1.5 border border-[#e3e6eb] rounded-lg bg-white text-[12px] md:text-[12.5px] text-[#3c4149] outline-none cursor-pointer">
+            <option value="all">Tous sports</option>
+            <option value="football">Football</option>
+            <option value="tennis">Tennis</option>
           </select>
           <select value={bankrollFilter} onChange={(e) => setBankrollFilter(e.target.value)}
-            className="px-2.5 py-1.5 border border-[#e3e6eb] rounded-lg bg-white text-[12.5px] text-[#3c4149] outline-none cursor-pointer">
+            className="px-2.5 py-1.5 border border-[#e3e6eb] rounded-lg bg-white text-[12px] md:text-[12.5px] text-[#3c4149] outline-none cursor-pointer max-sm:hidden">
             <option value="all">Toutes bankrolls</option>
             <option value="campaign">Campagnes</option>
             <option value="global">Bankroll globale</option>
           </select>
-          <div className="flex gap-0.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg p-0.5">
+          <div className="flex gap-0.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg p-0.5 overflow-x-auto max-w-full">
             {([
               { id: "all" as const, label: "Tous" },
               { id: "en_cours" as const, label: "En cours" },
@@ -613,7 +623,7 @@ export default function Portfolio() {
               { id: "expires" as const, label: "Expirés" },
             ] as const).map((pill) => (
               <button key={pill.id} onClick={() => setStatusFilter(pill.id)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
+                className={`px-2 md:px-2.5 py-1 rounded-md text-[11px] md:text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
                   statusFilter === pill.id
                     ? "bg-white text-[#111318] font-semibold shadow-sm"
                     : "text-[#8a919e] hover:text-[#3c4149]"
@@ -649,7 +659,7 @@ export default function Portfolio() {
       {viewMode === "list" && (
         <div className="flex flex-col gap-3 flex-1 min-h-0" style={{ animation: "fu .3s ease both" }}>
           {/* List KPIs */}
-          <div className="grid grid-cols-3 lg:grid-cols-6 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             <LKpi label="ROI période" value={`${listKpis.roi >= 0 ? "+" : ""}${listKpis.roi.toFixed(1)}%`} color={listKpis.roi >= 0 ? C.green : C.red} />
             <LKpi label="CLV moyen" value={listKpis.clv !== 0 ? `${listKpis.clv >= 0 ? "+" : ""}${(listKpis.clv * 100).toFixed(1)}%` : "—"} color={listKpis.clv >= 0 ? C.green : C.red} />
             <LKpi label="Taux réussite" value={`${listKpis.winRate.toFixed(1)}%`} />
@@ -659,7 +669,7 @@ export default function Portfolio() {
           </div>
 
           {/* Period + extra filters */}
-          <div className="flex gap-2 items-center flex-wrap">
+          <div className="flex gap-2 items-center flex-wrap overflow-x-hidden">
             <div data-tour="period-filters" className="flex gap-0.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg p-0.5">
               {(["7d", "30d", "90d", "custom"] as PeriodFilter[]).map((p) => (
                 <button key={p} onClick={() => { setPeriodFilter(p); setPage(1); }}
@@ -808,11 +818,11 @@ export default function Portfolio() {
 
       {/* ══════ PAR CAMPAGNE VIEW ══════ */}
       {viewMode === "camp" && (
-        <div className="grid gap-3" style={{ gridTemplateColumns: "260px 1fr", animation: "fu .3s ease both" }}>
+        <div className="flex flex-col md:grid gap-3" style={{ gridTemplateColumns: "260px 1fr", animation: "fu .3s ease both" }}>
           {/* Campaign sidebar */}
-          <div className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl overflow-hidden h-fit max-h-[calc(100vh-280px)] overflow-y-auto" style={{ boxShadow: SH_SM }}>
+          <div className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl overflow-hidden h-fit max-md:max-h-[200px] max-h-[calc(100vh-280px)] overflow-y-auto" style={{ boxShadow: SH_SM }}>
             <div className="px-4 py-3 border-b border-[#e3e6eb] text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">
-              Campagnes actives & archivées
+              Campagnes
             </div>
             {campaigns.map((c) => {
               const cBets = bets.filter((b) => b.campaign_id === c.id && (b.result === "won" || b.result === "lost"));
@@ -878,7 +888,7 @@ export default function Portfolio() {
                 <div className="text-[13px] font-bold mb-3 flex items-center gap-2">
                   <AlertCircle size={14} className="text-[#8a919e]" /> Tickets hors campagne
                 </div>
-                <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                   {(() => {
                     const hc = bets.filter((b) => !b.campaign_id);
                     const settled = hc.filter((b) => b.result === "won" || b.result === "lost");
@@ -926,7 +936,7 @@ export default function Portfolio() {
       {/* ══════ ADD TICKET MODAL ══════ */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowAddModal(false)}>
-          <div className="bg-white rounded-xl p-5 w-full max-w-2xl shadow-[0_12px_40px_rgba(16,24,40,.14)] space-y-4"
+          <div className="bg-white rounded-xl p-4 md:p-5 w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-3 md:mx-0 shadow-[0_12px_40px_rgba(16,24,40,.14)] space-y-4"
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold text-[#111318]">Nouveau ticket</h2>
@@ -1150,28 +1160,28 @@ export default function Portfolio() {
 
 function KpiCard({ label, value, color, sub }: { label: string; value: string; color?: string; sub?: string }) {
   return (
-    <div className="bg-white border-[1.5px] border-[#e3e6eb] rounded-[10px] px-3.5 py-2.5" style={{ boxShadow: SH_SM }}>
-      <div className="text-[10.5px] text-[#8a919e] truncate">{label}</div>
-      <div className="text-[17px] font-extrabold tracking-tight font-[var(--font-mono)]" style={{ color: color || "#111318" }}>{value}</div>
-      {sub && <div className="text-[10px] text-[#b0b7c3] mt-0.5">{sub}</div>}
+    <div className="bg-white border-[1.5px] border-[#e3e6eb] rounded-[10px] px-2.5 md:px-3.5 py-2 md:py-2.5 text-center min-w-0" style={{ boxShadow: SH_SM }}>
+      <div className="text-[10px] md:text-[10.5px] text-[#8a919e] leading-tight">{label}</div>
+      <div className="text-[15px] md:text-[17px] font-extrabold tracking-tight font-[var(--font-mono)]" style={{ color: color || "#111318" }}>{value}</div>
+      {sub && <div className="text-[9px] md:text-[10px] text-[#b0b7c3] mt-0.5 truncate">{sub}</div>}
     </div>
   );
 }
 
 function LKpi({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="bg-white border-[1.5px] border-[#e3e6eb] rounded-[10px] px-3.5 py-2.5" style={{ boxShadow: SH_SM }}>
-      <div className="text-[10.5px] text-[#8a919e] mb-0.5">{label}</div>
-      <div className="text-[16px] font-extrabold font-[var(--font-mono)] tracking-tight" style={{ color: color || "#111318" }}>{value}</div>
+    <div className="bg-white border-[1.5px] border-[#e3e6eb] rounded-[10px] px-2.5 md:px-3.5 py-2 md:py-2.5 text-center min-w-0" style={{ boxShadow: SH_SM }}>
+      <div className="text-[10px] md:text-[10.5px] text-[#8a919e] mb-0.5 leading-tight">{label}</div>
+      <div className="text-[14px] md:text-[16px] font-extrabold font-[var(--font-mono)] tracking-tight" style={{ color: color || "#111318" }}>{value}</div>
     </div>
   );
 }
 
 function CmdStat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="text-center p-2 bg-[#f4f5f7] rounded-lg">
-      <div className="text-[15px] font-extrabold font-[var(--font-mono)] tracking-tight" style={{ color: color || "#111318" }}>{value}</div>
-      <div className="text-[10px] text-[#8a919e] mt-0.5">{label}</div>
+    <div className="text-center p-2 bg-[#f4f5f7] rounded-lg min-w-0">
+      <div className="text-[13px] md:text-[15px] font-extrabold font-[var(--font-mono)] tracking-tight" style={{ color: color || "#111318" }}>{value}</div>
+      <div className="text-[9px] md:text-[10px] text-[#8a919e] mt-0.5 leading-tight">{label}</div>
     </div>
   );
 }

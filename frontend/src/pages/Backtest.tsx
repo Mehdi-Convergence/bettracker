@@ -378,9 +378,9 @@ export default function Backtest() {
     s === "flat" ? "Fixe" : s === "half_kelly" ? "½ Kelly" : s === "pct_bankroll" ? "% BK" : "Kelly Dyn.";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-hidden">
       {/* ── Header ── */}
-      <div className="flex items-end justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h1 className="text-xl font-extrabold text-[#111318] tracking-tight">Backtest</h1>
           <p className="text-[12.5px] text-[#8a919e] mt-0.5">
@@ -409,7 +409,7 @@ export default function Backtest() {
 
       {/* ── Params Card ── */}
       <div className={cardCls} data-tour="params-card">
-        <div className="px-5 py-3.5 border-b border-[#e3e6eb] flex items-center justify-between">
+        <div className="px-5 py-3.5 border-b border-[#e3e6eb] flex flex-wrap items-center justify-between gap-2">
           <div className="text-[13.5px] font-bold flex items-center gap-2">
             <FlaskConical size={15} style={{ color: ACCENT }} />
             Paramètres de simulation
@@ -445,7 +445,7 @@ export default function Backtest() {
           {/* ── Quick mode ── */}
           {mode === "quick" && (
             <>
-              <div className="grid grid-cols-3 gap-3.5 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-4">
                 <div>
                   <label className={labelCls}>Sport</label>
                   <div className="flex gap-1.5 flex-wrap">
@@ -472,7 +472,7 @@ export default function Backtest() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3.5 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-4">
                 <div>
                   <label className={labelCls}>Edge minimum</label>
                   <div className="flex gap-1.5">
@@ -489,7 +489,7 @@ export default function Backtest() {
                 </div>
                 <div>
                   <label className={labelCls}>Stratégie de mise</label>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-3">
                     {STAKING_OPTIONS.map((so) => (
                       <button key={so.key} onClick={() => set({ staking_strategy: so.key })}
                         className={`border-2 rounded-lg py-2 px-1 text-center transition-all cursor-pointer ${
@@ -533,7 +533,7 @@ export default function Backtest() {
                   <ChevronDown size={13} className={`text-[#8a919e] transition-transform ${openSections.filters ? "rotate-180" : ""}`} />
                 </button>
                 {openSections.filters && (
-                  <div className="p-4 grid grid-cols-3 gap-3">
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     <div>
                       <label className={labelCls}>Confiance min</label>
                       <div className="flex items-center gap-2.5">
@@ -601,7 +601,7 @@ export default function Backtest() {
                   <ChevronDown size={13} className={`text-[#8a919e] transition-transform ${openSections.bankroll ? "rotate-180" : ""}`} />
                 </button>
                 {openSections.bankroll && (
-                  <div className="p-4 grid grid-cols-3 gap-3">
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     <div>
                       <label className={labelCls}>Bankroll de départ (€)</label>
                       <input type="number" className={inputCls} value={p.initial_bankroll}
@@ -670,7 +670,7 @@ export default function Backtest() {
                       <span className="text-[13px] font-medium">{p.combo_mode ? "Combis activés" : "Simples uniquement"}</span>
                     </div>
                     {p.combo_mode && (
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                           <label className={labelCls}>Sélections min</label>
                           <input type="number" min={2} className={inputCls} value={2} readOnly />
@@ -694,7 +694,7 @@ export default function Backtest() {
           )}
 
           {/* ── Launch bar ── */}
-          <div className="flex items-center justify-between pt-4 border-t border-[#e3e6eb] mt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-[#e3e6eb] mt-4">
             <div className="text-xs text-[#8a919e] flex flex-wrap gap-x-3 gap-y-0.5">
               {[...sports].map((s) => {
                 const cfg: Record<string, { emoji: string; label: string; train: string; test: string }> = {
@@ -746,7 +746,7 @@ export default function Backtest() {
           ))}
 
           {/* KPI Strip */}
-          <div className="grid grid-cols-6 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
             {[
               { label: "ROI simulé", val: formatPct(activeResult.metrics.roi_pct), color: activeResult.metrics.roi_pct >= 0 ? GREEN : RED },
               { label: "Taux réussite", val: `${(activeResult.metrics.win_rate * 100).toFixed(1)}%` },
@@ -844,7 +844,7 @@ export default function Backtest() {
 
           {/* Bets Table */}
           <div className={`${cardCls} overflow-hidden`}>
-            <div className="px-4 py-3 border-b border-[#e3e6eb] flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-[#e3e6eb] flex flex-wrap items-center justify-between gap-2">
               <div className="text-[13px] font-bold">
                 Paris simulés : {results[activeStrat]?.label}{" "}
                 <span className="text-[12px] text-[#8a919e] font-normal">({activeResult.metrics.total_bets} total)</span>
@@ -919,7 +919,7 @@ export default function Backtest() {
           </div>
 
           {/* Actions bar */}
-          <div className={`${cardCls} px-5 py-4 flex items-center justify-between`} style={{ borderColor: `${ACCENT}30` }}>
+          <div className={`${cardCls} px-5 py-4 flex flex-wrap items-center justify-between gap-3`} style={{ borderColor: `${ACCENT}30` }}>
             <div>
               <div className="text-[13.5px] font-bold">Vous aimez ces résultats ?</div>
               <div className="text-xs text-[#8a919e] mt-0.5">Créez une campagne avec exactement ces paramètres, pré-remplie automatiquement.</div>
@@ -971,7 +971,7 @@ export default function Backtest() {
       {/* ── Save Modal ── */}
       {showSaveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowSaveModal(false)}>
-          <div className="bg-white rounded-xl p-6 w-[400px] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-xl p-6 w-[calc(100vw-2rem)] max-w-[400px] shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[15px] font-bold mb-3">Sauvegarder ce backtest</h3>
             <input type="text" className={inputCls}
               placeholder="Nom du backtest (ex: Football Edge 5% · ½ Kelly)"

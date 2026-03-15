@@ -254,7 +254,7 @@ export default function CampaignDetail() {
   const isArchived = campaign.status === "archived";
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 overflow-x-hidden">
       {/* ═══════════════════════════════════════════ */}
       {/* STATUS BANNERS */}
       {/* ═══════════════════════════════════════════ */}
@@ -571,7 +571,7 @@ export default function CampaignDetail() {
         </button>
         {showParams && (
           <div className="px-4 pb-4 border-t border-[#e3e6eb]">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-4">
               <ParamBlock title="Identité">
                 <ParamRow label="Nom" value={campaign.name} />
                 <ParamRow label="Sport" value="Football" />
