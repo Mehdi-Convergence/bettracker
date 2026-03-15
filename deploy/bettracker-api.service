@@ -17,13 +17,9 @@ StandardError=journal
 SyslogIdentifier=bettracker-api
 NoNewPrivileges=yes
 ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/opt/bettracker
+ReadWritePaths=/opt/bettracker /home/ubuntu
 PrivateTmp=yes
-ProtectKernelTunables=yes
-ProtectKernelModules=yes
 ProtectControlGroups=yes
-RestrictSUIDSGID=yes
 UMask=0077
 
 [Install]
