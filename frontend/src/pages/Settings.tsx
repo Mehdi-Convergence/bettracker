@@ -126,7 +126,8 @@ export default function Settings() {
   const [profileLoading, setProfileLoading] = useState(false);
 
   // Toggles (local state for now)
-  const [publicProfile, setPublicProfile] = useState(false);
+  // TODO: public_profile n'existe pas dans UserPreferences — toggle desactive jusqu'a implementation backend
+  const [publicProfile] = useState(false);
   const [weeklyDigest, setWeeklyDigest] = useState(true);
   const [matchAlerts, setMatchAlerts] = useState(true);
 
@@ -422,12 +423,16 @@ export default function Settings() {
                   <Bell size={13} /> Préférences & notifications
                 </div>
                 <div className="flex flex-col">
+                  {/* TODO: public_profile n'existe pas encore dans UserPreferences backend — a connecter via updatePreferences() quand le champ sera ajoute */}
                   <div className="flex items-center gap-3 py-3 border-b border-[#e3e6eb]">
                     <div className="flex-1">
                       <div className="text-[13.5px] font-medium text-[#111318]">Profil public</div>
                       <div className="text-[12px] text-[#8a919e] mt-0.5">Pseudo et ROI visibles par la communauté</div>
                     </div>
-                    <Toggle checked={publicProfile} onChange={setPublicProfile} />
+                    <div className="flex items-center gap-2">
+                      <Toggle checked={publicProfile} onChange={() => {}} disabled />
+                      <span className="text-[11px] text-[#8a919e] whitespace-nowrap">Bientot disponible</span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 py-3 border-b border-[#e3e6eb]">
                     <div className="flex-1">
@@ -508,7 +513,7 @@ export default function Settings() {
                       value={newPwd}
                       onChange={(e) => setNewPwd(e.target.value)}
                       className={inputWithIconCls + " pr-9"}
-                      placeholder="Min. 10 car."
+                      placeholder="Min. 8 car."
                     />
                     <button type="button" onClick={() => togglePwd("new")} className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[#b0b7c3] hover:text-[#111318] transition-colors p-0">
                       {showPwd.new ? <EyeOff size={14} /> : <Eye size={14} />}

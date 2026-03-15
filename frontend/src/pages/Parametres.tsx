@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { toPng } from "html-to-image";
 import {
   DollarSign,
   Bell,
@@ -79,6 +80,8 @@ export default function Parametres() {
   const [pendingBets, setPendingBets] = useState<Bet[]>([]);
   const [activeSection, setActiveSection] = useState<SectionId>("bankroll");
   const [showShareModal, setShowShareModal] = useState(false);
+  const [shareAction, setShareAction] = useState<"copy" | "download" | "tweet" | null>(null);
+  const ticketPreviewRef = useRef<HTMLDivElement>(null);
 
   // 2FA states
   const [twoFaStep, setTwoFaStep] = useState<"idle" | "setup" | "disable">("idle");
@@ -247,6 +250,52 @@ export default function Parametres() {
 
   // Share preview pseudo
   const pseudo = (getVal("share_pseudo") as string) || `@${user?.display_name?.replace(/\s+/g, "") ?? "pseudo"}`;
+
+  const tweetText = `✅ Sinner vs Fritz : Dom @ 1.65\nEdge : +5.8% | CLV : +3.8%\n+19.50€\n\n#ValueBetting #BetTracker`;
+
+  const handleCopyImage = async () => {
+    if (!ticketPreviewRef.current) return;
+    setShareAction("copy");
+    try {
+      const dataUrl = await toPng(ticketPreviewRef.current, { cacheBust: true, pixelRatio: 2 });
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    } catch {
+      // Fallback : copie le texte du ticket
+      try {
+        await navigator.clipboard.writeText(tweetText);
+      } catch {
+        // silently ignored
+      }
+    } finally {
+      setShareAction(null);
+    }
+  };
+
+  const handleDownloadPng = async () => {
+    if (!ticketPreviewRef.current) return;
+    setShareAction("download");
+    try {
+      const dataUrl = await toPng(ticketPreviewRef.current, { cacheBust: true, pixelRatio: 2 });
+      const link = document.createElement("a");
+      link.download = `bettracker-ticket-sinner-fritz.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch {
+      // silently ignored
+    } finally {
+      setShareAction(null);
+    }
+  };
+
+  const handleShareX = () => {
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`,
+      "_blank",
+      "noopener,noreferrer,width=600,height=450"
+    );
+  };
 
   return (
     <div className="animate-fade-up">
@@ -938,7 +987,7 @@ export default function Parametres() {
               {/* Preview side */}
               <div className="shrink-0 w-[260px]">
                 <div className="text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2.5">Aperçu</div>
-                <div className="rounded-xl p-[18px_20px] text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]" style={{ background: "linear-gradient(145deg, #0f172a, #1a2540)" }}>
+                <div ref={ticketPreviewRef} className="rounded-xl p-[18px_20px] text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]" style={{ background: "linear-gradient(145deg, #0f172a, #1a2540)" }}>
                   <div className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded bg-[rgba(59,91,219,0.3)] text-[#7eb8ff] font-[var(--font-mono)] uppercase tracking-wider mb-3">
                     🎾 ATP · Indian Wells QF
                   </div>
@@ -1016,17 +1065,28 @@ export default function Parametres() {
 
                 <div className="text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">Actions</div>
                 <div className="grid grid-cols-3 gap-2">
-                  <button className="p-2.5 rounded-[9px] border-[1.5px] border-[#e3e6eb] bg-transparent cursor-pointer flex flex-col items-center gap-1.5 transition-all hover:border-[rgba(59,91,219,0.18)] hover:bg-[rgba(59,91,219,0.07)]">
+                  <button
+                    onClick={handleCopyImage}
+                    disabled={shareAction === "copy"}
+                    className="p-2.5 rounded-[9px] border-[1.5px] border-[#e3e6eb] bg-transparent cursor-pointer flex flex-col items-center gap-1.5 transition-all hover:border-[rgba(59,91,219,0.18)] hover:bg-[rgba(59,91,219,0.07)] disabled:opacity-50"
+                  >
                     <span className="text-[20px]">📋</span>
-                    <span className="text-[12px] font-semibold text-[#3c4149]">Copier l'image</span>
+                    <span className="text-[12px] font-semibold text-[#3c4149]">{shareAction === "copy" ? "Copie..." : "Copier l'image"}</span>
                     <span className="text-[10.5px] text-[#8a919e]">PNG presse-papier</span>
                   </button>
-                  <button className="p-2.5 rounded-[9px] border-[1.5px] border-[#e3e6eb] bg-transparent cursor-pointer flex flex-col items-center gap-1.5 transition-all hover:border-[rgba(59,91,219,0.18)] hover:bg-[rgba(59,91,219,0.07)]">
+                  <button
+                    onClick={handleDownloadPng}
+                    disabled={shareAction === "download"}
+                    className="p-2.5 rounded-[9px] border-[1.5px] border-[#e3e6eb] bg-transparent cursor-pointer flex flex-col items-center gap-1.5 transition-all hover:border-[rgba(59,91,219,0.18)] hover:bg-[rgba(59,91,219,0.07)] disabled:opacity-50"
+                  >
                     <span className="text-[20px]">⬇️</span>
-                    <span className="text-[12px] font-semibold text-[#3c4149]">Télécharger</span>
+                    <span className="text-[12px] font-semibold text-[#3c4149]">{shareAction === "download" ? "Export..." : "Télécharger"}</span>
                     <span className="text-[10.5px] text-[#8a919e]">Fichier PNG local</span>
                   </button>
-                  <button className="p-2.5 rounded-[9px] border-[1.5px] border-[rgba(0,0,0,0.15)] bg-black cursor-pointer flex flex-col items-center gap-1.5 transition-all hover:bg-[#1a1a1a]">
+                  <button
+                    onClick={handleShareX}
+                    className="p-2.5 rounded-[9px] border-[1.5px] border-[rgba(0,0,0,0.15)] bg-black cursor-pointer flex flex-col items-center gap-1.5 transition-all hover:bg-[#1a1a1a]"
+                  >
                     <span className="text-[18px] font-black font-[var(--font-mono)]">𝕏</span>
                     <span className="text-[12px] font-semibold text-white/80">Partager sur X</span>
                     <span className="text-[10.5px] text-white/50">Image + texte pré-rempli</span>
