@@ -247,11 +247,6 @@ function WelcomeScreen({ onSend }: { onSend: (text: string) => void }) {
 export default function AIAnalyste() {
   const { user } = useAuth();
 
-  // Admin only for now
-  if (user && !user.is_admin) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   const userInitials = useMemo(() => {
     if (!user?.display_name) return "U";
     return user.display_name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -428,6 +423,11 @@ export default function AIAnalyste() {
       e.preventDefault();
       handleSend();
     }
+  }
+
+  // Admin only for now
+  if (user && !user.is_admin) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   /* ── Render ── */
