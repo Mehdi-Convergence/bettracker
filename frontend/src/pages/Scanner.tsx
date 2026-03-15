@@ -254,7 +254,7 @@ export default function Scanner() {
             if (r.sport) cacheMap[r.sport] = { cached: r.cached, cached_at: r.cached_at };
           }
           setSportCacheInfo(cacheMap);
-          setHasScanned(matches.length > 0);
+          setHasScanned(true);
         }
       }
 
