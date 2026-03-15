@@ -24,10 +24,10 @@ SPORTS = ["football", "tennis", "nba", "rugby", "mlb", "pmu"]
 
 SCAN_INTERVALS: dict[str, int] = {
     "football": 3600,
-    "tennis": 3600,
-    "nba": 3600,
-    "rugby": 3600,
-    "mlb": 3600,
+    "tennis": 9000,
+    "nba": 9000,
+    "rugby": 9000,
+    "mlb": 9000,
     "pmu": 1800,
 }
 

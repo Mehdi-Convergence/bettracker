@@ -184,8 +184,8 @@ def _save_odds_snapshots(all_matches: list, sport: str) -> None:
 # API-Football free: 100 req/day — one full scan ≈ 150-200 requests
 # Increase these when upgrading to Pro ($20/mo = 7500 req/day).
 FOOTBALL_SCAN_INTERVAL = 60 * 60   # 1h (safe for free tier)
-TENNIS_SCAN_INTERVAL = 60 * 60     # 1h
-SCAN_CACHE_TTL = 3600              # 1h (match intervals)
+TENNIS_SCAN_INTERVAL = 60 * 150    # 2h30 (Odds API credit budget)
+SCAN_CACHE_TTL = 9000              # 2h30 (match intervals)
 DATA_SCORE_MIN = 0.40
 
 
@@ -1009,7 +1009,7 @@ async def run_tennis_scan():
 # NBA scan
 # ---------------------------------------------------------------------------
 
-NBA_SCAN_INTERVAL = 60 * 60  # 1h
+NBA_SCAN_INTERVAL = 60 * 150  # 2h30 (Odds API credit budget)
 
 
 def _load_nba_model():
@@ -1301,7 +1301,7 @@ async def run_nba_scan():
 # Rugby scan
 # ---------------------------------------------------------------------------
 
-RUGBY_SCAN_INTERVAL = 60 * 60  # 1h
+RUGBY_SCAN_INTERVAL = 60 * 150  # 2h30 (Odds API credit budget)
 
 
 def _load_rugby_model():
@@ -1572,7 +1572,7 @@ async def run_rugby_scan():
 # MLB scan
 # ---------------------------------------------------------------------------
 
-MLB_SCAN_INTERVAL = 60 * 60  # 1h
+MLB_SCAN_INTERVAL = 60 * 150  # 2h30 (Odds API credit budget)
 _MLB_FILE_CACHE_DIR = Path("data/cache/mlb")
 
 
@@ -2191,6 +2191,7 @@ async def main():
         ("NBA", run_nba_scan),
         ("rugby", run_rugby_scan),
         ("MLB", run_mlb_scan),
+        ("PMU", run_pmu_scan),
     ]:
         logger.info("Running initial %s scan...", scan_name)
         try:
@@ -2247,7 +2248,8 @@ async def main():
             except Exception as exc:
                 logger.error("PMU scan error: %s", exc)
 
-    logger.info("Worker running — football/tennis/nba/rugby/mlb/pmu every %ds", FOOTBALL_SCAN_INTERVAL)
+    logger.info("Worker running — football every %ds, tennis/nba/rugby/mlb every %ds, pmu every %ds",
+                 FOOTBALL_SCAN_INTERVAL, TENNIS_SCAN_INTERVAL, PMU_SCAN_INTERVAL)
     await asyncio.gather(_football_loop(), _tennis_loop(), _nba_loop(), _rugby_loop(), _mlb_loop(), _pmu_loop())
 
 
