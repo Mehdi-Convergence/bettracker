@@ -98,7 +98,7 @@ class TennisClient:
         timeframe: str = "48h",
         force: bool = False,
         markets: str = "h2h",
-        regions: str = "eu,uk",
+        regions: str = "eu,uk,us,us2,au",
     ) -> dict:
         """Return normalized tennis matches dict with odds.
 
@@ -165,19 +165,36 @@ class TennisClient:
             # Small delay to be polite (still counts 1 req per tournament)
             time.sleep(0.05)
 
-        # --- Enrich with Sofascore stats ---
-        try:
-            from src.data.sofascore_client import SofascoreClient
-            logger.info("Starting Sofascore enrichment for %d matches...", len(all_matches))
-            sofa = SofascoreClient()
-            today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            sofa.enrich_matches(all_matches, date_str=today_str)
-            sofa.close()
-            enriched_count = sum(1 for m in all_matches if m.get("p1_ranking"))
-            logger.info("Sofascore enrichment done: %d/%d enriched", enriched_count, len(all_matches))
-        except Exception as e:
-            import traceback
-            logger.warning("Sofascore enrichment failed (non-blocking): %s\n%s", e, traceback.format_exc())
+        # --- Enrich with Sackmann CSV stats (replaces SofaScore which returns 403) ---
+        from src.config import settings as _settings
+        if _settings.USE_SACKMANN_TENNIS:
+            try:
+                from src.data.sackmann_client import SackmannClient
+                logger.info("Starting Sackmann enrichment for %d matches...", len(all_matches))
+                sackmann = SackmannClient()
+                sackmann.enrich_matches(all_matches)
+                enriched_count = sum(1 for m in all_matches if m.get("p1_ranking"))
+                logger.info("Sackmann enrichment done: %d/%d enriched", enriched_count, len(all_matches))
+            except Exception as e:
+                import traceback
+                logger.warning("Sackmann enrichment failed, trying SofaScore fallback: %s\n%s", e, traceback.format_exc())
+                try:
+                    from src.data.sofascore_client import SofascoreClient
+                    sofa = SofascoreClient()
+                    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                    sofa.enrich_matches(all_matches, date_str=today_str)
+                    sofa.close()
+                except Exception:
+                    pass
+        else:
+            try:
+                from src.data.sofascore_client import SofascoreClient
+                sofa = SofascoreClient()
+                today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                sofa.enrich_matches(all_matches, date_str=today_str)
+                sofa.close()
+            except Exception as e:
+                logger.warning("Sofascore enrichment failed (non-blocking): %s", e)
 
         duration = round(time.time() - start, 2)
         logger.info("Tennis scan complete: %d matches from %d tournaments in %.1fs",

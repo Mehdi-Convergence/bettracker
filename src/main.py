@@ -17,6 +17,7 @@ from src.api.notifications import router as notifications_router
 from src.api.feedback import router as feedback_router
 from src.api.stripe_router import router as stripe_router
 from src.api.ai_analyste import router as ai_router
+from src.api.admin import router as admin_router
 
 from src.config import settings
 from src.rate_limit import limiter
@@ -74,3 +75,4 @@ app.include_router(notifications_router, prefix="/api")
 app.include_router(feedback_router, prefix="/api")
 app.include_router(stripe_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")

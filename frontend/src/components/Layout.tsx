@@ -17,6 +17,7 @@ import {
   X,
   Menu,
   BarChart2,
+  ShieldAlert,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { BreadcrumbProvider, useBreadcrumb } from "@/contexts/BreadcrumbContext";
@@ -334,6 +335,25 @@ export default function Layout() {
             <MessageCircle size={collapsed ? 18 : 16} className="shrink-0" />
             {!collapsed && "IA Analyste"}
           </NavLink>
+          {/* Admin link — visible aux admins uniquement */}
+          {user?.is_admin && (
+            <>
+              <div className="h-px mx-2 my-1.5" style={{ background: SB.border }} />
+              <NavLink
+                to="/admin"
+                title={collapsed ? "Admin" : undefined}
+                className={`flex items-center ${collapsed ? "justify-center" : "gap-[9px]"} ${collapsed ? "px-0 py-2" : "px-2.5 py-2"} rounded-lg text-[13.5px] font-semibold no-underline`}
+                style={{
+                  background: "rgba(240,68,56,0.10)",
+                  color: "#f04438",
+                  border: "1px solid rgba(240,68,56,0.18)",
+                }}
+              >
+                <ShieldAlert size={collapsed ? 18 : 16} className="shrink-0" />
+                {!collapsed && "Admin"}
+              </NavLink>
+            </>
+          )}
         </nav>
 
         {/* Bottom */}

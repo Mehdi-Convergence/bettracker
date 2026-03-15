@@ -27,6 +27,9 @@ class User(Base, TimestampMixin):
     stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
+    # Admin
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+
     # Onboarding & Tour
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     visited_modules: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, default="")

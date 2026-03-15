@@ -61,6 +61,14 @@ class Settings(BaseSettings):
     AI_PRO_DAILY_LIMIT: int = 50
     AI_PREMIUM_DAILY_LIMIT: int = 200
 
+    # Data source toggles (migration incrementale)
+    USE_SACKMANN_TENNIS: bool = True   # Phase 1: Sackmann CSV replaces SofaScore
+    USE_ESPN_NBA: bool = True          # Phase 2: ESPN replaces API-Sports Basketball
+    USE_STATSAPI_MLB: bool = True      # Phase 3: statsapi replaces API-Sports Baseball
+
+    # Odds API budget (daily limiter)
+    ODDS_API_DAILY_BUDGET: int = 75    # Max requests per day
+
     # Auth / JWT (no default — MUST be set via env or .env)
     JWT_SECRET_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"

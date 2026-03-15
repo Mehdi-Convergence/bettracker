@@ -1,0 +1,560 @@
+import { useEffect, useState, useCallback } from "react";
+import {
+  Activity,
+  Database,
+  Cpu,
+  Clock,
+  RefreshCw,
+  AlertTriangle,
+  XCircle,
+  CheckCircle,
+  Zap,
+  BarChart2,
+  TrendingUp,
+  Users,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Navigate } from "react-router-dom";
+import {
+  getAdminSystem,
+  getAdminScans,
+  getAdminQuota,
+  getAdminAnalytics,
+  getAdminAlerts,
+  getAdminErrors,
+  forceScan,
+} from "@/services/api";
+import type {
+  AdminSystemStatus,
+  AdminScanStatus,
+  AdminQuota,
+  AdminSportAnalytics,
+  AdminAlert,
+  AdminError,
+} from "@/types";
+
+/* ── helpers ── */
+function fmtTs(ts: string | null): string {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  return d.toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtAge(minutes: number | null): string {
+  if (minutes === null) return "—";
+  if (minutes < 60) return `${Math.round(minutes)} min`;
+  return `${(minutes / 60).toFixed(1)} h`;
+}
+
+function scanStatusColor(status: AdminScanStatus["status"]): { bg: string; text: string; dot: string } {
+  if (status === "ok") return { bg: "rgba(18,183,106,0.08)", text: "#12b76a", dot: "#12b76a" };
+  if (status === "warning") return { bg: "rgba(247,144,9,0.08)", text: "#f79009", dot: "#f79009" };
+  return { bg: "rgba(240,68,56,0.08)", text: "#f04438", dot: "#f04438" };
+}
+
+function alertSeverityConfig(severity: AdminAlert["severity"]): { bg: string; text: string; label: string } {
+  if (severity === "CRITICAL") return { bg: "rgba(240,68,56,0.1)", text: "#f04438", label: "CRITIQUE" };
+  if (severity === "WARNING") return { bg: "rgba(247,144,9,0.1)", text: "#f79009", label: "ALERTE" };
+  return { bg: "rgba(59,91,219,0.08)", text: "#3b5bdb", label: "INFO" };
+}
+
+/* ── Section Card wrapper ── */
+function SectionCard({ title, icon, children, action }: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-[#e3e6eb]">
+        <div className="flex items-center gap-2 text-[13px] font-bold text-[#111318]">
+          {icon}
+          {title}
+        </div>
+        {action}
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  );
+}
+
+/* ── Status dot ── */
+function StatusDot({ ok }: { ok: boolean }) {
+  return (
+    <span
+      className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+      style={{ background: ok ? "#12b76a" : "#f04438" }}
+    />
+  );
+}
+
+/* ══════════════════════════════════════════════
+   ADMIN PAGE
+   ══════════════════════════════════════════════ */
+export default function Admin() {
+  const { user } = useAuth();
+
+  // Guard: only admins
+  if (user && !user.is_admin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <AdminDashboard />;
+}
+
+function AdminDashboard() {
+  const [system, setSystem] = useState<AdminSystemStatus | null>(null);
+  const [scans, setScans] = useState<AdminScanStatus[]>([]);
+  const [quota, setQuota] = useState<AdminQuota | null>(null);
+  const [analytics, setAnalytics] = useState<AdminSportAnalytics[]>([]);
+  const [alerts, setAlerts] = useState<AdminAlert[]>([]);
+  const [errors, setErrors] = useState<AdminError[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [forcingScans, setForcingScans] = useState<Record<string, boolean>>({});
+  const [forceMessages, setForceMessages] = useState<Record<string, string>>({});
+  const [errorsExpanded, setErrorsExpanded] = useState(false);
+
+  const load = useCallback(async () => {
+    const [sys, sc, q, an, al, er] = await Promise.allSettled([
+      getAdminSystem(),
+      getAdminScans(),
+      getAdminQuota(),
+      getAdminAnalytics(),
+      getAdminAlerts(),
+      getAdminErrors(),
+    ]);
+    if (sys.status === "fulfilled") setSystem(sys.value);
+    if (sc.status === "fulfilled") setScans(sc.value);
+    if (q.status === "fulfilled") setQuota(q.value);
+    if (an.status === "fulfilled") setAnalytics(an.value);
+    if (al.status === "fulfilled") setAlerts(al.value);
+    if (er.status === "fulfilled") setErrors(er.value);
+    setLoading(false);
+    setLastRefresh(new Date());
+  }, []);
+
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 60_000);
+    return () => clearInterval(interval);
+  }, [load]);
+
+  async function handleForceScan(sport: string) {
+    setForcingScans((prev) => ({ ...prev, [sport]: true }));
+    setForceMessages((prev) => ({ ...prev, [sport]: "" }));
+    try {
+      const res = await forceScan(sport);
+      setForceMessages((prev) => ({ ...prev, [sport]: res.message || "Scan lancé" }));
+      setTimeout(() => load(), 3000);
+    } catch (err) {
+      setForceMessages((prev) => ({
+        ...prev,
+        [sport]: err instanceof Error ? err.message : "Erreur",
+      }));
+    } finally {
+      setForcingScans((prev) => ({ ...prev, [sport]: false }));
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[300px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3b5bdb]" />
+      </div>
+    );
+  }
+
+  const quotaPct = quota ? Math.round((quota.used_today / quota.limit_daily) * 100) : 0;
+  const quotaMonthPct = quota ? Math.round((quota.used_month / quota.limit_month) * 100) : 0;
+  const quotaColor = quotaPct >= 90 ? "#f04438" : quotaPct >= 70 ? "#f79009" : "#12b76a";
+
+  const visibleErrors = errorsExpanded ? errors : errors.slice(0, 5);
+
+  return (
+    <div className="flex flex-col gap-5 animate-fade-up">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-[20px] font-extrabold tracking-tight text-[#111318]">Admin Dashboard</h1>
+          <p className="text-[12.5px] text-[#8a919e] mt-0.5">
+            Derniere actualisation : {lastRefresh.toLocaleTimeString("fr-FR")} — rafraichissement auto toutes les 60s
+          </p>
+        </div>
+        <button
+          onClick={() => { setLoading(true); load(); }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#f4f5f7] border border-[#e3e6eb] text-[13px] font-medium text-[#3c4149] hover:bg-[#e8eaed] transition-all cursor-pointer"
+        >
+          <RefreshCw size={13} />
+          Actualiser
+        </button>
+      </div>
+
+      {/* ── Section 1: System Status ── */}
+      <SectionCard title="Etat du systeme" icon={<Activity size={14} className="text-[#3b5bdb]" />}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Redis */}
+          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb] bg-[#fafbfc]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#3c4149]">
+                <Zap size={13} className="text-[#f79009]" />
+                Redis
+              </div>
+              <StatusDot ok={system?.redis.ok ?? false} />
+            </div>
+            <div className="font-mono text-[11px] text-[#8a919e]">
+              {system?.redis.ok ? (
+                <>latence : <span className="text-[#111318] font-bold">{system.redis.latency_ms ?? "—"} ms</span></>
+              ) : (
+                <span className="text-[#f04438]">Hors ligne</span>
+              )}
+            </div>
+          </div>
+
+          {/* DB */}
+          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb] bg-[#fafbfc]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#3c4149]">
+                <Database size={13} className="text-[#3b5bdb]" />
+                Base de donnees
+              </div>
+              <StatusDot ok={system?.db.ok ?? false} />
+            </div>
+            <div className="font-mono text-[11px] text-[#8a919e]">
+              {system?.db.ok ? (
+                <>taille : <span className="text-[#111318] font-bold">{system.db.size_mb != null ? `${system.db.size_mb.toFixed(1)} Mo` : "—"}</span></>
+              ) : (
+                <span className="text-[#f04438]">Indisponible</span>
+              )}
+            </div>
+          </div>
+
+          {/* Worker */}
+          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb] bg-[#fafbfc]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#3c4149]">
+                <Cpu size={13} className="text-[#7c3aed]" />
+                Worker
+              </div>
+              <StatusDot ok={system?.worker.ok ?? false} />
+            </div>
+            <div className="font-mono text-[11px] text-[#8a919e]">
+              {system?.worker.last_heartbeat ? (
+                <>derniere activite : <span className="text-[#111318] font-bold">{fmtTs(system.worker.last_heartbeat)}</span></>
+              ) : (
+                <span className="text-[#f04438]">Aucune activite</span>
+              )}
+            </div>
+          </div>
+
+          {/* Last deploy */}
+          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb] bg-[#fafbfc]">
+            <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#3c4149]">
+              <Clock size={13} className="text-[#12b76a]" />
+              Dernier deploy
+            </div>
+            <div className="font-mono text-[11px] text-[#8a919e]">
+              <span className="text-[#111318] font-bold">{fmtTs(system?.last_deploy ?? null)}</span>
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* ── Section 2: Scans par sport ── */}
+      <SectionCard title="Scans par sport" icon={<RefreshCw size={14} className="text-[#3b5bdb]" />}>
+        {scans.length === 0 ? (
+          <p className="text-[12px] text-[#b0b7c3] text-center py-4">Aucune donnee de scan disponible</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12.5px]">
+              <thead>
+                <tr className="border-b border-[#e3e6eb]">
+                  {["Sport", "Dernier scan", "Age cache", "Matchs", "Erreurs 24h", "Statut", "Action"].map((h) => (
+                    <th key={h} className="text-left py-2 px-3 text-[11px] font-semibold text-[#8a919e] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {scans.map((scan) => {
+                  const sc = scanStatusColor(scan.status);
+                  const forcing = forcingScans[scan.sport];
+                  const msg = forceMessages[scan.sport];
+                  return (
+                    <tr key={scan.sport} className="border-b border-[#f0f1f3] last:border-0 hover:bg-[#fafbfc] transition-colors">
+                      <td className="py-2.5 px-3 font-semibold text-[#111318] capitalize">{scan.sport}</td>
+                      <td className="py-2.5 px-3 font-mono text-[#3c4149]">{fmtTs(scan.last_scan)}</td>
+                      <td className="py-2.5 px-3 font-mono text-[#3c4149]">{fmtAge(scan.cache_age_minutes)}</td>
+                      <td className="py-2.5 px-3 font-mono text-[#3c4149]">{scan.match_count ?? "—"}</td>
+                      <td className="py-2.5 px-3 font-mono">
+                        <span style={{ color: scan.errors_24h > 0 ? "#f04438" : "#12b76a" }}>
+                          {scan.errors_24h}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-semibold"
+                          style={{ background: sc.bg, color: sc.text }}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: sc.dot }} />
+                          {scan.status === "ok" ? "OK" : scan.status === "warning" ? "Alerte" : "Erreur"}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleForceScan(scan.sport)}
+                            disabled={forcing}
+                            className="px-2.5 py-1 rounded-lg bg-[#3b5bdb] text-white text-[11px] font-semibold cursor-pointer border-none hover:bg-[#2f4ac7] transition-all disabled:opacity-50 whitespace-nowrap"
+                          >
+                            {forcing ? "..." : "Forcer scan"}
+                          </button>
+                          {msg && (
+                            <span className="text-[10px] text-[#8a919e] max-w-[120px] truncate" title={msg}>{msg}</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+
+      {/* ── Section 3: Quota API ── */}
+      <SectionCard title="Quota API Odds" icon={<BarChart2 size={14} className="text-[#3b5bdb]" />}>
+        {quota ? (
+          <div className="flex flex-col gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Daily */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[12px] font-semibold text-[#3c4149]">Aujourd'hui</span>
+                  <span className="font-mono text-[12px] font-bold" style={{ color: quotaColor }}>
+                    {quota.used_today} / {quota.limit_daily}
+                  </span>
+                </div>
+                <div className="h-2.5 bg-[#f4f5f7] rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(quotaPct, 100)}%`, background: quotaColor }}
+                  />
+                </div>
+                <div className="text-[10.5px] text-[#8a919e] mt-1">{quotaPct}% utilise</div>
+              </div>
+
+              {/* Monthly */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[12px] font-semibold text-[#3c4149]">Ce mois</span>
+                  <span className="font-mono text-[12px] font-bold" style={{ color: quotaMonthPct >= 90 ? "#f04438" : "#3b5bdb" }}>
+                    {quota.used_month} / {quota.limit_month}
+                  </span>
+                </div>
+                <div className="h-2.5 bg-[#f4f5f7] rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(quotaMonthPct, 100)}%`, background: quotaMonthPct >= 90 ? "#f04438" : "#3b5bdb" }}
+                  />
+                </div>
+                <div className="text-[10.5px] text-[#8a919e] mt-1">{quotaMonthPct}% utilise</div>
+              </div>
+            </div>
+
+            {/* Per-sport breakdown */}
+            {quota.by_sport.length > 0 && (
+              <div>
+                <p className="text-[11px] font-semibold text-[#8a919e] uppercase tracking-wide mb-2">Repartition par sport</p>
+                <div className="flex flex-col gap-2">
+                  {quota.by_sport.map((s) => {
+                    const pct = quota.used_today > 0 ? Math.round((s.calls / quota.used_today) * 100) : 0;
+                    const SPORT_COLORS: Record<string, string> = {
+                      football: "#12b76a",
+                      tennis: "#3b5bdb",
+                      basketball: "#f04438",
+                      baseball: "#f79009",
+                      rugby: "#7c3aed",
+                      pmu: "#8a919e",
+                    };
+                    const color = SPORT_COLORS[s.sport] || "#8a919e";
+                    return (
+                      <div key={s.sport} className="flex items-center gap-3">
+                        <span className="text-[11.5px] capitalize text-[#3c4149] font-medium w-20 shrink-0">{s.sport}</span>
+                        <div className="flex-1 h-2 bg-[#f4f5f7] rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${Math.max(pct, 2)}%`, background: color }}
+                          />
+                        </div>
+                        <span className="font-mono text-[11px] text-[#8a919e] w-16 text-right">{s.calls} appels</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-[12px] text-[#b0b7c3] text-center py-4">Donnees de quota indisponibles</p>
+        )}
+      </SectionCard>
+
+      {/* ── Section 4: Betting Analytics ── */}
+      <SectionCard title="Analytique paris par sport" icon={<TrendingUp size={14} className="text-[#3b5bdb]" />}>
+        {analytics.length === 0 ? (
+          <p className="text-[12px] text-[#b0b7c3] text-center py-4">Aucune donnee disponible</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12.5px]">
+              <thead>
+                <tr className="border-b border-[#e3e6eb]">
+                  {["Sport", "Paris 7j", "Paris 30j", "ROI", "CLV moyen", "Utilisateurs actifs"].map((h) => (
+                    <th key={h} className="text-left py-2 px-3 text-[11px] font-semibold text-[#8a919e] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.map((row) => (
+                  <tr key={row.sport} className="border-b border-[#f0f1f3] last:border-0 hover:bg-[#fafbfc] transition-colors">
+                    <td className="py-2.5 px-3 font-semibold text-[#111318] capitalize">{row.sport}</td>
+                    <td className="py-2.5 px-3 font-mono text-[#3c4149]">{row.bets_7d}</td>
+                    <td className="py-2.5 px-3 font-mono text-[#3c4149]">{row.bets_30d}</td>
+                    <td className="py-2.5 px-3 font-mono font-bold" style={{ color: row.roi_pct == null ? "#8a919e" : row.roi_pct >= 0 ? "#12b76a" : "#f04438" }}>
+                      {row.roi_pct != null ? `${row.roi_pct >= 0 ? "+" : ""}${row.roi_pct.toFixed(1)}%` : "—"}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-[#3c4149]">
+                      {row.avg_clv != null ? `${row.avg_clv >= 0 ? "+" : ""}${(row.avg_clv * 100).toFixed(1)}%` : "—"}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <div className="flex items-center gap-1.5">
+                        <Users size={11} className="text-[#8a919e]" />
+                        <span className="font-mono text-[#3c4149]">{row.active_users}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+
+      {/* ── Section 5: Alerts ── */}
+      <SectionCard
+        title="Alertes actives"
+        icon={<AlertTriangle size={14} className="text-[#f79009]" />}
+        action={
+          alerts.length > 0 ? (
+            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-[#f04438] text-white">
+              {alerts.length}
+            </span>
+          ) : undefined
+        }
+      >
+        {alerts.length === 0 ? (
+          <div className="flex items-center gap-2.5 py-3 text-[12.5px] text-[#12b76a]">
+            <CheckCircle size={15} />
+            Aucune alerte active — tout fonctionne normalement
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {alerts.map((alert) => {
+              const cfg = alertSeverityConfig(alert.severity);
+              const Icon = alert.severity === "CRITICAL" ? XCircle : AlertCircle;
+              return (
+                <div
+                  key={alert.id}
+                  className="flex items-start gap-3 p-3 rounded-xl border"
+                  style={{ background: cfg.bg, borderColor: `${cfg.text}22` }}
+                >
+                  <Icon size={14} style={{ color: cfg.text }} className="shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span
+                        className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                        style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.text}33` }}
+                      >
+                        {cfg.label}
+                      </span>
+                      {alert.sport && (
+                        <span className="text-[10px] text-[#8a919e] capitalize">{alert.sport}</span>
+                      )}
+                      <span className="text-[10px] text-[#b0b7c3] ml-auto shrink-0">{fmtTs(alert.timestamp)}</span>
+                    </div>
+                    <p className="text-[12px] text-[#3c4149] leading-snug">{alert.message}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </SectionCard>
+
+      {/* ── Section 6: Recent Errors ── */}
+      <SectionCard
+        title="Erreurs recentes"
+        icon={<XCircle size={14} className="text-[#f04438]" />}
+        action={
+          errors.length > 0 ? (
+            <span className="font-mono text-[11px] text-[#8a919e]">{errors.length} entree{errors.length > 1 ? "s" : ""}</span>
+          ) : undefined
+        }
+      >
+        {errors.length === 0 ? (
+          <div className="flex items-center gap-2.5 py-3 text-[12.5px] text-[#12b76a]">
+            <CheckCircle size={15} />
+            Aucune erreur recente
+          </div>
+        ) : (
+          <div className="flex flex-col gap-0">
+            <div className="max-h-[340px] overflow-y-auto rounded-lg border border-[#e3e6eb] bg-[#fafbfc]">
+              {visibleErrors.map((err, i) => (
+                <div
+                  key={i}
+                  className="flex gap-3 px-4 py-2.5 border-b border-[#f0f1f3] last:border-0 hover:bg-[#f4f5f7] transition-colors"
+                >
+                  <div className="shrink-0 mt-0.5">
+                    <XCircle size={12} className="text-[#f04438] opacity-60" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-mono text-[10.5px] text-[#8a919e]">{fmtTs(err.timestamp)}</span>
+                      {err.sport && (
+                        <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-[rgba(59,91,219,0.08)] text-[#3b5bdb] capitalize">{err.sport}</span>
+                      )}
+                    </div>
+                    <p className="text-[11.5px] text-[#3c4149] leading-snug font-mono break-all">{err.message}</p>
+                    {err.traceback && (
+                      <details className="mt-1">
+                        <summary className="text-[10px] text-[#8a919e] cursor-pointer hover:text-[#3c4149]">Traceback</summary>
+                        <pre className="text-[9.5px] text-[#8a919e] mt-1 overflow-x-auto whitespace-pre-wrap leading-relaxed">{err.traceback}</pre>
+                      </details>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {errors.length > 5 && (
+              <button
+                onClick={() => setErrorsExpanded((v) => !v)}
+                className="flex items-center gap-1.5 mt-2 text-[12px] text-[#3b5bdb] font-medium bg-transparent border-none cursor-pointer hover:underline self-start"
+              >
+                {errorsExpanded ? (
+                  <><ChevronUp size={13} /> Voir moins</>
+                ) : (
+                  <><ChevronDown size={13} /> Voir {errors.length - 5} de plus</>
+                )}
+              </button>
+            )}
+          </div>
+        )}
+      </SectionCard>
+    </div>
+  );
+}

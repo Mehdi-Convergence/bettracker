@@ -4,6 +4,22 @@ Sport key: rugbyunion
 Markets: h2h (1X2 moneyline), totals (over/under)
 
 Rugby has draws unlike NBA — we fetch all three outcomes (H/D/A).
+
+Each match dict returned by get_matches():
+    home_team, away_team, date, league,
+    bookmakers: {
+        "h2h": {
+            "Home": {"pinnacle": 1.55, "bet365": 1.52, ...},
+            "Draw": {"pinnacle": 15.0, "bet365": 14.0, ...},
+            "Away": {"pinnacle": 2.60, "bet365": 2.55, ...},
+        },
+        "totals": {
+            "over": {"pinnacle": 1.91, ...},
+            "under": {"pinnacle": 1.93, ...},
+            "line": 45.5,
+        }
+    },
+    best_odds_home, best_odds_draw, best_odds_away  (best across all bookmakers)
 """
 
 import logging
@@ -47,14 +63,26 @@ class RugbyClient:
         self,
         timeframe: str = "48h",
         markets: str = "h2h,totals",
-        regions: str = "eu,uk",
+        regions: str = "eu,uk,us,us2,au",
     ) -> list[dict]:
-        """Return rugby matches with odds for the specified timeframe.
+        """Return rugby matches with multi-bookmaker odds for the specified timeframe.
 
         Each dict:
             home_team, away_team, date, league,
-            odds_home, odds_draw, odds_away,
-            odds_over, odds_under, total_line
+            bookmakers: {
+                "h2h": {
+                    "Home": {bk_key: price, ...},
+                    "Draw": {bk_key: price, ...},
+                    "Away": {bk_key: price, ...},
+                },
+                "totals": {
+                    "over": {bk_key: price, ...},
+                    "under": {bk_key: price, ...},
+                    "line": float | None,
+                },
+            },
+            best_odds_home, best_odds_draw, best_odds_away,
+            best_odds_over, best_odds_under, total_line
         """
         if not self.api_key:
             logger.warning("No ODDS_API_KEY configured — rugby live odds unavailable")
@@ -62,7 +90,11 @@ class RugbyClient:
 
         # The Odds API may return multiple rugby competition keys
         # rugbyunion covers major competitions
-        sport_keys = ["rugbyunion", "rugbyunion_championship_cup", "rugbyunion_united_rugby_championship"]
+        sport_keys = [
+            "rugbyunion",
+            "rugbyunion_championship_cup",
+            "rugbyunion_united_rugby_championship",
+        ]
 
         all_matches: list[dict] = []
         seen_event_ids: set[str] = set()
@@ -117,48 +149,77 @@ class RugbyClient:
                     away = _normalize_team(ev.get("away_team", ""))
                     competition = ev.get("sport_title", sport_key)
 
-                    odds_home: float | None = None
-                    odds_draw: float | None = None
-                    odds_away: float | None = None
-                    odds_over: float | None = None
-                    odds_under: float | None = None
+                    # Multi-bookmaker dicts: outcome -> {bk_key: price}
+                    h2h_home: dict[str, float] = {}
+                    h2h_draw: dict[str, float] = {}
+                    h2h_away: dict[str, float] = {}
+                    totals_over: dict[str, float] = {}
+                    totals_under: dict[str, float] = {}
                     total_line: float | None = None
 
                     bookmakers = ev.get("bookmakers", [])
-                    # Prefer Pinnacle, fallback to any bookmaker
-                    _bk_order = sorted(
-                        bookmakers,
-                        key=lambda b: (0 if "pinnacle" in b.get("key", "").lower() else 1),
-                    )
 
-                    for bk in _bk_order:
+                    for bk in bookmakers:
+                        bk_key = bk.get("key", "")
+                        if not bk_key:
+                            continue
+
                         for mkt in bk.get("markets", []):
                             if mkt["key"] == "h2h":
                                 for outcome in mkt.get("outcomes", []):
-                                    team = _normalize_team(outcome.get("name", ""))
-                                    price = float(outcome.get("price", 0))
-                                    if team == home and odds_home is None:
-                                        odds_home = price
-                                    elif team == away and odds_away is None:
-                                        odds_away = price
-                                    elif outcome.get("name", "").lower() == "draw" and odds_draw is None:
-                                        odds_draw = price
+                                    outcome_name = outcome.get("name", "")
+                                    team = _normalize_team(outcome_name)
+                                    price = outcome.get("price")
+                                    if price is None:
+                                        continue
+                                    try:
+                                        price = float(price)
+                                    except (TypeError, ValueError):
+                                        continue
+                                    if price <= 1.0:
+                                        continue
+
+                                    if team == home:
+                                        h2h_home[bk_key] = price
+                                    elif team == away:
+                                        h2h_away[bk_key] = price
+                                    elif outcome_name.lower() == "draw":
+                                        h2h_draw[bk_key] = price
+
                             elif mkt["key"] == "totals":
                                 for outcome in mkt.get("outcomes", []):
                                     name = outcome.get("name", "").lower()
-                                    price = float(outcome.get("price", 0))
+                                    price = outcome.get("price")
                                     point = outcome.get("point")
-                                    if "over" in name and odds_over is None:
-                                        odds_over = price
-                                        total_line = float(point) if point is not None else None
-                                    elif "under" in name and odds_under is None:
-                                        odds_under = price
+                                    if price is None:
+                                        continue
+                                    try:
+                                        price = float(price)
+                                    except (TypeError, ValueError):
+                                        continue
+                                    if price <= 1.0:
+                                        continue
 
-                        if odds_home and odds_away:
-                            break
+                                    if "over" in name:
+                                        totals_over[bk_key] = price
+                                        if point is not None and total_line is None:
+                                            try:
+                                                total_line = float(point)
+                                            except (TypeError, ValueError):
+                                                pass
+                                    elif "under" in name:
+                                        totals_under[bk_key] = price
 
-                    if not odds_home or not odds_away:
+                    # Require at least one bookmaker with h2h home + away
+                    if not h2h_home or not h2h_away:
                         continue
+
+                    # Best odds convenience fields
+                    best_odds_home = max(h2h_home.values()) if h2h_home else None
+                    best_odds_draw = max(h2h_draw.values()) if h2h_draw else None
+                    best_odds_away = max(h2h_away.values()) if h2h_away else None
+                    best_odds_over = max(totals_over.values()) if totals_over else None
+                    best_odds_under = max(totals_under.values()) if totals_under else None
 
                     seen_event_ids.add(ev_id)
                     all_matches.append({
@@ -166,11 +227,24 @@ class RugbyClient:
                         "away_team": away,
                         "date": commence,
                         "league": competition,
-                        "odds_home": odds_home,
-                        "odds_draw": odds_draw,
-                        "odds_away": odds_away,
-                        "odds_over": odds_over,
-                        "odds_under": odds_under,
+                        "bookmakers": {
+                            "h2h": {
+                                "Home": h2h_home,
+                                "Draw": h2h_draw,
+                                "Away": h2h_away,
+                            },
+                            "totals": {
+                                "over": totals_over,
+                                "under": totals_under,
+                                "line": total_line,
+                            },
+                        },
+                        # Convenience fields for backward-compatible consumers
+                        "best_odds_home": best_odds_home,
+                        "best_odds_draw": best_odds_draw,
+                        "best_odds_away": best_odds_away,
+                        "best_odds_over": best_odds_over,
+                        "best_odds_under": best_odds_under,
                         "total_line": total_line,
                     })
                 except Exception as e:

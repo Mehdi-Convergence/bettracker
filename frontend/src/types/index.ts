@@ -712,3 +712,54 @@ export interface PMUScanResponse {
   cached: boolean;
   cached_at: string | null;
 }
+
+// --- Admin types ---
+
+export interface AdminSystemStatus {
+  redis: { ok: boolean; latency_ms: number | null };
+  db: { ok: boolean; size_mb: number | null };
+  worker: { ok: boolean; last_heartbeat: string | null };
+  last_deploy: string | null;
+  uptime_seconds: number | null;
+}
+
+export interface AdminScanStatus {
+  sport: string;
+  last_scan: string | null;
+  cache_age_minutes: number | null;
+  match_count: number | null;
+  errors_24h: number;
+  status: "ok" | "warning" | "error";
+}
+
+export interface AdminQuota {
+  used_today: number;
+  limit_daily: number;
+  used_month: number;
+  limit_month: number;
+  by_sport: { sport: string; calls: number }[];
+}
+
+export interface AdminSportAnalytics {
+  sport: string;
+  bets_7d: number;
+  bets_30d: number;
+  roi_pct: number | null;
+  avg_clv: number | null;
+  active_users: number;
+}
+
+export interface AdminAlert {
+  id: string;
+  severity: "WARNING" | "CRITICAL" | "INFO";
+  message: string;
+  sport: string | null;
+  timestamp: string;
+}
+
+export interface AdminError {
+  timestamp: string;
+  sport: string | null;
+  message: string;
+  traceback: string | null;
+}

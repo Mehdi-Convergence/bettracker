@@ -6,6 +6,7 @@ interface User {
   display_name: string;
   tier: string;
   is_active: boolean;
+  is_admin?: boolean;
   trial_ends_at: string | null;
   created_at: string;
   onboarding_completed: boolean;

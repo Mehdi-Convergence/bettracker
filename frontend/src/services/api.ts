@@ -467,3 +467,32 @@ export function deleteAIConversation(conversationId: number) {
 export function getAIRateLimit() {
   return request<import("../types").AIRateLimit>("/ai/rate-limit");
 }
+
+// Admin
+export function getAdminSystem() {
+  return request<import("../types").AdminSystemStatus>("/admin/system");
+}
+
+export function getAdminScans() {
+  return request<import("../types").AdminScanStatus[]>("/admin/scans");
+}
+
+export function getAdminQuota() {
+  return request<import("../types").AdminQuota>("/admin/quota");
+}
+
+export function getAdminAnalytics() {
+  return request<import("../types").AdminSportAnalytics[]>("/admin/analytics/sports");
+}
+
+export function getAdminAlerts() {
+  return request<import("../types").AdminAlert[]>("/admin/alerts");
+}
+
+export function getAdminErrors() {
+  return request<import("../types").AdminError[]>("/admin/errors");
+}
+
+export function forceScan(sport: string) {
+  return request<{ ok: boolean; message: string }>(`/admin/scan/${sport}/force`, { method: "POST" });
+}

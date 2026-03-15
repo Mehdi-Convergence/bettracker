@@ -93,3 +93,13 @@ def require_tier(min_tier: str):
         return user
 
     return _check
+
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    """Dependency: require user to have admin privileges."""
+    if not getattr(user, "is_admin", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès administrateur requis",
+        )
+    return user
