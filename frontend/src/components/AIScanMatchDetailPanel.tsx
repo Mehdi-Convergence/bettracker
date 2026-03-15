@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, TrendingUp, Trophy, Target, Zap, Activity, BarChart2 } from "lucide-react";
+import { X, TrendingUp, Trophy, Target, Zap, Activity, BarChart2, Clock, MapPin } from "lucide-react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import type { AIScanMatch } from "@/types";
 
@@ -180,16 +180,35 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
       ? (bestOutcome === "Home" ? probH : probA)
       : (bestOutcome === "H" ? probH : bestOutcome === "D" ? probD : probA);
 
-  const bestEdgeEntry = Object.entries(am.edges ?? {}).sort((a, b) => b[1] - a[1])[0];
+  // Find best edge across ALL markets (H2H + O/U + BTTS + spreads)
+  const allEdges = Object.entries(am.edges ?? {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const bestEdgeEntry = allEdges[0];
   const bestEdgeKey = bestEdgeEntry?.[0];
   const bestEdge = bestEdgeEntry?.[1] ?? 0;
 
+  // Secondary market edge labels
+  const SECONDARY_EDGE_LABELS: Record<string, string> = {
+    Over: `Over ${am.total_line ?? ""}`,
+    Under: `Under ${am.total_line ?? ""}`,
+    BTTS_Yes: "Les 2 marquent (Oui)",
+    BTTS_No: "Les 2 marquent (Non)",
+    Over25: "Plus de 2.5 buts",
+    Under25: "Moins de 2.5 buts",
+  };
+  const H2H_KEYS = new Set(["H", "D", "A", "P1", "P2", "Home", "Away"]);
+  const isSecondaryBet = bestEdgeKey != null && !H2H_KEYS.has(bestEdgeKey);
+  // Also find the best H2H edge for comparison
+  const bestH2HEntry = allEdges.find(([k]) => H2H_KEYS.has(k));
+  const bestH2HKey = bestH2HEntry?.[0];
+  const bestH2HEdge = bestH2HEntry?.[1] ?? 0;
+
   const oddForEdge = (() => {
     const o = am.odds as Record<string, Record<string, unknown>>;
+    const edgeKey = isSecondaryBet ? bestH2HKey : bestEdgeKey;
     const marketKey = isBinary ? "winner" : "1x2";
     const market = o?.[marketKey];
-    if (!market || !bestEdgeKey) return null;
-    const entry = market[bestEdgeKey];
+    if (!market || !edgeKey) return null;
+    const entry = market[edgeKey];
     if (!entry) return null;
     if (typeof entry === "number") return entry;
     if (typeof entry === "object" && !Array.isArray(entry)) {
@@ -199,8 +218,8 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
     return null;
   })();
 
-  // Data score display: /18 for tennis, /20 for football, /6 for NBA/MLB, /7 for rugby
-  const maxPts = isTennis ? 18 : (am.sport === "nba" || am.sport === "mlb") ? 6 : am.sport === "rugby" ? 7 : 20;
+  // Data score display: /18 for tennis, /23 for football, /6 for NBA/MLB, /7 for rugby
+  const maxPts = isTennis ? 18 : (am.sport === "nba" || am.sport === "mlb") ? 6 : am.sport === "rugby" ? 7 : 23;
 
   return (
     <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
@@ -257,21 +276,28 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
               <span className="font-bold text-slate-900">{bestOutcomeLabel}</span>
               <span className="text-slate-400 text-xs ml-1">({(bestProb * 100).toFixed(1)}% confiance)</span>
             </p>
-            {bestEdge > 0 && (
+            {bestH2HEdge > 0 && bestH2HKey && (
               <p className="text-sm text-slate-500">
                 Value bet :{" "}
                 <span className={`font-semibold ${
-                  bestEdgeKey === "H" || bestEdgeKey === "P1" || bestEdgeKey === "Home" ? "text-blue-600" :
-                  bestEdgeKey === "D" ? "text-amber-600" : "text-red-600"
+                  bestH2HKey === "H" || bestH2HKey === "P1" || bestH2HKey === "Home" ? "text-blue-600" :
+                  bestH2HKey === "D" ? "text-amber-600" : "text-red-600"
                 }`}>
                   {isTennis
-                    ? (bestEdgeKey === "P1" ? home.split(" ").pop() : away.split(" ").pop())
+                    ? (bestH2HKey === "P1" ? home.split(" ").pop() : away.split(" ").pop())
                     : (am.sport === "nba" || am.sport === "mlb")
-                      ? (bestEdgeKey === "Home" ? "DOM" : "EXT")
-                      : (bestEdgeKey === "H" ? "DOM" : bestEdgeKey === "D" ? "NUL" : "EXT")}
+                      ? (bestH2HKey === "Home" ? "DOM" : "EXT")
+                      : (bestH2HKey === "H" ? "DOM" : bestH2HKey === "D" ? "NUL" : "EXT")}
                 </span>
-                <span className="text-emerald-600 ml-2 font-medium">+{(bestEdge * 100).toFixed(1)}% edge</span>
+                <span className="text-emerald-600 ml-2 font-medium">+{(bestH2HEdge * 100).toFixed(1)}% <Tip text="Ecart entre la probabilite estimee par le modele et la probabilite implicite de la cote du bookmaker. Positif = valeur detectee."><span className="underline decoration-dotted cursor-help">edge</span></Tip></span>
                 {oddForEdge && <span className="text-amber-600 ml-2">@ {oddForEdge.toFixed(2)}</span>}
+              </p>
+            )}
+            {isSecondaryBet && bestEdgeKey && (
+              <p className="text-sm">
+                <span className="text-amber-600 font-semibold">Meilleur pari : </span>
+                <span className="font-bold text-slate-900">{SECONDARY_EDGE_LABELS[bestEdgeKey] ?? bestEdgeKey}</span>
+                <span className="text-emerald-600 ml-2 font-medium">+{(bestEdge * 100).toFixed(1)}% <Tip text="Ecart entre la probabilite estimee par le modele et la probabilite implicite de la cote du bookmaker. Positif = valeur detectee."><span className="underline decoration-dotted cursor-help">edge</span></Tip></span>
               </p>
             )}
           </div>
@@ -393,13 +419,17 @@ function FormSection({ am, home, away }: { am: AIScanMatch; home: string; away: 
   );
 }
 
-function FormRow({ label, homeVal, awayVal, homeBetter }: { label: string; homeVal: string; awayVal: string; homeBetter?: boolean }) {
+function FormRow({ label, homeVal, awayVal, homeBetter, tooltip }: { label: string; homeVal: string; awayVal: string; homeBetter?: boolean; tooltip?: string }) {
   return (
     <>
       <div className={`text-right text-xs py-0.5 ${homeBetter === true ? "text-emerald-600 font-semibold" : homeBetter === false ? "text-slate-400" : "text-slate-700"}`}>
         {homeVal}
       </div>
-      <div className="text-center text-slate-400 text-[10px] py-0.5">{label}</div>
+      <div className="text-center text-slate-400 text-[10px] py-0.5">
+        {tooltip ? (
+          <Tip text={tooltip}><span className="underline decoration-dotted cursor-help">{label}</span></Tip>
+        ) : label}
+      </div>
       <div className={`text-left text-xs py-0.5 ${homeBetter === false ? "text-emerald-600 font-semibold" : homeBetter === true ? "text-slate-400" : "text-slate-700"}`}>
         {awayVal}
       </div>
@@ -634,23 +664,35 @@ function IADataTab({ am, home, away }: { am: AIScanMatch; home: string; away: st
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {am.btts_edge != null && (
               <div className="bg-white border border-slate-200 rounded-lg p-3">
-                <div className="text-[10px] text-slate-500 font-medium mb-1">Les 2 equipes marquent</div>
+                <div className="text-[10px] text-slate-500 font-medium mb-1">
+                  <Tip text="Both Teams To Score — les deux equipes marquent au moins un but dans le match.">
+                    <span className="underline decoration-dotted cursor-help">Les 2 equipes marquent</span>
+                  </Tip>
+                </div>
                 {am.btts_model_prob != null && (
                   <div className="text-sm font-semibold text-slate-700">{(am.btts_model_prob * 100).toFixed(1)}% (modele)</div>
                 )}
                 <div className={`text-xs font-bold mt-0.5 ${am.btts_edge > 0 ? "text-emerald-600" : "text-red-500"}`}>
-                  Edge : {am.btts_edge > 0 ? "+" : ""}{(am.btts_edge * 100).toFixed(1)}%
+                  <Tip text="Ecart entre la probabilite estimee par le modele et la probabilite implicite de la cote. Positif = valeur detectee.">
+                    <span className="underline decoration-dotted cursor-help">Edge</span>
+                  </Tip> : {am.btts_edge > 0 ? "+" : ""}{(am.btts_edge * 100).toFixed(1)}%
                 </div>
               </div>
             )}
             {am.over25_edge != null && (
               <div className="bg-white border border-slate-200 rounded-lg p-3">
-                <div className="text-[10px] text-slate-500 font-medium mb-1">Plus de 2.5 buts</div>
+                <div className="text-[10px] text-slate-500 font-medium mb-1">
+                  <Tip text="Over 2.5 — plus de 2.5 buts dans le match (3 buts minimum).">
+                    <span className="underline decoration-dotted cursor-help">Plus de 2.5 buts</span>
+                  </Tip>
+                </div>
                 {am.over25_model_prob != null && (
                   <div className="text-sm font-semibold text-slate-700">{(am.over25_model_prob * 100).toFixed(1)}% (modele)</div>
                 )}
                 <div className={`text-xs font-bold mt-0.5 ${am.over25_edge > 0 ? "text-emerald-600" : "text-red-500"}`}>
-                  Edge : {am.over25_edge > 0 ? "+" : ""}{(am.over25_edge * 100).toFixed(1)}%
+                  <Tip text="Ecart entre la probabilite estimee par le modele et la probabilite implicite de la cote. Positif = valeur detectee.">
+                    <span className="underline decoration-dotted cursor-help">Edge</span>
+                  </Tip> : {am.over25_edge > 0 ? "+" : ""}{(am.over25_edge * 100).toFixed(1)}%
                 </div>
               </div>
             )}
@@ -751,13 +793,6 @@ function TennisAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; a
 
   return (
     <div className="space-y-4">
-      {/* ML model badge */}
-      {am.tennis_ml_used && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-violet-50 border border-violet-200 rounded-lg">
-          <span className="w-2 h-2 rounded-full bg-violet-500 flex-shrink-0" />
-          <span className="text-xs text-violet-700 font-medium">Modele ML actif (XGBoost + LightGBM, 60 features)</span>
-        </div>
-      )}
       {/* Rankings comparison */}
       {(am.ranking_p1 != null || am.ranking_p2 != null) && (
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
@@ -1019,7 +1054,7 @@ function TennisStatsTab({ am, home, away }: { am: AIScanMatch; home: string; awa
             <Trophy size={15} className="text-amber-500" />
             <h4 className="text-slate-900 font-semibold text-sm">Confrontations directes</h4>
             {am.h2h_total != null && (
-              <span className="ml-auto text-[10px] text-slate-400">{am.h2h_total} match{am.h2h_total > 1 ? "s" : ""} en DB</span>
+              <span className="ml-auto text-[10px] text-slate-400">{am.h2h_total} confrontation{am.h2h_total > 1 ? "s" : ""}</span>
             )}
           </div>
 
@@ -1097,9 +1132,182 @@ function TennisStatsTab({ am, home, away }: { am: AIScanMatch; home: string; awa
 // Markets displayed as horizontal cards (≤3 outcomes)
 const CARD_MARKETS = new Set(["1x2", "btts", "double_chance", "draw_no_bet", "winner"]);
 
+function CotesMarketSection({ market, label, outcomes, isMainMarket, modelProbs, maxProb, getAltModelInfo, defaultOpen }: {
+  market: string;
+  label: string;
+  outcomes: [string, unknown][];
+  isMainMarket: boolean;
+  modelProbs: Record<string, number>;
+  maxProb: number;
+  getAltModelInfo: (market: string, outcome: string) => { prob: number | null; edge: number | null };
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const [selectedBk, setSelectedBk] = useState<Record<string, string>>({});
+  const [expandedOutcome, setExpandedOutcome] = useState<string | null>(null);
+  const isCard = CARD_MARKETS.has(market) && outcomes.length <= 3;
+
+  function buildBkOptions(val: unknown): { bk: string; odd: number }[] {
+    if (typeof val === "number") return [{ bk: "Best", odd: val }];
+    if (val && typeof val === "object") {
+      return Object.entries(val as Record<string, number>)
+        .map(([bk, odd]) => ({ bk, odd: Number(odd) }))
+        .filter(({ odd }) => odd > 0)
+        .sort((a, b) => b.odd - a.odd);
+    }
+    return [];
+  }
+
+  // Count bookmakers across all outcomes
+  const totalBks = new Set(outcomes.flatMap(([, val]) => {
+    if (val && typeof val === "object" && !Array.isArray(val)) return Object.keys(val as Record<string, unknown>);
+    return [];
+  })).size;
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+      {/* Collapsible header */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 px-4 py-3 hover:bg-slate-50/60 transition-colors text-left"
+      >
+        <span className="text-sm font-semibold text-slate-700 flex-1">{label}</span>
+        {totalBks > 0 && (
+          <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">{totalBks} books</span>
+        )}
+        <span className="text-slate-400">
+          {open ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+            : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>}
+        </span>
+      </button>
+
+      {open && (
+        <div className="border-t border-slate-100">
+          {isCard ? (
+            /* ── Horizontal cards ── */
+            <div className="p-3">
+              <div className={`grid gap-2 ${outcomes.length === 2 ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-3"}`}>
+                {outcomes.map(([outcome, val]) => {
+                  const bkOptions = buildBkOptions(val);
+                  if (bkOptions.length === 0) return null;
+                  const bestBk = bkOptions[0];
+                  const prob = isMainMarket ? (modelProbs[outcome] ?? 0) : 0;
+                  const isFav = isMainMarket && prob === maxProb && maxProb > 0;
+                  const altModel = getAltModelInfo(market, outcome);
+                  const hasAltModel = altModel.prob !== null;
+                  const hasValueEdge = altModel.edge !== null && altModel.edge > 0;
+                  const isExpanded = expandedOutcome === `${market}__${outcome}`;
+
+                  return (
+                    <div key={outcome} className={`rounded-xl overflow-hidden border-2 bg-white ${isFav ? "border-emerald-300" : hasValueEdge ? "border-amber-300" : "border-slate-100"}`}>
+                      {(isMainMarket && prob > 0) && <div className={`h-1 ${isFav ? "bg-emerald-400" : "bg-slate-200"}`} />}
+                      {hasAltModel && <div className={`h-1 ${hasValueEdge ? "bg-amber-400" : "bg-slate-200"}`} style={{ width: `${(altModel.prob! * 100).toFixed(0)}%` }} />}
+                      <div className="flex flex-col items-center px-2 pt-2.5 pb-2 gap-1">
+                        <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide truncate w-full text-center">{outcome}</span>
+                        <span className={`text-2xl font-bold tabular-nums ${isFav ? "text-emerald-600" : "text-slate-800"}`}>{bestBk.odd.toFixed(2)}</span>
+                        {isMainMarket && prob > 0 && (
+                          <span className={`text-[9px] font-medium ${isFav ? "text-emerald-500" : "text-slate-400"}`}>{(prob * 100).toFixed(0)}%</span>
+                        )}
+                        {hasAltModel && (
+                          <span className={`text-[9px] font-medium ${hasValueEdge ? "text-amber-600" : "text-slate-400"}`}>
+                            {(altModel.prob! * 100).toFixed(1)}%
+                            {hasValueEdge && <span className="text-emerald-600 ml-1">+{(altModel.edge! * 100).toFixed(1)}%</span>}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400">{bestBk.bk}</span>
+                        {bkOptions.length > 1 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setExpandedOutcome(isExpanded ? null : `${market}__${outcome}`); }}
+                            className="text-[10px] text-blue-500 hover:text-blue-700 font-medium mt-0.5"
+                          >
+                            {isExpanded ? "Masquer" : `${bkOptions.length} bookmakers`}
+                          </button>
+                        )}
+                      </div>
+                      {isExpanded && bkOptions.length > 1 && (
+                        <div className="border-t border-slate-100 px-2 py-1.5 bg-slate-50 max-h-32 overflow-y-auto">
+                          {bkOptions.map(({ bk, odd }, i) => (
+                            <div key={bk} className={`flex justify-between py-0.5 text-[11px] ${i === 0 ? "font-semibold text-emerald-700" : "text-slate-600"}`}>
+                              <span className="truncate mr-2">{bk}</span>
+                              <span className="tabular-nums font-medium">{odd.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            /* ── List with expandable bookmaker rows ── */
+            <div className="divide-y divide-slate-50">
+              {outcomes.map(([outcome, val]) => {
+                const bkOptions = buildBkOptions(val);
+                if (bkOptions.length === 0) return null;
+                const bestBk = bkOptions[0];
+                const key = `${market}__${outcome}`;
+                const currentBk = selectedBk[key] ?? bestBk.bk;
+                const currentOdd = bkOptions.find((b) => b.bk === currentBk)?.odd ?? bestBk.odd;
+                const isExpanded = expandedOutcome === key;
+
+                const altModel = getAltModelInfo(market, outcome);
+                const hasEdge = altModel.edge !== null && altModel.edge > 0;
+
+                return (
+                  <div key={outcome}>
+                    <div className={`flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50 transition-colors cursor-pointer ${hasEdge ? "border-l-2 border-amber-400" : ""}`}
+                      onClick={() => bkOptions.length > 1 && setExpandedOutcome(isExpanded ? null : key)}
+                    >
+                      <span className="flex-1 text-sm text-slate-600 truncate">{outcome}</span>
+                      {altModel.prob !== null && (
+                        <span className="text-[10px] text-slate-400 shrink-0">
+                          {(altModel.prob * 100).toFixed(1)}%
+                          {hasEdge && <span className="text-emerald-600 ml-1 font-semibold">+{(altModel.edge! * 100).toFixed(1)}%</span>}
+                        </span>
+                      )}
+                      <span className="text-base font-bold tabular-nums text-slate-900 min-w-[3rem] text-right shrink-0">{currentOdd.toFixed(2)}</span>
+                      <span className="text-[10px] text-slate-400 shrink-0 max-w-[70px] truncate">{currentBk}</span>
+                      {bkOptions.length > 1 && (
+                        <span className="text-slate-300 shrink-0">
+                          {isExpanded
+                            ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                            : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>}
+                        </span>
+                      )}
+                    </div>
+                    {isExpanded && bkOptions.length > 1 && (
+                      <div className="bg-slate-50 px-4 py-2 border-t border-slate-100">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1">
+                          {bkOptions.map(({ bk, odd }, i) => (
+                            <button key={bk}
+                              onClick={() => setSelectedBk((prev) => ({ ...prev, [key]: bk }))}
+                              className={`flex justify-between py-1 px-2 rounded text-[11px] transition-colors ${
+                                bk === currentBk ? "bg-blue-50 text-blue-700 font-semibold" :
+                                i === 0 ? "text-emerald-700 font-medium hover:bg-emerald-50" :
+                                "text-slate-600 hover:bg-slate-100"
+                              }`}
+                            >
+                              <span className="truncate mr-1">{bk}</span>
+                              <span className="tabular-nums">{odd.toFixed(2)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CotesTab({ am }: { am: AIScanMatch }) {
   const odds = am.odds as Record<string, Record<string, unknown>>;
-  const [selectedBk, setSelectedBk] = useState<Record<string, string>>({});
 
   if (!odds || Object.keys(odds).length === 0) {
     return <p className="text-sm text-slate-400">Aucune cote disponible.</p>;
@@ -1152,7 +1360,7 @@ function CotesTab({ am }: { am: AIScanMatch }) {
             "draw_no_bet": "Match nul rembourse",
             "goalscorer_first": "Premier buteur",
             "goalscorer_anytime": "Buteur (a tout moment)",
-            "asian_handicap": "Handicap asiatique",
+            "asian_handicap": "Handicap",
           };
 
   const orderedMarkets = [
@@ -1160,7 +1368,6 @@ function CotesTab({ am }: { am: AIScanMatch }) {
     ...Object.keys(odds).filter((m) => !MARKET_ORDER.includes(m)),
   ];
 
-  // Model probs for main market probability bar
   const modelProbs: Record<string, number> = isTennis
     ? { P1: am.model_prob_home ?? 0, P2: am.model_prob_away ?? 0 }
     : (isNBAOdds || isMLBOdds)
@@ -1169,7 +1376,6 @@ function CotesTab({ am }: { am: AIScanMatch }) {
   const maxProb = Math.max(...Object.values(modelProbs));
   const mainMarket = isTennis || isNBAOdds || isMLBOdds ? "winner" : "1x2";
 
-  // Model info for alternative markets (BTTS, Over 2.5)
   function getAltModelInfo(market: string, outcome: string): { prob: number | null; edge: number | null } {
     const o = outcome.toLowerCase();
     if ((market === "btts" || market === "both_teams_to_score") && (o === "yes" || o === "oui")) {
@@ -1181,145 +1387,29 @@ function CotesTab({ am }: { am: AIScanMatch }) {
     return { prob: null, edge: null };
   }
 
-  function buildBkOptions(val: unknown): { bk: string; odd: number }[] {
-    if (typeof val === "number") return [{ bk: "Modèle IA", odd: val }];
-    if (val && typeof val === "object") {
-      return Object.entries(val as Record<string, number>)
-        .map(([bk, odd]) => ({ bk, odd: Number(odd) }))
-        .filter(({ odd }) => odd > 0)
-        .sort((a, b) => b.odd - a.odd);
-    }
-    return [];
-  }
-
   return (
-    <div className="space-y-6">
-      {orderedMarkets.map((market) => {
+    <div className="space-y-3">
+      {/* Summary: number of markets */}
+      <div className="flex items-center gap-2 text-[11px] text-slate-400">
+        <BarChart2 size={12} />
+        <span>{orderedMarkets.length} marches disponibles</span>
+      </div>
+      {orderedMarkets.map((market, idx) => {
         const outcomes = odds[market];
         if (!outcomes || typeof outcomes !== "object") return null;
         const entries = Object.entries(outcomes);
-        const isCard = CARD_MARKETS.has(market) && entries.length <= 3;
-
         return (
-          <div key={market}>
-            {/* Market label with line */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap">
-                {MARKET_LABELS[market] ?? market.replace(/_/g, " ")}
-              </span>
-              <div className="flex-1 h-px bg-slate-100" />
-            </div>
-
-            {isCard ? (
-              /* ── Horizontal cards (style épuré) ── */
-              <div className={`grid gap-2 ${entries.length === 2 ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-3"}`}>
-                {entries.map(([outcome, val]) => {
-                  const bkOptions = buildBkOptions(val);
-                  if (bkOptions.length === 0) return null;
-                  const bestBk = bkOptions[0];
-                  const key = `${market}__${outcome}`;
-                  const currentBk = selectedBk[key] ?? bestBk.bk;
-                  const currentOdd = bkOptions.find((b) => b.bk === currentBk)?.odd ?? bestBk.odd;
-                  const prob = market === mainMarket ? (modelProbs[outcome] ?? 0) : 0;
-                  const isFav = market === mainMarket && prob === maxProb && maxProb > 0;
-                  const altModel = getAltModelInfo(market, outcome);
-                  const hasAltModel = altModel.prob !== null;
-                  const hasValueEdge = altModel.edge !== null && altModel.edge > 0;
-
-                  return (
-                    <div key={outcome} className={`flex flex-col rounded-xl overflow-hidden border-2 bg-white shadow-sm ${isFav ? "border-emerald-300" : hasValueEdge ? "border-amber-300" : "border-slate-100"}`}>
-                      {/* Prob bar top */}
-                      {market === mainMarket && prob > 0 && (
-                        <div className={`h-1 w-full ${isFav ? "bg-emerald-400" : "bg-slate-200"}`} />
-                      )}
-                      {hasAltModel && (
-                        <div className={`h-1 w-full ${hasValueEdge ? "bg-amber-400" : "bg-slate-200"}`}
-                          style={{ width: `${(altModel.prob! * 100).toFixed(0)}%` }} />
-                      )}
-                      {/* Card body */}
-                      <div className="flex flex-col items-center px-2 pt-2.5 pb-2 gap-1">
-                        <span className="text-[10px] font-medium text-slate-500 text-center leading-tight w-full truncate text-center uppercase tracking-wide">
-                          {outcome}
-                        </span>
-                        <span className={`text-2xl font-bold tabular-nums ${isFav ? "text-emerald-600" : "text-slate-800"}`}>
-                          {currentOdd.toFixed(2)}
-                        </span>
-                        {market === mainMarket && prob > 0 && (
-                          <span className={`text-[9px] font-medium ${isFav ? "text-emerald-500" : "text-slate-400"}`}>
-                            {(prob * 100).toFixed(0)}%
-                          </span>
-                        )}
-                        {hasAltModel && (
-                          <span className={`text-[9px] font-medium ${hasValueEdge ? "text-amber-600" : "text-slate-400"}`}>
-                            modele {(altModel.prob! * 100).toFixed(1)}%
-                            {altModel.edge !== null && altModel.edge > 0 && (
-                              <span className="text-emerald-600 ml-1">+{(altModel.edge * 100).toFixed(1)}% edge</span>
-                            )}
-                          </span>
-                        )}
-                        {bkOptions.length > 1 ? (
-                          <select
-                            className="text-[10px] text-slate-400 bg-slate-50 border border-slate-100 rounded px-1 py-0.5 cursor-pointer focus:outline-none w-full text-center mt-0.5"
-                            value={currentBk}
-                            onChange={(e) => setSelectedBk((prev) => ({ ...prev, [key]: e.target.value }))}
-                          >
-                            {bkOptions.map(({ bk, odd }) => (
-                              <option key={bk} value={bk}>{bk} : {odd.toFixed(2)}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 mt-0.5">{bestBk.bk}</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              /* ── Vertical list (O/U, goalscorer, handicap, etc.) ── */
-              <div className="divide-y divide-slate-50 border border-slate-100 rounded-xl overflow-hidden">
-                {entries.map(([outcome, val]) => {
-                  const bkOptions = buildBkOptions(val);
-                  if (bkOptions.length === 0) return null;
-                  const bestBk = bkOptions[0];
-                  const key = `${market}__${outcome}`;
-                  const currentBk = selectedBk[key] ?? bestBk.bk;
-                  const currentOdd = bkOptions.find((b) => b.bk === currentBk)?.odd ?? bestBk.odd;
-
-                  const listAltModel = getAltModelInfo(market, outcome);
-                  const listHasEdge = listAltModel.edge !== null && listAltModel.edge > 0;
-
-                  return (
-                    <div key={outcome} className={`flex items-center gap-3 bg-white px-3 py-2.5 hover:bg-slate-50 transition-colors ${listHasEdge ? "border-l-2 border-amber-400" : ""}`}>
-                      <span className="flex-1 text-sm text-slate-600 truncate">{outcome}</span>
-                      {listAltModel.prob !== null && (
-                        <span className="text-[10px] text-slate-400">
-                          {(listAltModel.prob * 100).toFixed(1)}%
-                          {listHasEdge && <span className="text-emerald-600 ml-1 font-semibold">+{(listAltModel.edge! * 100).toFixed(1)}%</span>}
-                        </span>
-                      )}
-                      <span className="text-base font-bold tabular-nums text-slate-900 min-w-[3rem] text-right">
-                        {currentOdd.toFixed(2)}
-                      </span>
-                      {bkOptions.length > 1 ? (
-                        <select
-                          className="text-[11px] text-slate-500 bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 cursor-pointer focus:outline-none focus:border-blue-300 max-w-[110px]"
-                          value={currentBk}
-                          onChange={(e) => setSelectedBk((prev) => ({ ...prev, [key]: e.target.value }))}
-                        >
-                          {bkOptions.map(({ bk, odd }) => (
-                            <option key={bk} value={bk}>{bk} : {odd.toFixed(2)}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-[11px] text-slate-400 max-w-[110px] truncate">{bestBk.bk}</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <CotesMarketSection
+            key={market}
+            market={market}
+            label={MARKET_LABELS[market] ?? market.replace(/_/g, " ")}
+            outcomes={entries}
+            isMainMarket={market === mainMarket}
+            modelProbs={modelProbs}
+            maxProb={maxProb}
+            getAltModelInfo={getAltModelInfo}
+            defaultOpen={idx < 3}
+          />
         );
       })}
     </div>
@@ -1760,12 +1850,6 @@ function NBAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away:
 
   return (
     <div className="space-y-4">
-      {am.nba_ml_used && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
-          <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
-          <span className="text-xs text-orange-700 font-medium">Modele ML actif (XGBoost + LightGBM, 38 features)</span>
-        </div>
-      )}
       {/* Win rates + point differential */}
       {(am.home_win_rate_10 != null || am.away_win_rate_10 != null) && (
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
@@ -1854,6 +1938,59 @@ function NBAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away:
             <span><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1" />Value (modele &gt; marche)</span>
             <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1" />Cote trop basse</span>
           </div>
+        </div>
+      )}
+      {/* Secondary markets: Over/Under edge */}
+      {am.total_line != null && am.odds_over != null && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap size={15} className="text-amber-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Marches secondaires</h4>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white rounded-lg border border-slate-200 p-3">
+              <div className="text-[11px] text-slate-500 font-medium mb-1">Over {am.total_line}</div>
+              {am.odds_over != null && (
+                <div className="text-lg font-bold text-slate-800">{am.odds_over.toFixed(2)}</div>
+              )}
+              {am.edges?.Over != null && (
+                <div className={`text-xs font-semibold mt-1 ${am.edges.Over > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                  Edge : {am.edges.Over > 0 ? "+" : ""}{(am.edges.Over * 100).toFixed(1)}%
+                </div>
+              )}
+            </div>
+            <div className="bg-white rounded-lg border border-slate-200 p-3">
+              <div className="text-[11px] text-slate-500 font-medium mb-1">Under {am.total_line}</div>
+              {am.odds_under != null && (
+                <div className="text-lg font-bold text-slate-800">{am.odds_under.toFixed(2)}</div>
+              )}
+              {am.edges?.Under != null && (
+                <div className={`text-xs font-semibold mt-1 ${am.edges.Under > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                  Edge : {am.edges.Under > 0 ? "+" : ""}{(am.edges.Under * 100).toFixed(1)}%
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Rest days */}
+      {(am.home_rest_days != null || am.away_rest_days != null) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock size={15} className="text-slate-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Repos</h4>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="flex justify-between"><span className="text-slate-500">{home}</span><span className="font-semibold">{am.home_rest_days ?? "?"}j</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">{away}</span><span className="font-semibold">{am.away_rest_days ?? "?"}j</span></div>
+          </div>
+        </div>
+      )}
+      {/* Venue */}
+      {am.venue && (
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <MapPin size={12} />
+          <span>{am.venue}</span>
         </div>
       )}
       {/* Data quality */}
@@ -2048,12 +2185,6 @@ function NBAStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: 
 function RugbyAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away: string }) {
   return (
     <div className="space-y-4">
-      {am.rugby_ml_used && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
-          <span className="w-2 h-2 rounded-full bg-green-600 flex-shrink-0" />
-          <span className="text-xs text-green-700 font-medium">Modele ML actif (XGBoost + LightGBM, 36 features)</span>
-        </div>
-      )}
       {/* Win rates + point differential */}
       {(am.home_win_rate_10 != null || am.away_win_rate_10 != null) && (
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
@@ -2130,6 +2261,95 @@ function RugbyAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; aw
                 <span className="font-semibold text-slate-700">{am.total_line} pts</span>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* Secondary markets: Over/Under edge */}
+      {am.total_line != null && am.odds_over != null && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap size={15} className="text-amber-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Marches secondaires</h4>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white rounded-lg border border-slate-200 p-3">
+              <div className="text-[11px] text-slate-500 font-medium mb-1">Over {am.total_line}</div>
+              <div className="text-lg font-bold text-slate-800">{am.odds_over?.toFixed(2)}</div>
+              {am.edges?.Over != null && (
+                <div className={`text-xs font-semibold mt-1 ${am.edges.Over > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                  Edge : {am.edges.Over > 0 ? "+" : ""}{(am.edges.Over * 100).toFixed(1)}%
+                </div>
+              )}
+            </div>
+            <div className="bg-white rounded-lg border border-slate-200 p-3">
+              <div className="text-[11px] text-slate-500 font-medium mb-1">Under {am.total_line}</div>
+              <div className="text-lg font-bold text-slate-800">{am.odds_under?.toFixed(2)}</div>
+              {am.edges?.Under != null && (
+                <div className={`text-xs font-semibold mt-1 ${am.edges.Under > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                  Edge : {am.edges.Under > 0 ? "+" : ""}{(am.edges.Under * 100).toFixed(1)}%
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Edge breakdown */}
+      {(() => {
+        const edges = am.edges ?? {};
+        const edgeData = Object.entries(edges)
+          .filter(([k]) => k === "H" || k === "D" || k === "A")
+          .map(([k, v]) => ({
+            name: k === "H" ? home : k === "D" ? "Nul" : away,
+            value: parseFloat((v * 100).toFixed(2)),
+            fill: v > 0 ? "#10b981" : "#ef4444",
+          }))
+          .filter((d) => Math.abs(d.value) > 0.01);
+        if (edgeData.length === 0) return null;
+        return (
+          <div>
+            <div className="text-xs font-semibold text-slate-600 mb-2">Avantage modele vs bookmakers</div>
+            <div className="h-24">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={edgeData} layout="vertical" margin={{ left: 80, right: 30, top: 0, bottom: 0 }}>
+                  <XAxis type="number" stroke="#94a3b8" tick={{ fontSize: 10 }} tickFormatter={(v) => `${v > 0 ? "+" : ""}${v}%`} />
+                  <YAxis type="category" dataKey="name" stroke="#94a3b8" tick={{ fontSize: 10 }} width={75} />
+                  <Tooltip formatter={(v: number | undefined) => { const n = v ?? 0; return `${n > 0 ? "+" : ""}${n}%`; }} contentStyle={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 11 }} />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                    {edgeData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex gap-4 text-[10px] text-slate-400 mt-1">
+              <span><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1" />Value (modele &gt; marche)</span>
+              <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1" />Cote trop basse</span>
+            </div>
+          </div>
+        );
+      })()}
+      {/* Rest days */}
+      {(am.home_rest_days != null || am.away_rest_days != null) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock size={15} className="text-slate-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Repos</h4>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="flex justify-between"><span className="text-slate-500">{home}</span><span className="font-semibold">{am.home_rest_days ?? "?"}j</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">{away}</span><span className="font-semibold">{am.away_rest_days ?? "?"}j</span></div>
+          </div>
+        </div>
+      )}
+      {/* Data quality */}
+      {am.data_quality && (
+        <div>
+          <div className="text-xs font-semibold text-slate-600 mb-2">Fiabilite des donnees</div>
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${am.data_quality === "green" ? "bg-emerald-500" : am.data_quality === "yellow" ? "bg-amber-400" : "bg-red-500"}`} />
+            <span className="text-sm text-slate-700">
+              {am.data_quality === "green" ? "Excellente" : am.data_quality === "yellow" ? "Correcte" : "Limitee"}
+              {am.data_score != null && <span className="text-slate-400 ml-1">({Math.round(am.data_score * 7)}/7 points)</span>}
+            </span>
           </div>
         </div>
       )}
@@ -2266,12 +2486,6 @@ function MLBAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away
 
   return (
     <div className="space-y-4">
-      {am.mlb_ml_used && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
-          <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
-          <span className="text-xs text-orange-700 font-medium">Modele ML actif (XGBoost + LightGBM, features baseball)</span>
-        </div>
-      )}
       {/* Pitcher matchup */}
       {(am.starter_home_name || am.starter_away_name) && (
         <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
@@ -2348,6 +2562,59 @@ function MLBAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away
           </div>
         </div>
       )}
+      {/* Secondary markets: Over/Under edge */}
+      {am.total_line != null && am.odds_over != null && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap size={15} className="text-amber-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Marches secondaires</h4>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white rounded-lg border border-slate-200 p-3">
+              <div className="text-[11px] text-slate-500 font-medium mb-1">Over {am.total_line}</div>
+              {am.odds_over != null && (
+                <div className="text-lg font-bold text-slate-800">{am.odds_over.toFixed(2)}</div>
+              )}
+              {am.edges?.Over != null && (
+                <div className={`text-xs font-semibold mt-1 ${am.edges.Over > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                  Edge : {am.edges.Over > 0 ? "+" : ""}{(am.edges.Over * 100).toFixed(1)}%
+                </div>
+              )}
+            </div>
+            <div className="bg-white rounded-lg border border-slate-200 p-3">
+              <div className="text-[11px] text-slate-500 font-medium mb-1">Under {am.total_line}</div>
+              {am.odds_under != null && (
+                <div className="text-lg font-bold text-slate-800">{am.odds_under.toFixed(2)}</div>
+              )}
+              {am.edges?.Under != null && (
+                <div className={`text-xs font-semibold mt-1 ${am.edges.Under > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                  Edge : {am.edges.Under > 0 ? "+" : ""}{(am.edges.Under * 100).toFixed(1)}%
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Rest days */}
+      {(am.home_rest_days != null || am.away_rest_days != null) && (
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock size={15} className="text-slate-500" />
+            <h4 className="text-slate-900 font-semibold text-sm">Repos</h4>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="flex justify-between"><span className="text-slate-500">{home}</span><span className="font-semibold">{am.home_rest_days ?? "?"}j</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">{away}</span><span className="font-semibold">{am.away_rest_days ?? "?"}j</span></div>
+          </div>
+        </div>
+      )}
+      {/* Venue */}
+      {am.venue && (
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <MapPin size={12} />
+          <span>{am.venue}</span>
+        </div>
+      )}
       {/* Data quality */}
       {am.data_quality && (
         <div>
@@ -2372,12 +2639,6 @@ function MLBAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away
           <p className="text-xs text-slate-600 leading-relaxed">{am.context}</p>
         </div>
       )}
-      {/* Venue */}
-      {am.venue && (
-        <div className="text-[11px] text-slate-500">
-          <span>Stade : <span className="text-slate-700 font-medium">{am.venue}</span></span>
-        </div>
-      )}
     </div>
   );
 }
@@ -2385,13 +2646,13 @@ function MLBAnalyseTab({ am, home, away }: { am: AIScanMatch; home: string; away
 // ─── MLB Stats Tab ────────────────────────────────────────────────────────────
 
 function MLBStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: string }) {
-  const rows: { label: string; hv: string | null; av: string | null; lowerBetter?: boolean }[] = [
+  const rows: { label: string; hv: string | null; av: string | null; lowerBetter?: boolean; tooltip?: string }[] = [
     { label: "Runs marques / match (10j)", hv: am.home_runs_avg_10 != null ? am.home_runs_avg_10.toFixed(2) : null, av: am.away_runs_avg_10 != null ? am.away_runs_avg_10.toFixed(2) : null },
     { label: "Runs encaisses / match (10j)", hv: am.home_runs_allowed_10 != null ? am.home_runs_allowed_10.toFixed(2) : null, av: am.away_runs_allowed_10 != null ? am.away_runs_allowed_10.toFixed(2) : null, lowerBetter: true },
     { label: "Moyenne au baton (BA)", hv: am.home_batting_avg != null ? am.home_batting_avg.toFixed(3) : null, av: am.away_batting_avg != null ? am.away_batting_avg.toFixed(3) : null },
-    { label: "OBP (On-Base %)", hv: am.home_obp != null ? am.home_obp.toFixed(3) : null, av: am.away_obp != null ? am.away_obp.toFixed(3) : null },
-    { label: "SLG (Slugging)", hv: am.home_slg != null ? am.home_slg.toFixed(3) : null, av: am.away_slg != null ? am.away_slg.toFixed(3) : null },
-    { label: "OPS (OBP + SLG)", hv: am.home_ops != null ? am.home_ops.toFixed(3) : null, av: am.away_ops != null ? am.away_ops.toFixed(3) : null },
+    { label: "OBP (On-Base %)", hv: am.home_obp != null ? am.home_obp.toFixed(3) : null, av: am.away_obp != null ? am.away_obp.toFixed(3) : null, tooltip: "On-Base Percentage — frequence a laquelle un batteur atteint la base (coup sur, but sur balles ou atteint par lancer)." },
+    { label: "SLG (Slugging)", hv: am.home_slg != null ? am.home_slg.toFixed(3) : null, av: am.away_slg != null ? am.away_slg.toFixed(3) : null, tooltip: "Slugging — puissance de frappe moyenne. Mesure le nombre total de bases obtenues par passage au baton." },
+    { label: "OPS (OBP + SLG)", hv: am.home_ops != null ? am.home_ops.toFixed(3) : null, av: am.away_ops != null ? am.away_ops.toFixed(3) : null, tooltip: "On-base Plus Slugging — mesure combinee d'un batteur. Somme du OBP et du SLG." },
     { label: "ERA (equipe, saison)", hv: am.home_era != null ? am.home_era.toFixed(2) : null, av: am.away_era != null ? am.away_era.toFixed(2) : null, lowerBetter: true },
   ].filter(r => r.hv != null || r.av != null);
 
@@ -2494,12 +2755,12 @@ function MLBStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away: 
             <div className="text-right text-blue-600 font-semibold text-xs truncate">{home}</div>
             <div className="text-center text-slate-400 text-xs">VS</div>
             <div className="text-left text-red-600 font-semibold text-xs truncate">{away}</div>
-            {rows.map(({ label, hv, av, lowerBetter }) => {
+            {rows.map(({ label, hv, av, lowerBetter, tooltip }) => {
               const hNum = parseFloat(hv?.replace(/[^0-9.-]/g, "") ?? "");
               const aNum = parseFloat(av?.replace(/[^0-9.-]/g, "") ?? "");
               const canCompare = !isNaN(hNum) && !isNaN(aNum) && hNum !== aNum;
               const homeBetter = canCompare ? (lowerBetter ? hNum < aNum : hNum > aNum) : undefined;
-              return <FormRow key={label} label={label} homeVal={hv ?? "-"} awayVal={av ?? "-"} homeBetter={homeBetter} />;
+              return <FormRow key={label} label={label} homeVal={hv ?? "-"} awayVal={av ?? "-"} homeBetter={homeBetter} tooltip={tooltip} />;
             })}
           </div>
         </div>

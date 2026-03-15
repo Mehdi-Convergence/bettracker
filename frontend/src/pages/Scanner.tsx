@@ -815,7 +815,13 @@ export default function Scanner() {
                         ? "bg-[#3b5bdb] text-white shadow-sm"
                         : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"
                     }`}>
-                    {s === "football" ? "⚽ Football" : s === "tennis" ? "🎾 Tennis" : s === "nba" ? "🏀 NBA" : s === "rugby" ? "🏉 Rugby" : s === "mlb" ? "⚾ MLB" : "🐎 PMU"}
+                    {s === "football" ? "⚽ Football" : s === "tennis" ? "🎾 Tennis" : s === "nba" ? "🏀 NBA" : s === "rugby" ? (
+                      <span className="flex items-center gap-1">🏉 Rugby<span className="text-[8px] font-bold text-amber-500 bg-amber-500/10 px-1 py-0.5 rounded uppercase leading-none">beta</span></span>
+                    ) : s === "mlb" ? (
+                      <span className="flex items-center gap-1">⚾ MLB<span className="text-[8px] font-bold text-amber-500 bg-amber-500/10 px-1 py-0.5 rounded uppercase leading-none">beta</span></span>
+                    ) : (
+                      <span className="flex items-center gap-1">🐎 PMU<span className="text-[8px] font-bold text-amber-500 bg-amber-500/10 px-1 py-0.5 rounded uppercase leading-none">beta</span></span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -900,12 +906,12 @@ export default function Scanner() {
                 className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg px-2 py-[5px] text-[11px] text-[#111318] w-14" />
             </div>
             <div>
-              <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Cote min</label>
+              <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Cote min<Tip text="Filtrer les matchs par fourchette de cotes. Cote min = eviter les favoris, Cote max = eviter les outsiders." /></label>
               <input type="number" step="0.1" min="1" placeholder="1.3" value={minOdds} onChange={(e) => setMinOdds(e.target.value)}
                 className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg px-2 py-[5px] text-[11px] text-[#111318] w-16" />
             </div>
             <div>
-              <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Cote max</label>
+              <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Cote max<Tip text="Filtrer les matchs par fourchette de cotes. Cote min = eviter les favoris, Cote max = eviter les outsiders." /></label>
               <input type="number" step="0.1" min="1" placeholder="3.0" value={maxOdds} onChange={(e) => setMaxOdds(e.target.value)}
                 className="bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg px-2 py-[5px] text-[11px] text-[#111318] w-16" />
             </div>
@@ -1286,6 +1292,7 @@ export default function Scanner() {
           {/* Shared: Value bets + Masquer en ticket */}
           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#f0f1f3]">
             <button data-tour="value-toggle" onClick={() => setValueOnlyFilter(!valueOnlyFilter)}
+              title="N'afficher que les matchs ou le modele detecte une valeur positive (edge > 0)."
               className={`flex items-center gap-1 px-2.5 py-[5px] rounded-full text-[11px] font-semibold transition-all ${valueOnlyFilter ? "bg-[#12b76a] text-white" : "bg-[#f4f5f7] text-[#8a919e] hover:text-[#111318]"}`}>
               <TrendingUp size={10} /> Value bets
             </button>
@@ -1476,13 +1483,15 @@ export default function Scanner() {
           {/* Sort */}
           <div className="flex items-center gap-1.5">
             <Filter size={11} className="text-[#8a919e]" />
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}
-              className="bg-white border border-[#e3e6eb] rounded-lg px-2 py-[5px] text-[11px] text-[#111318] font-medium focus:ring-2 focus:ring-[#3b5bdb]/30 outline-none">
-              <option value="prob">Probabilite</option>
-              <option value="edge">Edge</option>
-              <option value="date">Date</option>
-              <option value="league">Ligue</option>
-            </select>
+            <span className="inline-block cursor-help" title="Trier les matchs par probabilite (confiance du modele), edge (valeur detectee), date ou ligue.">
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}
+                className="bg-white border border-[#e3e6eb] rounded-lg px-2 py-[5px] text-[11px] text-[#111318] font-medium focus:ring-2 focus:ring-[#3b5bdb]/30 outline-none">
+                <option value="prob">Probabilite</option>
+                <option value="edge">Edge</option>
+                <option value="date">Date</option>
+                <option value="league">Ligue</option>
+              </select>
+            </span>
           </div>
         </div>
       </div>
