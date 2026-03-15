@@ -103,6 +103,19 @@ def get_system_overview(
 ):
     redis_ok = is_redis_available()
 
+    # Redis latency
+    redis_latency_ms: float | None = None
+    if redis_ok:
+        try:
+            from src.cache import _get_redis
+            r = _get_redis()
+            if r:
+                t0 = time.time()
+                r.ping()
+                redis_latency_ms = round((time.time() - t0) * 1000, 1)
+        except Exception:
+            pass
+
     # DB ok + size
     db_ok = False
     db_size_mb: float | None = None
@@ -138,10 +151,10 @@ def get_system_overview(
         last_heartbeat = _ts_to_iso(latest_ts)
 
     return {
-        "redis": {"ok": redis_ok, "latency_ms": None},
+        "redis": {"ok": redis_ok, "latency_ms": redis_latency_ms},
         "db": {"ok": db_ok, "size_mb": db_size_mb},
         "worker": {"ok": worker_ok, "last_heartbeat": last_heartbeat},
-        "last_deploy": None,
+        "last_deploy": _ts_to_iso(cache_get("deploy:last_timestamp")),
         "uptime_seconds": None,
     }
 

@@ -30,7 +30,7 @@ logger = logging.getLogger("scan_worker")
 def _odds_api_budget_check(sport: str, cost: int = 1) -> bool:
     """Check if we can make an Odds API request within the daily credit budget.
 
-    Cost = markets × regions per call.  See ODDS_API_DAILY_BUDGET in config.
+    Cost = markets x regions per call.  See ODDS_API_DAILY_BUDGET in config.
     Returns True if within budget (and increments counter), False if budget exhausted.
     """
     from src.config import settings
@@ -46,19 +46,30 @@ def _odds_api_budget_check(sport: str, cost: int = 1) -> bool:
             "Odds API daily budget exhausted (%d/%d) — skipping %s scan, using cached data",
             daily_used, budget, sport,
         )
-        # Track the skip for admin monitoring
         cache_set(f"scan:stats:{sport}:last_budget_skip", time.time(), ttl=86400)
         return False
 
-    # Increment counter
+    # Increment counter with estimated cost (will be corrected by sync_odds_api_usage)
     cache_set(day_key, daily_used + cost, ttl=86400)
 
-    # Track per-sport usage
     by_sport = cache_get(sport_key) or {}
     by_sport[sport] = by_sport.get(sport, 0) + cost
     cache_set(sport_key, by_sport, ttl=86400)
 
     return True
+
+
+def _sync_odds_api_usage(client) -> None:
+    """Sync Redis budget counter with real Odds API usage from response headers."""
+    from datetime import datetime as _dt
+
+    remaining = getattr(client, "remaining_requests", None)
+    if remaining is None:
+        return
+    # Total plan credits = 20000 (plan $30)
+    real_used = 20000 - remaining
+    day_key = f"odds_api_daily:{_dt.now().strftime('%Y-%m-%d')}"
+    cache_set(day_key, real_used, ttl=86400)
 
 
 def _track_scan_result(sport: str, match_count: int, error: str | None = None) -> None:
@@ -681,6 +692,8 @@ async def run_football_scan(league_list: list[str] | None = None):
     except Exception as exc:
         logger.warning("File backup failed: %s", exc)
 
+    _track_scan_result("football", len(matches_out))
+
     logger.info(
         "Football scan completed: %d matches (%d passed filter) in %.1fs",
         len(fixtures), len(matches_out), duration,
@@ -988,6 +1001,7 @@ async def run_tennis_scan():
     cache_set("scan:meta:last_tennis", time.time(), ttl=86400)
 
     _track_scan_result("tennis", len(matches))
+    _sync_odds_api_usage(tennis_client)
     logger.info("Tennis scan completed: %d matches in %.1fs", len(matches), duration)
 
 
@@ -1279,6 +1293,7 @@ async def run_nba_scan():
     cache_set("scan:nba:all", cache_payload, ttl=SCAN_CACHE_TTL + 300)
     cache_set("scan:meta:last_nba", time.time(), ttl=86400)
     _track_scan_result("nba", len(matches))
+    _sync_odds_api_usage(nba_client)
     logger.info("NBA scan completed: %d games in %.1fs", len(matches), duration)
 
 
@@ -1549,6 +1564,7 @@ async def run_rugby_scan():
     cache_set("scan:rugby:all", cache_payload, ttl=SCAN_CACHE_TTL + 300)
     cache_set("scan:meta:last_rugby", time.time(), ttl=86400)
     _track_scan_result("rugby", len(matches))
+    _sync_odds_api_usage(rugby_odds_client)
     logger.info("Rugby scan completed: %d matches in %.1fs", len(matches), duration)
 
 
@@ -1825,6 +1841,8 @@ async def run_mlb_scan():
     except Exception as exc:
         logger.warning("MLB file backup failed: %s", exc)
 
+    _track_scan_result("mlb", len(matches))
+    _sync_odds_api_usage(mlb_client)
     logger.info("MLB scan completed: %d games in %.1fs", len(matches), duration)
 
 
@@ -2153,6 +2171,8 @@ async def run_pmu_scan():
         backup_file.write_text(json.dumps(cache_payload, ensure_ascii=False, default=str), encoding="utf-8")
     except Exception as exc:
         logger.warning("PMU file backup failed: %s", exc)
+
+    _track_scan_result("pmu", len(races_out))
 
     logger.info("PMU scan completed: %d races in %.1fs", len(races_out), duration)
 
