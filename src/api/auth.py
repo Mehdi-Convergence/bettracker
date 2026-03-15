@@ -313,6 +313,7 @@ def _user_to_response(user: User) -> UserResponse:
         display_name=user.display_name,
         tier=user.tier,
         is_active=user.is_active,
+        is_admin=getattr(user, "is_admin", False),
         trial_ends_at=user.trial_ends_at.isoformat() if user.trial_ends_at else None,
         created_at=user.created_at.isoformat() if user.created_at else "",
         onboarding_completed=user.onboarding_completed,

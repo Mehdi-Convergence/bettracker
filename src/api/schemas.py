@@ -54,6 +54,7 @@ class UserResponse(BaseModel):
     is_active: bool
     trial_ends_at: str | None = None
     created_at: str
+    is_admin: bool = False
     onboarding_completed: bool = False
     visited_modules: list[str] = []
 
