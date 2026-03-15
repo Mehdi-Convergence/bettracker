@@ -306,7 +306,7 @@ export default function CampaignDetail() {
           </div>
           <p className="text-xs text-[#8a919e] mt-0.5">
             Football · Edge {"\u2265"} {(campaign.min_edge * 100).toFixed(0)}% · Mise {(campaign.flat_stake * 100).toFixed(0)}%
-            {campaign.target_bankroll && ` · Objectif ${campaign.target_bankroll}\€`}
+            {campaign.target_bankroll && ` · Objectif ${campaign.target_bankroll}€`}
           </p>
         </div>
         {!isArchived && (
@@ -351,19 +351,19 @@ export default function CampaignDetail() {
           value={stats.won + stats.lost > 0 ? `${(stats.win_rate * 100).toFixed(1)}%` : "\u2014"}
           color={ACCENT} />
         <KpiCard label="Mise totale"
-          value={`${stats.total_staked.toFixed(0)}\€`}
+          value={`${stats.total_staked.toFixed(0)}€`}
           color="#111318" />
         <KpiCard label="Gain net"
-          value={`${stats.total_pnl >= 0 ? "+" : ""}${stats.total_pnl.toFixed(2)}\€`}
+          value={`${stats.total_pnl >= 0 ? "+" : ""}${stats.total_pnl.toFixed(2)}€`}
           color={stats.total_pnl >= 0 ? GREEN : RED} />
         <KpiCard label="BK courante"
-          value={`${stats.current_bankroll.toFixed(0)}\€`}
+          value={`${stats.current_bankroll.toFixed(0)}€`}
           color={AMBER} />
         <KpiCard label="Drawdown max"
           value={stats.max_drawdown_pct > 0 ? `-${stats.max_drawdown_pct.toFixed(1)}%` : "0%"}
           color={stats.max_drawdown_pct > 5 ? RED : "#111318"} />
         <KpiCard label="EV attendu"
-          value={`${stats.ev_expected >= 0 ? "+" : ""}${stats.ev_expected.toFixed(2)}\€`}
+          value={`${stats.ev_expected >= 0 ? "+" : ""}${stats.ev_expected.toFixed(2)}€`}
           color={stats.ev_expected >= 0 ? GREEN : RED} />
       </div>
 
@@ -578,9 +578,9 @@ export default function CampaignDetail() {
                 <ParamRow label="Statut" value={statusCfg.label} />
               </ParamBlock>
               <ParamBlock title="Bankroll & Mise">
-                <ParamRow label="Bankroll initiale" value={`${campaign.initial_bankroll}\€`} />
+                <ParamRow label="Bankroll initiale" value={`${campaign.initial_bankroll}€`} />
                 <ParamRow label="Mise" value={`${(campaign.flat_stake * 100).toFixed(0)}% BK`} />
-                {campaign.target_bankroll && <ParamRow label="Objectif" value={`${campaign.target_bankroll}\€`} />}
+                {campaign.target_bankroll && <ParamRow label="Objectif" value={`${campaign.target_bankroll}€`} />}
               </ParamBlock>
               <ParamBlock title="Filtres">
                 <ParamRow label="Edge min" value={`${(campaign.min_edge * 100).toFixed(0)}%`} />
@@ -657,7 +657,7 @@ function SourceBlock({ label, color, stats }: {
         <div className="flex justify-between"><span className="text-[#8a919e]">Tickets</span><span className="font-semibold">{stats.total_bets}</span></div>
         <div className="flex justify-between"><span className="text-[#8a919e]">Réussite</span><span className="font-semibold">{(stats.win_rate * 100).toFixed(0)}%</span></div>
         <div className="flex justify-between"><span className="text-[#8a919e]">CLV moy.</span><span className="font-semibold font-[var(--font-mono)]">{stats.avg_clv != null ? `${stats.avg_clv >= 0 ? "+" : ""}${stats.avg_clv.toFixed(1)}%` : "\u2014"}</span></div>
-        <div className="flex justify-between"><span className="text-[#8a919e]">Mise tot.</span><span className="font-semibold font-[var(--font-mono)]">{stats.total_staked.toFixed(0)}\€</span></div>
+        <div className="flex justify-between"><span className="text-[#8a919e]">Mise tot.</span><span className="font-semibold font-[var(--font-mono)]">{stats.total_staked.toFixed(0)}€</span></div>
       </div>
     </div>
   );
@@ -731,7 +731,7 @@ function RecoRow({ reco, idx, accepting, onAccept, onSkip }: {
       <div className="flex items-center gap-3 shrink-0">
         <span className="font-bold font-[var(--font-mono)]" style={{ color: AMBER }}>{reco.best_odds.toFixed(2)}</span>
         <span className="text-xs font-semibold font-[var(--font-mono)]" style={{ color: GREEN }}>+{(reco.edge * 100).toFixed(1)}%</span>
-        <span className="text-xs font-semibold font-[var(--font-mono)]">{reco.suggested_stake.toFixed(2)}\€</span>
+        <span className="text-xs font-semibold font-[var(--font-mono)]">{reco.suggested_stake.toFixed(2)}€</span>
         <button onClick={() => onAccept(reco, idx)} disabled={accepting}
           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-white transition-colors cursor-pointer disabled:opacity-60"
           style={{ backgroundColor: ACCENT }}
@@ -815,7 +815,7 @@ function TicketKanban({ bets, recos, isArchived, acceptingIdx, updatingBetId, de
               <div className="flex items-center gap-2 mb-2">
                 <span className="font-bold text-sm font-[var(--font-mono)]" style={{ color: AMBER }}>{reco.best_odds.toFixed(2)}</span>
                 <span className="text-[10px] font-semibold font-[var(--font-mono)]" style={{ color: GREEN }}>+{(reco.edge * 100).toFixed(1)}%</span>
-                <span className="text-[10px] font-[var(--font-mono)] text-[#8a919e]">{reco.suggested_stake.toFixed(2)}\€</span>
+                <span className="text-[10px] font-[var(--font-mono)] text-[#8a919e]">{reco.suggested_stake.toFixed(2)}€</span>
               </div>
               {!isArchived && (
                 <div className="flex gap-1.5">
@@ -962,7 +962,7 @@ function TicketTable({ bets, isArchived, updatingBetId, deletingBetId, onUpdateB
                 <td className="px-3 py-2.5 text-right font-[var(--font-mono)] font-semibold" style={{ color: AMBER }}>
                   {bet.odds_at_bet.toFixed(2)}
                 </td>
-                <td className="px-3 py-2.5 text-right font-[var(--font-mono)]">{bet.stake.toFixed(2)}\€</td>
+                <td className="px-3 py-2.5 text-right font-[var(--font-mono)]">{bet.stake.toFixed(2)}€</td>
                 <td className="px-3 py-2.5">
                   {isPending ? (
                     isUpdating ? (
