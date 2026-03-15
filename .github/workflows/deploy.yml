@@ -61,7 +61,7 @@ jobs:
             --exclude='*.db-shm' \
             --exclude='*.db-wal' \
             --exclude='*.db-journal' \
-            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            -e "ssh -i ~/.ssh/deploy_key" \
             ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/bettracker/
 
       - name: Install dependencies and build
@@ -102,6 +102,11 @@ jobs:
 
             echo "-> Running DB migrations (STRICT - fails deploy on error)..."
             uv run alembic upgrade head
+
+            echo "-> Setting DB file permissions..."
+            chmod 600 /opt/bettracker/bettracker.db 2>/dev/null || true
+            chmod 600 /opt/bettracker/bettracker.db-shm 2>/dev/null || true
+            chmod 600 /opt/bettracker/bettracker.db-wal 2>/dev/null || true
 
             echo "-> Installing systemd services + Caddy config..."
             sudo cp deploy/bettracker-api.service /etc/systemd/system/

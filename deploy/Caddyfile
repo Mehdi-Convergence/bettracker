@@ -1,15 +1,11 @@
 betracker.fr {
+    header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+
     # API proxy — doit etre avant file_server
     handle /api/* {
         reverse_proxy localhost:8000
     }
     handle /health {
-        reverse_proxy localhost:8000
-    }
-    handle /docs {
-        reverse_proxy localhost:8000
-    }
-    handle /openapi.json {
         reverse_proxy localhost:8000
     }
 

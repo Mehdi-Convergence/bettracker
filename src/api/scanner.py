@@ -9,9 +9,10 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from src.api.deps import require_tier
+from src.rate_limit import limiter
 from src.api.schemas import (
     AIResearchResponse,
     AIScanMatch,
@@ -73,7 +74,9 @@ def _filter_matches(
 
 
 @router.get("/scanner/ai-scan", response_model=AIScanResponse)
+@limiter.limit("30/minute")
 async def ai_scan(
+    request: Request,
     sport: str = Query(default="football", description="football or tennis"),
     leagues: str = Query(default="", description="Comma-separated league codes"),
     timeframe: str = Query(default="48h", description="24h, 48h, 72h, or 1w"),
@@ -388,7 +391,9 @@ def _read_pmu_scan() -> PMUScanResponse:
 
 
 @router.get("/scanner/pmu", response_model=PMUScanResponse)
+@limiter.limit("30/minute")
 async def pmu_scan(
+    request: Request,
     force: bool = Query(default=False, description="Force refresh depuis l'API PMU"),
 ):
     """Retourne les courses PMU du jour avec probas et edges pre-calcules."""
@@ -402,7 +407,9 @@ async def pmu_scan(
 
 
 @router.get("/scanner/ai-research", response_model=AIResearchResponse)
+@limiter.limit("30/minute")
 async def ai_research(
+    request: Request,
     sport: str = Query(default="football"),
     home: str = Query(..., description="Home team or player 1"),
     away: str = Query(..., description="Away team or player 2"),

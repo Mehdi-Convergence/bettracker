@@ -67,6 +67,30 @@ def cache_set(key: str, value: Any, ttl: int = 1800) -> None:
     _memory_cache[key] = (time.time() + ttl, raw)
 
 
+def cache_incr(key: str, ttl: int = 900) -> int:
+    """Increment a counter in cache. Creates the key at 1 if absent. Returns the new value."""
+    r = _get_redis()
+    if r:
+        try:
+            new_val = r.incr(key)
+            if new_val == 1:
+                r.expire(key, ttl)
+            return new_val
+        except Exception:
+            pass
+
+    # Fallback: in-memory
+    entry = _memory_cache.get(key)
+    now = time.time()
+    if entry is None or now > entry[0]:
+        _memory_cache[key] = (now + ttl, json.dumps(1))
+        return 1
+    current = json.loads(entry[1])
+    new_val = current + 1
+    _memory_cache[key] = (entry[0], json.dumps(new_val))
+    return new_val
+
+
 def cache_delete(key: str) -> None:
     """Delete a key from cache."""
     r = _get_redis()

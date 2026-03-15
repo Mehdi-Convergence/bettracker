@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LogIn, Mail, Lock, Eye, EyeOff, UserPlus, Check, ScanSearch, BarChart2, Bot, MessageCircle } from "lucide-react";
+import { LogIn, Mail, Lock, Eye, EyeOff, UserPlus, Check, ScanSearch, BarChart2, Bot, MessageCircle, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 type Mode = "login" | "signup";
 
 export default function Login() {
-  const { login, register } = useAuth();
+  const { login, login2FAVerify, register } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("login");
 
@@ -17,6 +17,12 @@ export default function Login() {
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // 2FA step
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
+  const [loginToken, setLoginToken] = useState("");
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false);
 
   // Signup
   const [signupName, setSignupName] = useState("");
@@ -30,12 +36,32 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
-      navigate("/dashboard");
+      const result = await login(email, password);
+      if (result && result.requires_2fa) {
+        setLoginToken(result.login_token);
+        setTwoFactorRequired(true);
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur de connexion");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTwoFactorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setTwoFactorLoading(true);
+    try {
+      await login2FAVerify(loginToken, twoFactorCode);
+      navigate("/dashboard");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Code invalide");
+      setTwoFactorCode("");
+    } finally {
+      setTwoFactorLoading(false);
     }
   };
 
@@ -193,8 +219,67 @@ export default function Login() {
             </button>
           </div>
 
+          {/* ── 2FA FORM ── */}
+          {mode === "login" && twoFactorRequired && (
+            <form onSubmit={handleTwoFactorSubmit}>
+              <div className="flex flex-col gap-3.5">
+                <div className="flex items-center gap-3 px-4 py-3.5 rounded-[10px]" style={{ background: "rgba(59,91,219,0.06)", border: "1px solid rgba(59,91,219,0.18)" }}>
+                  <ShieldCheck size={20} className="text-[#3b5bdb] shrink-0" />
+                  <div>
+                    <div className="text-[13px] font-semibold text-[#111318]">Double authentification activee</div>
+                    <div className="text-[12px] text-[#8a919e] mt-0.5">Entrez le code a 6 chiffres de votre application d'authentification</div>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "rgba(240,68,56,0.06)", border: "1px solid rgba(240,68,56,0.2)" }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
+                    {error}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <label className={labelCls}>Code de verification (6 chiffres)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    value={twoFactorCode}
+                    onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="000000"
+                    className={inputNoPadCls + " text-center text-[18px] font-[var(--font-mono)] tracking-[0.3em]"}
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={twoFactorLoading || twoFactorCode.length !== 6}
+                  className="w-full py-[13px] rounded-[10px] border-none bg-[#3b5bdb] text-white text-[14px] font-bold cursor-pointer flex items-center justify-center gap-2 transition-all shadow-[0_2px_8px_rgba(59,91,219,0.3)] hover:bg-[#2f4ac7] hover:-translate-y-px hover:shadow-[0_6px_20px_rgba(59,91,219,0.35)] disabled:opacity-70 mt-1"
+                >
+                  {twoFactorLoading ? (
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                  ) : (
+                    <ShieldCheck size={16} />
+                  )}
+                  Verifier le code
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setTwoFactorRequired(false); setTwoFactorCode(""); setError(""); }}
+                  className="text-[12.5px] text-[#8a919e] bg-transparent border-none cursor-pointer hover:text-[#3c4149] transition-colors text-center"
+                >
+                  Retour a la connexion
+                </button>
+              </div>
+            </form>
+          )}
+
           {/* ── LOGIN FORM ── */}
-          {mode === "login" && (
+          {mode === "login" && !twoFactorRequired && (
             <form onSubmit={handleLogin}>
               <div className="flex flex-col gap-3.5">
                 {error && (

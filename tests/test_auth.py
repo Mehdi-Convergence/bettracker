@@ -77,8 +77,9 @@ def test_login_success(client):
     assert resp.status_code == 200
     data = resp.json()
     assert "access_token" in data
-    assert "refresh_token" in data
+    assert "refresh_token" not in data  # now in httpOnly cookie
     assert data["token_type"] == "bearer"
+    assert "refresh_token" in resp.cookies
 
 
 def test_login_wrong_password(client):
@@ -112,21 +113,20 @@ def test_refresh_token(client):
         "email": "refresh@example.com",
         "password": TEST_PASSWORD,
     })
-    refresh_token = login_resp.json()["refresh_token"]
-
-    resp = client.post("/api/auth/refresh", json={
-        "refresh_token": refresh_token,
-    })
+    # Extract refresh token from Set-Cookie header and set it manually
+    refresh_token = login_resp.cookies.get("refresh_token")
+    assert refresh_token is not None
+    client.cookies.set("refresh_token", refresh_token)
+    resp = client.post("/api/auth/refresh")
     assert resp.status_code == 200
     data = resp.json()
     assert "access_token" in data
-    assert "refresh_token" in data
 
 
 def test_refresh_invalid_token(client):
-    resp = client.post("/api/auth/refresh", json={
-        "refresh_token": "invalid.token.here",
-    })
+    # Set an invalid refresh_token cookie
+    client.cookies.set("refresh_token", "invalid.token.here")
+    resp = client.post("/api/auth/refresh")
     assert resp.status_code == 401
 
 

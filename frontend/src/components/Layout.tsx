@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { NavLink, Outlet, useLocation, Link } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -229,6 +229,21 @@ export default function Layout() {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [verifSent, setVerifSent] = useState(false);
+
+  const resendVerification = useCallback(async () => {
+    try {
+      const token = (await import("@/services/api")).getAccessToken();
+      await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      setVerifSent(true);
+    } catch {
+      // Silencieux — l'utilisateur peut reessayer
+    }
+  }, []);
 
   // Ferme le drawer mobile à chaque navigation
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
@@ -252,8 +267,9 @@ export default function Layout() {
         style={{ background: SB.bg }}
       >
         {/* Logo */}
-        <div
-          className={`h-14 flex items-center gap-[9px] ${collapsed ? "justify-center px-0" : "px-[18px]"}`}
+        <Link
+          to="/dashboard"
+          className={`h-14 flex items-center gap-[9px] no-underline ${collapsed ? "justify-center px-0" : "px-[18px]"} hover:opacity-80 transition-opacity`}
           style={{ borderBottom: `1px solid ${SB.border}` }}
         >
           <div className="w-7 h-7 bg-[#4f8cff] rounded-[7px] flex items-center justify-center shrink-0">
@@ -271,7 +287,7 @@ export default function Layout() {
               </span>
             </div>
           )}
-        </div>
+        </Link>
 
         {/* Navigation */}
         <nav className={`flex-1 py-2.5 ${collapsed ? "px-1.5" : "px-2"} flex flex-col gap-px overflow-y-auto`}>
@@ -466,6 +482,23 @@ export default function Layout() {
               <HelpAndFeedback />
             </div>
           </div>
+
+          {/* Bandeau verification email */}
+          {user && !user.email_verified && (
+            <div className="bg-amber-500/10 border-b border-amber-500/30 text-amber-200 px-4 py-2 text-sm flex items-center justify-between">
+              <span>Verifiez votre adresse email pour securiser votre compte.</span>
+              {verifSent ? (
+                <span className="text-amber-400 ml-4 text-xs">Email envoye !</span>
+              ) : (
+                <button
+                  onClick={resendVerification}
+                  className="text-amber-400 underline hover:text-amber-300 ml-4 bg-transparent border-none cursor-pointer text-sm p-0"
+                >
+                  Renvoyer l'email
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Content */}
           <main className="flex-1 overflow-y-auto px-3 py-3 md:px-6 md:py-5 flex flex-col">

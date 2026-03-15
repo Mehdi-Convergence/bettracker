@@ -1,23 +1,30 @@
 const BASE = "/api";
 
+// Access token stocke en memoire (jamais dans localStorage)
+let accessToken: string | null = null;
+
+export function setAccessToken(token: string | null) {
+  accessToken = token;
+}
+
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
 let isRefreshing = false;
 
 async function tryRefreshToken(): Promise<boolean> {
   if (isRefreshing) return false;
-  const refreshToken = localStorage.getItem("refresh_token");
-  if (!refreshToken) return false;
 
   isRefreshing = true;
   try {
     const res = await fetch(`${BASE}/auth/refresh`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      credentials: "include",
     });
     if (!res.ok) return false;
     const data = await res.json();
-    localStorage.setItem("access_token", data.access_token);
-    localStorage.setItem("refresh_token", data.refresh_token);
+    setAccessToken(data.access_token);
     return true;
   } catch {
     return false;
@@ -27,12 +34,13 @@ async function tryRefreshToken(): Promise<boolean> {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("access_token");
+  const token = getAccessToken();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   let res = await fetch(`${BASE}${path}`, {
     headers,
+    credentials: "include",
     ...options,
   });
 
@@ -40,13 +48,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   if (res.status === 401) {
     const refreshed = await tryRefreshToken();
     if (refreshed) {
-      const newToken = localStorage.getItem("access_token");
+      const newToken = getAccessToken();
       headers["Authorization"] = `Bearer ${newToken}`;
-      res = await fetch(`${BASE}${path}`, { headers, ...options });
+      res = await fetch(`${BASE}${path}`, { headers, credentials: "include", ...options });
     }
     if (res.status === 401) {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+      setAccessToken(null);
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }
@@ -320,6 +327,23 @@ export function markAllNotificationsRead() {
   return request<void>("/notifications/read-all", { method: "POST" });
 }
 
+// 2FA (TOTP)
+export function setup2FA(): Promise<{ secret: string; qr_code: string }> {
+  return request("/auth/2fa/setup", { method: "POST" });
+}
+
+export function verify2FA(code: string): Promise<{ detail: string }> {
+  return request("/auth/2fa/verify", { method: "POST", body: JSON.stringify({ code }) });
+}
+
+export function disable2FA(password: string, code: string): Promise<{ detail: string }> {
+  return request("/auth/2fa", { method: "DELETE", body: JSON.stringify({ password, code }) });
+}
+
+export function login2FA(login_token: string, code: string): Promise<{ access_token: string; token_type: string; user: unknown }> {
+  return request("/auth/2fa/login", { method: "POST", body: JSON.stringify({ login_token, code }) });
+}
+
 // Onboarding & Tour
 export function completeOnboarding(bankroll: number, default_stake_pct: number) {
   return request<unknown>("/auth/onboarding", {
@@ -372,7 +396,7 @@ export async function* aiChatStream(
   message: string,
   conversationId?: number | null,
 ): AsyncGenerator<{ type: "token" | "done" | "error"; text?: string; conversationId?: number; usage?: Record<string, number>; message?: string }> {
-  const token = localStorage.getItem("access_token");
+  const token = getAccessToken();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -381,20 +405,19 @@ export async function* aiChatStream(
     conversation_id: conversationId ?? null,
   });
 
-  const res = await fetch(`${BASE}/ai/chat`, { method: "POST", headers, body });
+  const res = await fetch(`${BASE}/ai/chat`, { method: "POST", headers, credentials: "include", body });
 
   if (res.status === 401) {
     const refreshed = await tryRefreshToken();
     if (!refreshed) {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+      setAccessToken(null);
       window.location.href = "/login";
       return;
     }
     // Retry with new token
-    const newToken = localStorage.getItem("access_token");
+    const newToken = getAccessToken();
     headers["Authorization"] = `Bearer ${newToken}`;
-    const res2 = await fetch(`${BASE}/ai/chat`, { method: "POST", headers, body });
+    const res2 = await fetch(`${BASE}/ai/chat`, { method: "POST", headers, credentials: "include", body });
     if (!res2.ok) {
       const err = await res2.json().catch(() => ({ detail: res2.statusText }));
       yield { type: "error", message: typeof err.detail === "string" ? err.detail : res2.statusText };

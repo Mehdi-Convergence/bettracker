@@ -2,7 +2,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter()
 
@@ -18,8 +18,10 @@ def health_check():
 
 
 @router.get("/health/data")
-def health_data():
+def health_data(request: Request):
     """Detailed health check: scan freshness, API quotas, model version."""
+    if request.client and request.client.host not in ("127.0.0.1", "::1"):
+        raise HTTPException(status_code=403, detail="Acces restreint")
     from src.cache import cache_get, is_redis_available
 
     now = time.time()
@@ -70,12 +72,14 @@ def _get_model_info() -> dict:
 
 
 @router.get("/health/deep")
-def health_deep():
+def health_deep(request: Request):
     """Deep health check for deploy validation.
 
     Verifies DB connectivity, critical tables, ML models, and frontend build.
     Returns 503 if any check fails so the deploy pipeline can rollback.
     """
+    if request.client and request.client.host not in ("127.0.0.1", "::1"):
+        raise HTTPException(status_code=403, detail="Acces restreint")
     errors = []
 
     # DB check

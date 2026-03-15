@@ -41,6 +41,8 @@ dependencies = [
     "stripe",
     "groq>=0.12.0",
     "MLB-StatsAPI>=1.7.0",
+    "pyotp>=2.9.0",
+    "qrcode[pil]>=8.2",
 ]
 
 [tool.ruff]

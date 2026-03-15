@@ -3,7 +3,7 @@
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -12,6 +12,7 @@ from src.api.deps import get_current_user
 from src.database import get_db
 from src.models.ai_conversation import AIConversation, AIMessage
 from src.models.user import User
+from src.rate_limit import limiter
 from src.services.ai_analyste import chat_stream, check_rate_limit, increment_rate_limit
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,9 @@ class MessageOut(BaseModel):
 
 
 @router.post("/ai/chat")
+@limiter.limit("20/minute")
 async def ai_chat(
+    request: Request,
     body: ChatRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

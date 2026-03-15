@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { setAccessToken, getAccessToken } from "../services/api";
 
 interface User {
   id: number;
@@ -11,6 +12,8 @@ interface User {
   created_at: string;
   onboarding_completed: boolean;
   visited_modules: string[];
+  email_verified: boolean;
+  totp_enabled?: boolean;
 }
 
 interface AuthState {
@@ -19,8 +22,14 @@ interface AuthState {
   loading: boolean;
 }
 
+interface TwoFactorRequired {
+  requires_2fa: true;
+  login_token: string;
+}
+
 interface AuthContextValue extends AuthState {
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void | TwoFactorRequired>;
+  login2FAVerify: (login_token: string, code: string) => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -35,7 +44,12 @@ const BASE = "/api";
 async function apiPost<T>(path: string, body: unknown, token?: string | null): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${BASE}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(typeof err.detail === "string" ? err.detail : res.statusText);
@@ -46,6 +60,7 @@ async function apiPost<T>(path: string, body: unknown, token?: string | null): P
 async function apiGet<T>(path: string, token: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -57,48 +72,37 @@ async function apiGet<T>(path: string, token: string): Promise<T> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
-    token: localStorage.getItem("access_token"),
+    token: null,
     loading: true,
   });
 
-  const setToken = (access: string, refresh: string) => {
-    localStorage.setItem("access_token", access);
-    localStorage.setItem("refresh_token", refresh);
-    setState((s) => ({ ...s, token: access }));
-  };
-
   const clearAuth = useCallback(() => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+    setAccessToken(null);
     setState({ user: null, token: null, loading: false });
   }, []);
 
+  // Tente un silent refresh via le cookie httpOnly au chargement
   const refreshUser = useCallback(async () => {
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      setState({ user: null, token: null, loading: false });
-      return;
-    }
-    try {
-      const user = await apiGet<User>("/auth/me", token);
-      setState({ user, token, loading: false });
-    } catch {
-      // Try refresh
-      const refreshToken = localStorage.getItem("refresh_token");
-      if (refreshToken) {
-        try {
-          const tokens = await apiPost<{ access_token: string; refresh_token: string }>(
-            "/auth/refresh",
-            { refresh_token: refreshToken },
-          );
-          setToken(tokens.access_token, tokens.refresh_token);
-          const user = await apiGet<User>("/auth/me", tokens.access_token);
-          setState({ user, token: tokens.access_token, loading: false });
-          return;
-        } catch {
-          // Refresh failed
-        }
+    // 1. Si on a deja un access token en memoire, essaie de charger le profil
+    const currentToken = getAccessToken();
+    if (currentToken) {
+      try {
+        const user = await apiGet<User>("/auth/me", currentToken);
+        setState({ user, token: currentToken, loading: false });
+        return;
+      } catch {
+        // access token expire, on tente le refresh via cookie
       }
+    }
+
+    // 2. Silent refresh via cookie httpOnly
+    try {
+      const data = await apiPost<{ access_token: string }>("/auth/refresh", undefined);
+      setAccessToken(data.access_token);
+      const user = await apiGet<User>("/auth/me", data.access_token);
+      setState({ user, token: data.access_token, loading: false });
+    } catch {
+      // Pas de session valide
       clearAuth();
     }
   }, [clearAuth]);
@@ -107,14 +111,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser();
   }, [refreshUser]);
 
-  const login = async (email: string, password: string) => {
-    const tokens = await apiPost<{ access_token: string; refresh_token: string }>(
+  const login = async (email: string, password: string): Promise<void | TwoFactorRequired> => {
+    const data = await apiPost<{ access_token?: string; user?: User; requires_2fa?: boolean; login_token?: string }>(
       "/auth/login",
-      { email, password },
+      { email, password }
     );
-    setToken(tokens.access_token, tokens.refresh_token);
-    const user = await apiGet<User>("/auth/me", tokens.access_token);
-    setState({ user, token: tokens.access_token, loading: false });
+
+    // Cas 2FA : retourner l'info pour que le composant Login puisse afficher le champ code
+    if (data.requires_2fa && data.login_token) {
+      return { requires_2fa: true, login_token: data.login_token };
+    }
+
+    if (!data.access_token) throw new Error("Token manquant");
+    setAccessToken(data.access_token);
+    // Le cookie refresh_token est pose par le backend (httpOnly)
+    const user = await apiGet<User>("/auth/me", data.access_token);
+    setState({ user, token: data.access_token, loading: false });
+  };
+
+  const login2FAVerify = async (login_token: string, code: string): Promise<void> => {
+    const data = await apiPost<{ access_token: string; user: User }>("/auth/2fa/login", { login_token, code });
+    setAccessToken(data.access_token);
+    const user = await apiGet<User>("/auth/me", data.access_token);
+    setState({ user, token: data.access_token, loading: false });
   };
 
   const register = async (email: string, password: string, displayName: string) => {
@@ -124,8 +143,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      const token = localStorage.getItem("access_token");
-      if (token) await apiPost("/auth/logout-all", {}, token);
+      const token = getAccessToken();
+      if (token) {
+        await fetch(`${BASE}/auth/logout`, {
+          method: "POST",
+          credentials: "include",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
     } catch {
       // Logout local meme si l'API echoue
     }
@@ -133,11 +158,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateProfile = async (data: { display_name?: string; email?: string }) => {
-    const token = localStorage.getItem("access_token");
+    const token = getAccessToken();
     if (!token) throw new Error("Non authentifie");
     const res = await fetch(`${BASE}/auth/me`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      credentials: "include",
       body: JSON.stringify(data),
     });
     if (!res.ok) {
@@ -148,11 +174,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteAccount = async () => {
-    const token = localStorage.getItem("access_token");
+    const token = getAccessToken();
     if (!token) throw new Error("Non authentifie");
     const res = await fetch(`${BASE}/auth/me`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -162,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ ...state, login, register, logout, refreshUser, updateProfile, deleteAccount }}>
+    <AuthContext.Provider value={{ ...state, login, login2FAVerify, register, logout, refreshUser, updateProfile, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );

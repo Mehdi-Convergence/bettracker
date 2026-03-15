@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from src.api.deps import (
@@ -21,15 +22,17 @@ from src.api.schemas import (
     LoginRequest,
     MessageResponse,
     OnboardingRequest,
-    RefreshRequest,
     RegisterRequest,
     ResetPasswordRequest,
-    TokenResponse,
     TourVisitedRequest,
+    TwoFactorDisableRequest,
+    TwoFactorLoginRequest,
+    TwoFactorVerifyRequest,
     UpdateProfileRequest,
     UserResponse,
     UserStatsResponse,
 )
+from src.cache import cache_delete, cache_get, cache_incr, cache_set
 from src.config import settings
 from src.database import get_db
 from src.models.password_reset import PasswordResetToken
@@ -40,6 +43,26 @@ logger = logging.getLogger(__name__)
 from src.rate_limit import limiter
 
 router = APIRouter(tags=["auth"])
+
+_REFRESH_COOKIE_MAX_AGE = 30 * 86400  # 30 jours en secondes
+
+
+def _set_refresh_cookie(response: JSONResponse, refresh_token: str) -> None:
+    """Pose le cookie httpOnly contenant le refresh token."""
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        max_age=_REFRESH_COOKIE_MAX_AGE,
+        path="/api/auth",
+    )
+
+
+def _delete_refresh_cookie(response: JSONResponse) -> None:
+    """Supprime le cookie refresh token."""
+    response.delete_cookie("refresh_token", path="/api/auth")
 
 
 def _hash_password(password: str) -> str:
@@ -65,35 +88,77 @@ def register(request: Request, body: RegisterRequest, db: Session = Depends(get_
         tier="free",
         trial_ends_at=datetime.now(timezone.utc) + timedelta(days=settings.TRIAL_DAYS),
     )
+    token = secrets.token_urlsafe(32)
+    user.email_verification_token = token
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    from src.services.email import send_welcome_email
+    from src.services.email import send_welcome_email, send_verification_email
     threading.Thread(target=send_welcome_email, args=(user.email, user.display_name), daemon=True).start()
+    verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+    threading.Thread(target=send_verification_email, args=(user.email, user.display_name, verification_url), daemon=True).start()
 
     return _user_to_response(user)
 
 
-@router.post("/auth/login", response_model=TokenResponse)
+@router.post("/auth/login")
 @limiter.limit("10/minute")
 def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
-    """Authenticate user and return JWT tokens."""
-    user = db.query(User).filter(User.email == body.email.lower(), User.is_active == True).first()
-    if not user or not _verify_password(body.password, user.hashed_password):
+    """Authenticate user and return access token + set refresh token cookie."""
+    email_lower = body.email.lower()
+    lock_key = f"login_lock:{email_lower}"
+    fail_key = f"login_fails:{email_lower}"
+
+    # Verifie si le compte est verrouille
+    if cache_get(lock_key):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Trop de tentatives. Reessayez dans 15 minutes.")
+
+    user = db.query(User).filter(User.email == email_lower, User.is_active == True).first()
+
+    # Email inconnu : reponse neutre sans incrementer le compteur (anti-enumeration)
+    if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email ou mot de passe incorrect")
 
-    return TokenResponse(
-        access_token=create_access_token(user.id, user.token_version),
-        refresh_token=create_refresh_token(user.id, user.token_version),
-    )
+    # Mauvais mot de passe : incremente le compteur et verrouille si necessaire
+    if not _verify_password(body.password, user.hashed_password):
+        fails = cache_incr(fail_key, ttl=900)
+        if fails >= 5:
+            cache_set(lock_key, "locked", ttl=900)
+            cache_delete(fail_key)
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Trop de tentatives. Reessayez dans 15 minutes.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email ou mot de passe incorrect")
+
+    # Login reussi : reset des compteurs
+    cache_delete(fail_key)
+    cache_delete(lock_key)
+
+    # Si 2FA activé, retourner un token temporaire et demander le code
+    if getattr(user, "totp_enabled", False):
+        login_token = _create_login_2fa_token(user.id)
+        return JSONResponse(content={"requires_2fa": True, "login_token": login_token})
+
+    access_token = create_access_token(user.id, user.token_version)
+    refresh_token = create_refresh_token(user.id, user.token_version)
+
+    response = JSONResponse(content={
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": _user_response_dict(user),
+    })
+    _set_refresh_cookie(response, refresh_token)
+    return response
 
 
-@router.post("/auth/refresh", response_model=TokenResponse)
+@router.post("/auth/refresh")
 @limiter.limit("20/minute")
-def refresh(request: Request, body: RefreshRequest, db: Session = Depends(get_db)):
-    """Exchange a refresh token for a new access + refresh token pair."""
-    payload = _decode_token(body.refresh_token, expected_type="refresh")
+def refresh(request: Request, db: Session = Depends(get_db)):
+    """Exchange a refresh token cookie for a new access + refresh token pair."""
+    token_value = request.cookies.get("refresh_token")
+    if not token_value:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de rafraichissement manquant")
+
+    payload = _decode_token(token_value, expected_type="refresh")
     user_id = int(payload["sub"])
     user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.is_active:
@@ -101,10 +166,23 @@ def refresh(request: Request, body: RefreshRequest, db: Session = Depends(get_db
     if payload.get("ver") != user.token_version:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expirée")
 
-    return TokenResponse(
-        access_token=create_access_token(user.id, user.token_version),
-        refresh_token=create_refresh_token(user.id, user.token_version),
-    )
+    new_access_token = create_access_token(user.id, user.token_version)
+    new_refresh_token = create_refresh_token(user.id, user.token_version)
+
+    response = JSONResponse(content={
+        "access_token": new_access_token,
+        "token_type": "bearer",
+    })
+    _set_refresh_cookie(response, new_refresh_token)
+    return response
+
+
+@router.post("/auth/logout")
+async def logout(request: Request):
+    """Supprimer le cookie refresh token (deconnexion simple)."""
+    response = JSONResponse(content={"detail": "Deconnecte"})
+    _delete_refresh_cookie(response)
+    return response
 
 
 @router.get("/auth/me", response_model=UserResponse)
@@ -210,6 +288,37 @@ def reset_password(
     return MessageResponse(message="Mot de passe reinitialise avec succes")
 
 
+@router.get("/auth/verify-email")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    """Verify email address using the token sent by email."""
+    user = db.query(User).filter(User.email_verification_token == token).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token invalide ou expire")
+    user.email_verified = True
+    user.email_verification_token = None
+    db.commit()
+    return {"detail": "Email verifie avec succes"}
+
+
+@router.post("/auth/resend-verification")
+@limiter.limit("2/minute")
+def resend_verification(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Resend the email verification link to the current user."""
+    if current_user.email_verified:
+        return {"detail": "Email deja verifie"}
+    token = secrets.token_urlsafe(32)
+    current_user.email_verification_token = token
+    db.commit()
+    from src.services.email import send_verification_email
+    verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+    threading.Thread(target=send_verification_email, args=(current_user.email, current_user.display_name, verification_url), daemon=True).start()
+    return {"detail": "Email de verification renvoye"}
+
+
 @router.get("/auth/stats", response_model=UserStatsResponse)
 def get_user_stats(
     user: User = Depends(get_current_user),
@@ -243,7 +352,7 @@ def delete_account(
     return MessageResponse(message="Compte desactive")
 
 
-@router.post("/auth/logout-all", response_model=MessageResponse)
+@router.post("/auth/logout-all")
 def logout_all(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -251,7 +360,9 @@ def logout_all(
     """Invalidate all existing sessions by incrementing token_version."""
     user.token_version += 1
     db.commit()
-    return MessageResponse(message="Toutes les sessions ont ete deconnectees")
+    response = JSONResponse(content={"message": "Toutes les sessions ont ete deconnectees"})
+    _delete_refresh_cookie(response)
+    return response
 
 
 @router.post("/auth/onboarding", response_model=UserResponse)
@@ -318,4 +429,147 @@ def _user_to_response(user: User) -> UserResponse:
         created_at=user.created_at.isoformat() if user.created_at else "",
         onboarding_completed=user.onboarding_completed,
         visited_modules=visited_list,
+        email_verified=getattr(user, "email_verified", False),
+        totp_enabled=getattr(user, "totp_enabled", False),
     )
+
+
+def _user_response_dict(user: User) -> dict:
+    """Retourne le dict user pour les reponses JSON de login."""
+    visited_str = user.visited_modules or ""
+    return {
+        "id": user.id,
+        "email": user.email,
+        "display_name": user.display_name,
+        "tier": user.tier,
+        "is_active": user.is_active,
+        "is_admin": getattr(user, "is_admin", False),
+        "trial_ends_at": user.trial_ends_at.isoformat() if user.trial_ends_at else None,
+        "created_at": user.created_at.isoformat() if user.created_at else "",
+        "onboarding_completed": user.onboarding_completed,
+        "visited_modules": [m for m in visited_str.split(",") if m],
+        "totp_enabled": getattr(user, "totp_enabled", False),
+    }
+
+
+def _create_login_2fa_token(user_id: int) -> str:
+    """Cree un token temporaire (5 min) pour la validation 2FA lors du login."""
+    from jose import jwt as jose_jwt
+    expire = datetime.now(timezone.utc) + timedelta(minutes=5)
+    payload = {"sub": str(user_id), "exp": expire, "type": "login_2fa"}
+    return jose_jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+
+# ── Endpoints 2FA ──────────────────────────────────────────────────────────────
+
+
+@router.post("/auth/2fa/setup")
+def setup_2fa(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Genere un secret TOTP et retourne le QR code en base64 pour configuration."""
+    import base64
+    import io
+
+    import pyotp
+    import qrcode
+
+    if getattr(user, "totp_enabled", False):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="2FA deja active")
+
+    secret = pyotp.random_base32()
+    user.totp_secret = secret
+    db.commit()
+
+    totp = pyotp.TOTP(secret)
+    uri = totp.provisioning_uri(name=user.email, issuer_name="BetTracker")
+
+    img = qrcode.make(uri)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    qr_base64 = base64.b64encode(buf.getvalue()).decode()
+
+    return {"secret": secret, "qr_code": f"data:image/png;base64,{qr_base64}"}
+
+
+@router.post("/auth/2fa/verify")
+def verify_2fa(
+    body: TwoFactorVerifyRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Verifie le code TOTP et active le 2FA si correct."""
+    import pyotp
+
+    if not getattr(user, "totp_secret", None):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="2FA non configure")
+
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(body.code, valid_window=1):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Code invalide")
+
+    user.totp_enabled = True
+    db.commit()
+    return {"detail": "2FA active avec succes"}
+
+
+@router.delete("/auth/2fa")
+def disable_2fa(
+    body: TwoFactorDisableRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Desactive le 2FA apres verification du mot de passe et du code TOTP."""
+    import pyotp
+
+    if not getattr(user, "totp_enabled", False):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="2FA non active")
+
+    if not _verify_password(body.password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mot de passe incorrect")
+
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(body.code, valid_window=1):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Code 2FA invalide")
+
+    user.totp_enabled = False
+    user.totp_secret = None
+    db.commit()
+    return {"detail": "2FA desactive"}
+
+
+@router.post("/auth/2fa/login")
+def login_2fa(body: TwoFactorLoginRequest, db: Session = Depends(get_db)):
+    """Finalise le login apres verification du code 2FA (token temporaire requis)."""
+    import pyotp
+    from jose import JWTError
+    from jose import jwt as jose_jwt
+
+    try:
+        payload = jose_jwt.decode(body.login_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        if payload.get("type") != "login_2fa":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalide")
+        user_id = int(payload["sub"])
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expire ou invalide")
+
+    user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    if not user or not getattr(user, "totp_enabled", False):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Utilisateur invalide")
+
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(body.code, valid_window=1):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Code 2FA invalide")
+
+    access_token = create_access_token(user.id, user.token_version)
+    refresh_token = create_refresh_token(user.id, user.token_version)
+
+    response = JSONResponse(content={
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": _user_response_dict(user),
+    })
+    _set_refresh_cookie(response, refresh_token)
+    return response

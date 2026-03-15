@@ -80,6 +80,28 @@ def send_feedback_email(from_email: str, from_name: str, message: str) -> bool:
     return _send(admin_email, f"[BetTracker] Message de {from_name}", html)
 
 
+def send_verification_email(to_email: str, display_name: str, verification_url: str) -> bool:
+    """Send email verification link after registration."""
+    name = display_name or to_email.split("@")[0]
+    html = f"""
+    <div style="font-family: -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
+      <h2 style="color: #111318; margin-bottom: 8px;">Vérifiez votre adresse email</h2>
+      <p style="color: #3c4149; line-height: 1.6;">
+        Bonjour {name}, cliquez sur le bouton ci-dessous pour vérifier votre adresse email et sécuriser votre compte BetTracker.
+      </p>
+      <a href="{verification_url}"
+         style="display: inline-block; background: #3b5bdb; color: #fff; padding: 10px 24px;
+                border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 16px;">
+        Vérifier mon email
+      </a>
+      <p style="color: #8a919e; font-size: 13px; margin-top: 24px;">
+        Ce lien expire dans 24h. Si vous n'avez pas créé ce compte, ignorez cet email.
+      </p>
+    </div>
+    """
+    return _send(to_email, "Vérifiez votre adresse email - BetTracker", html)
+
+
 def send_reset_password_email(email: str, display_name: str, reset_url: str) -> bool:
     """Send password reset link."""
     name = display_name or email.split("@")[0]

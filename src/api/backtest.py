@@ -3,10 +3,11 @@
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from src.api.deps import get_current_user, require_tier
+from src.rate_limit import limiter
 from src.api.schemas import (
     BacktestRequest,
     BacktestResponse,
@@ -26,30 +27,31 @@ router = APIRouter(tags=["backtest"])
 
 
 @router.post("/backtest/run", response_model=BacktestResponse, dependencies=[Depends(require_tier("pro"))])
-def run_backtest(request: BacktestRequest):
+@limiter.limit("10/minute")
+def run_backtest(request: Request, body: BacktestRequest):
     """Run a backtest with custom parameters. sport='football' or 'tennis'."""
-    sport = (request.sport or "football").lower()
+    sport = (body.sport or "football").lower()
 
     if sport == "tennis":
-        result = _run_tennis_backtest(request)
+        result = _run_tennis_backtest(body)
     elif sport == "nba":
-        result = _run_nba_backtest(request)
+        result = _run_nba_backtest(body)
     elif sport == "rugby":
-        result = _run_rugby_backtest(request)
+        result = _run_rugby_backtest(body)
     elif sport == "mlb":
-        result = _run_mlb_backtest(request)
+        result = _run_mlb_backtest(body)
     elif sport == "pmu":
-        result = _run_pmu_backtest(request)
+        result = _run_pmu_backtest(body)
     else:
-        result = _run_football_backtest(request)
+        result = _run_football_backtest(body)
 
     if not result["bets"]:
         raise HTTPException(status_code=404, detail="Aucun pari généré avec ces paramètres. Élargissez vos filtres.")
 
     metrics_calc = BacktestMetrics()
-    metrics = metrics_calc.compute_all(result["bets"], request.initial_bankroll)
+    metrics = metrics_calc.compute_all(result["bets"], body.initial_bankroll)
 
-    bankroll_curve = [request.initial_bankroll]
+    bankroll_curve = [body.initial_bankroll]
     for b in result["bets"]:
         bankroll_curve.append(bankroll_curve[-1] + b["pnl"])
 

@@ -36,15 +36,6 @@ class LoginRequest(BaseModel):
     password: str
 
 
-class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
-
 
 class UserResponse(BaseModel):
     id: int
@@ -57,6 +48,22 @@ class UserResponse(BaseModel):
     is_admin: bool = False
     onboarding_completed: bool = False
     visited_modules: list[str] = []
+    email_verified: bool = False
+    totp_enabled: bool = False
+
+
+class TwoFactorVerifyRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=6)
+
+
+class TwoFactorDisableRequest(BaseModel):
+    password: str
+    code: str = Field(min_length=6, max_length=6)
+
+
+class TwoFactorLoginRequest(BaseModel):
+    login_token: str
+    code: str = Field(min_length=6, max_length=6)
 
 
 class OnboardingRequest(BaseModel):
