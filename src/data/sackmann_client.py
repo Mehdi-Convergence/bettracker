@@ -182,7 +182,8 @@ class SackmannClient:
             return self._matches_cache
 
         now = datetime.now(timezone.utc)
-        years = sorted({now.year, now.year - 1}, reverse=True)
+        # Try current year down to 2023 — Sackmann may lag 1-2 years
+        years = sorted({now.year, now.year - 1, now.year - 2, now.year - 3}, reverse=True)
 
         rows: list[dict] = []
         for year in years:

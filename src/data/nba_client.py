@@ -313,7 +313,7 @@ class NBAClient:
         """
         try:
             resp = httpx.get(
-                f"{ESPN_BASE}/standings",
+                "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings",
                 timeout=20,
             )
             resp.raise_for_status()
