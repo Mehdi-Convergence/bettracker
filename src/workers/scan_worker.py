@@ -28,8 +28,9 @@ logger = logging.getLogger("scan_worker")
 # ---------------------------------------------------------------------------
 
 def _odds_api_budget_check(sport: str, cost: int = 1) -> bool:
-    """Check if we can make an Odds API request within the daily budget.
+    """Check if we can make an Odds API request within the daily credit budget.
 
+    Cost = markets × regions per call.  See ODDS_API_DAILY_BUDGET in config.
     Returns True if within budget (and increments counter), False if budget exhausted.
     """
     from src.config import settings
@@ -810,9 +811,9 @@ async def run_tennis_scan():
     t0 = time.time()
 
     # Budget check: tennis uses 1 (discovery) + N (tournament) Odds API calls
-    # Estimate cost as 1 + average 5 tournaments = 6 requests
-    # The actual cost is tracked inside TennisClient._track_quota
-    if not _odds_api_budget_check("tennis", cost=6):
+    # Credit cost: 1 market (h2h) × 5 regions = 5 credits per sport key
+    # Average ~5 active tournament keys = 25 credits per tennis scan
+    if not _odds_api_budget_check("tennis", cost=25):
         _track_scan_result("tennis", 0, error="budget_exhausted")
         return
 
@@ -1023,8 +1024,8 @@ async def run_nba_scan():
 
     t0 = time.time()
 
-    # Budget check (1 Odds API call for NBA)
-    if not _odds_api_budget_check("nba"):
+    # Budget check: 3 markets (h2h,totals,spreads) × 5 regions = 15 credits
+    if not _odds_api_budget_check("nba", cost=15):
         _track_scan_result("nba", 0, error="budget_exhausted")
         return
 
@@ -1313,8 +1314,8 @@ async def run_rugby_scan():
 
     t0 = time.time()
 
-    # Budget check (3 Odds API calls for rugby — 3 sport keys)
-    if not _odds_api_budget_check("rugby", cost=3):
+    # Budget check: 2 markets (h2h,totals) × 5 regions × 3 sport keys = 30 credits
+    if not _odds_api_budget_check("rugby", cost=30):
         _track_scan_result("rugby", 0, error="budget_exhausted")
         return
 
@@ -1585,8 +1586,8 @@ async def run_mlb_scan():
 
     t0 = time.time()
 
-    # Budget check (1 Odds API call for MLB)
-    if not _odds_api_budget_check("mlb"):
+    # Budget check: 3 markets (h2h,totals,spreads) × 5 regions = 15 credits
+    if not _odds_api_budget_check("mlb", cost=15):
         _track_scan_result("mlb", 0, error="budget_exhausted")
         return
 

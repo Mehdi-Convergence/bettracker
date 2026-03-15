@@ -66,8 +66,9 @@ class Settings(BaseSettings):
     USE_ESPN_NBA: bool = True          # Phase 2: ESPN replaces API-Sports Basketball
     USE_STATSAPI_MLB: bool = True      # Phase 3: statsapi replaces API-Sports Baseball
 
-    # Odds API budget (daily limiter)
-    ODDS_API_DAILY_BUDGET: int = 75    # Max requests per day
+    # Odds API budget (daily limiter, in CREDITS not requests)
+    # Credits per call = markets × regions.  Plan $30 = 20K credits/month ≈ 667/day
+    ODDS_API_DAILY_BUDGET: int = 650    # Max credits per day (buffer under 667)
 
     # Auth / JWT (no default — MUST be set via env or .env)
     JWT_SECRET_KEY: str = ""
