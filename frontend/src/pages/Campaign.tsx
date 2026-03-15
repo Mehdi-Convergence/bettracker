@@ -337,7 +337,7 @@ export default function Campaign() {
                       <KpiCell label="ROI" value={`${cStats.roi_pct >= 0 ? "+" : ""}${cStats.roi_pct.toFixed(1)}%`}
                         color={cStats.roi_pct >= 0 ? GREEN : RED} />
                       <KpiCell label="Paris" value={`${cStats.total_bets}`} />
-                      <KpiCell label="P&L" value={`${cStats.total_pnl >= 0 ? "+" : ""}${cStats.total_pnl.toFixed(0)}\u20AC`}
+                      <KpiCell label="P&L" value={`${cStats.total_pnl >= 0 ? "+" : ""}${cStats.total_pnl.toFixed(0)}\€`}
                         color={cStats.total_pnl >= 0 ? GREEN : RED} />
                     </div>
                   ) : (
@@ -490,7 +490,7 @@ function CampaignKanban({ campaigns, campaignStats, onSelectCampaign }: {
                 <KpiCell label="ROI" value={`${s.roi_pct >= 0 ? "+" : ""}${s.roi_pct.toFixed(1)}%`}
                   color={s.roi_pct >= 0 ? GREEN : RED} />
                 <KpiCell label="Paris" value={`${s.total_bets}`} />
-                <KpiCell label="P&L" value={`${s.total_pnl >= 0 ? "+" : ""}${s.total_pnl.toFixed(0)}\u20AC`}
+                <KpiCell label="P&L" value={`${s.total_pnl >= 0 ? "+" : ""}${s.total_pnl.toFixed(0)}\€`}
                   color={s.total_pnl >= 0 ? GREEN : RED} />
               </div>
             ) : (
@@ -748,13 +748,13 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Bankroll initiale (\u20AC)</label>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Bankroll initiale (\€)</label>
                   <input type="number" value={form.initial_bankroll}
                     onChange={(e) => setForm({ ...form, initial_bankroll: Number(e.target.value) })}
                     className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Objectif bankroll (\u20AC)</label>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Objectif bankroll (\€)</label>
                   <input type="number" placeholder="optionnel" value={form.target_bankroll ?? ""}
                     onChange={(e) => setForm({ ...form, target_bankroll: e.target.value ? Number(e.target.value) : null })}
                     className={inputCls} />
@@ -788,7 +788,7 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
                     className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Mise max (\u20AC)</label>
+                  <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Mise max (\€)</label>
                   <input type="number" placeholder="illimité" value={extForm.max_stake ?? ""}
                     onChange={(e) => setExtForm({ ...extForm, max_stake: e.target.value ? Number(e.target.value) : null })}
                     className={inputCls} />
@@ -808,13 +808,13 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Stop-loss journalier (\u20AC)</label>
+                    <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Stop-loss journalier (\€)</label>
                     <input type="number" placeholder="désactivé" value={extForm.stop_loss_daily ?? ""}
                       onChange={(e) => setExtForm({ ...extForm, stop_loss_daily: e.target.value ? Number(e.target.value) : null })}
                       className={inputCls} />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Stop-loss total (\u20AC)</label>
+                    <label className="block text-xs font-medium text-[#8a919e] mb-1.5">Stop-loss total (\€)</label>
                     <input type="number" placeholder="désactivé" value={extForm.stop_loss_total ?? ""}
                       onChange={(e) => setExtForm({ ...extForm, stop_loss_total: e.target.value ? Number(e.target.value) : null })}
                       className={inputCls} />
@@ -1041,7 +1041,7 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
                 <div className="bg-[#f4f5f7] rounded-xl p-4 space-y-2 text-sm">
                   <RecapRow label="Nom" value={form.name || "—"} />
                   <RecapRow label="Sports" value={extForm.sports.map((s) => SPORTS.find((sp) => sp.key === s)?.label || s).join(", ")} />
-                  <RecapRow label="Bankroll" value={`${form.initial_bankroll}\u20AC`} />
+                  <RecapRow label="Bankroll" value={`${form.initial_bankroll}\€`} />
                   <RecapRow label="Stratégie" value={STAKING_STRATEGIES.find((s) => s.key === extForm.staking_strategy)?.label || ""} />
                   <RecapRow label="Mise" value={`${(form.flat_stake * 100).toFixed(1)}%`} />
                   <RecapRow label="Edge min" value={`${(form.min_edge * 100).toFixed(0)}%`} />
@@ -1050,7 +1050,7 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
                   {form.max_odds && <RecapRow label="Cote max" value={form.max_odds.toFixed(1)} />}
                   {form.combo_mode && <RecapRow label="Combis" value={`Max ${form.combo_max_legs} legs`} />}
                   <RecapRow label="Durée" value={`${extForm.duration_days} jours`} />
-                  {extForm.stop_loss_total && <RecapRow label="Stop-loss total" value={`${extForm.stop_loss_total}\u20AC`} />}
+                  {extForm.stop_loss_total && <RecapRow label="Stop-loss total" value={`${extForm.stop_loss_total}\€`} />}
                 </div>
               </div>
             </>

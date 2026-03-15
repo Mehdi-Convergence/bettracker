@@ -223,7 +223,7 @@ export default function Dashboard() {
         {/* LEFT column */}
         <div className="flex flex-col gap-3 min-h-0">
           {/* ROW 1: ROI chart + P&L résumé side by side */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 min-h-0">
             {/* ROI Chart */}
             <div data-tour="roi-chart" className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col">
               <div className="flex items-center px-4 py-2.5 border-b border-[#e3e6eb]">
@@ -259,8 +259,8 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* ROW 2: 2 cards side by side, pushed to bottom */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* ROW 2: 2 cards side by side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 shrink-0">
             {/* Sport + Donut merged */}
             <div data-tour="sport-breakdown" className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col">
               <div className="px-4 py-2.5 border-b border-[#e3e6eb] shrink-0">

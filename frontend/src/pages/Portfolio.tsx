@@ -493,7 +493,7 @@ export default function Portfolio() {
   }
 
   return (
-    <div className="flex flex-col gap-3.5 h-[calc(100vh-64px)] overflow-x-hidden" style={{ animation: "fu .3s ease both" }}>
+    <div className="flex flex-col gap-3.5 h-[calc(100vh-64px)] max-md:h-auto overflow-x-hidden max-md:overflow-y-auto max-md:pb-6" style={{ animation: "fu .3s ease both" }}>
 
       {/* ══════ HEADER ══════ */}
       <div className="flex items-end justify-between gap-2 flex-wrap">

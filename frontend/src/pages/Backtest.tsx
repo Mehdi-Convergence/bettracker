@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FlaskConical, Zap, SlidersHorizontal, RotateCcw,
-  ChevronDown, Download, Save, Plus, Trash2, Clock, Trophy,
+  ChevronDown, ChevronUp, Download, Save, Plus, Trash2, Clock, Trophy,
   AlertTriangle, CheckCircle, XCircle,
 } from "lucide-react";
 import {
@@ -178,6 +178,7 @@ export default function Backtest() {
 
   // Mode
   const [mode, setMode] = useState<"quick" | "adv">("quick");
+  const [filtersCollapsed, setFiltersCollapsed] = useState(window.innerWidth < 768);
 
   // Sport multi-select
   const [sports, setSports] = useState<Set<"football" | "tennis" | "nba" | "rugby" | "pmu" | "mlb">>(new Set(["football"]));
@@ -256,6 +257,7 @@ export default function Backtest() {
       setError((e as Error).message);
     }
     setLoading(false);
+    if (window.innerWidth < 768) setFiltersCollapsed(true);
   }, [params, results, sports]);
 
   // ── Save ──
@@ -413,6 +415,11 @@ export default function Backtest() {
           <div className="text-[13.5px] font-bold flex items-center gap-2">
             <FlaskConical size={15} style={{ color: ACCENT }} />
             Paramètres de simulation
+            <button onClick={() => setFiltersCollapsed(!filtersCollapsed)}
+              className="md:hidden flex items-center gap-1 px-2 py-0.5 rounded-md border border-[#e3e6eb] bg-white text-[11px] text-[#8a919e] font-medium cursor-pointer ml-1">
+              {filtersCollapsed ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+              {filtersCollapsed ? "Afficher" : "Masquer"}
+            </button>
           </div>
           {results.length > 0 && (
             <div className="flex items-center gap-2">
@@ -441,7 +448,7 @@ export default function Backtest() {
           )}
         </div>
 
-        <div className="p-5">
+        <div className={`p-5 ${filtersCollapsed ? "max-md:hidden" : ""}`}>
           {/* ── Quick mode ── */}
           {mode === "quick" && (
             <>
