@@ -72,42 +72,54 @@ function getStrength(v: string): number {
 const STRENGTH_LABELS = ["", "Faible", "Moyen", "Fort", "Très fort"];
 const STRENGTH_COLORS = ["", C.red, C.amber, C.green, C.green];
 
-/* ── Plans ── */
-const PLANS = [
+/* ── Plans — aligne avec la landing page ── */
+const PLANS: { id: string; name: string; price: string; period: string; desc?: string; badge?: string; features: { text: string; ok: boolean; bold?: boolean; soon?: boolean }[] }[] = [
   {
     id: "free",
     name: "Free",
     price: "0€",
+    period: "7 jours",
+    desc: "Acces a toutes les fonctionnalites pendant 7 jours. Aucune carte bancaire requise.",
     features: [
-      { text: "Accès complet 7 jours", ok: true },
-      { text: "Scanner IA", ok: true },
-      { text: "Portfolio & Dashboard", ok: true },
-      { text: "Campagnes illimitées", ok: false },
-      { text: "Export CSV", ok: false },
+      { text: "Scanner IA illimite", ok: true },
+      { text: "Portfolio", ok: true },
+      { text: "Dashboard", ok: true },
+      { text: "Backtest", ok: true },
+      { text: "Campagnes", ok: true },
+      { text: "Partage de tickets", ok: true },
+      { text: "Export CSV", ok: true },
     ],
   },
   {
     id: "pro",
     name: "Pro",
     price: "29€",
+    period: "/mois",
+    badge: "Le plus populaire",
+    desc: "L'algo analyse tous les matchs pour vous. Placez selon les recommandations, au bon moment.",
     features: [
-      { text: "Scanner IA illimité", ok: true },
-      { text: "Portfolio & Dashboard", ok: true },
+      { text: "Scanner IA illimite", ok: true, bold: true },
+      { text: "Portfolio", ok: true },
+      { text: "Dashboard", ok: true },
       { text: "Backtest", ok: true },
       { text: "Partage de tickets", ok: true },
-      { text: "Campagnes illimitées", ok: false },
+      { text: "Campagnes", ok: false },
+      { text: "Export CSV", ok: false },
     ],
   },
   {
     id: "premium",
     name: "Elite",
     price: "69€",
+    period: "/mois",
+    desc: "L'algo tourne en automatique via les Campagnes. L'IA analyse. Vous supervisez.",
     features: [
-      { text: "Tout de Pro", ok: true },
-      { text: "Campagnes illimitées", ok: true },
-      { text: "IA Analyste (bientôt)", ok: true },
+      { text: "Tout le Pro inclus", ok: true },
+      { text: "Campagnes illimitees", ok: true, bold: true },
+      { text: "IA Analyste", ok: true, bold: true, soon: true },
       { text: "Support prioritaire", ok: true },
-      { text: "Accès nouvelles features", ok: true },
+      { text: "Acces prioritaire nouvelles features", ok: true },
+      { text: "Export CSV", ok: true },
     ],
   },
 ];
@@ -647,11 +659,14 @@ export default function Settings() {
                         </div>
                       )}
                       <div className="text-[14px] font-bold text-[#111318]">{plan.name}</div>
-                      <div className="flex items-baseline gap-0.5 mt-1.5 mb-2.5">
+                      <div className="flex items-baseline gap-0.5 mt-1.5">
                         <span className="text-[24px] font-extrabold tracking-tight text-[#111318]">{plan.price}</span>
-                        <span className="text-[12px] text-[#8a919e]">/mois</span>
+                        <span className="text-[12px] text-[#8a919e]">{plan.period}</span>
                       </div>
-                      <ul className="list-none flex flex-col gap-1.5 p-0 m-0">
+                      {plan.desc && (
+                        <p className="text-[11px] text-[#8a919e] mt-1 mb-2 leading-snug">{plan.desc}</p>
+                      )}
+                      <ul className="list-none flex flex-col gap-1.5 p-0 m-0 mt-2.5">
                         {plan.features.map((f) => (
                           <li key={f.text} className="text-[12px] text-[#8a919e] flex items-center gap-1.5">
                             <span
@@ -661,9 +676,12 @@ export default function Settings() {
                                 color: f.ok ? C.green : C.muted2,
                               }}
                             >
-                              {f.ok ? "✓" : "✕"}
+                              {f.ok ? "\u2713" : "\u2715"}
                             </span>
-                            {f.text}
+                            <span className={f.bold ? "font-semibold text-[#111318]" : ""}>
+                              {f.text}
+                              {f.soon && <span className="ml-1 px-1 py-px rounded text-[8px] font-bold bg-[rgba(124,58,237,0.08)] text-[#7c3aed]">Bientot</span>}
+                            </span>
                           </li>
                         ))}
                       </ul>

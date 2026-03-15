@@ -337,20 +337,40 @@ export default function Layout() {
           {/* Divider */}
           <div className="h-px mx-2 my-1.5" style={{ background: SB.border }} />
 
-          {/* IA Analyste */}
-          <NavLink
-            to="/ai-analyst"
-            title={collapsed ? "IA Analyste" : undefined}
-            className={`flex items-center ${collapsed ? "justify-center" : "gap-[9px]"} ${collapsed ? "px-0 py-2" : "px-2.5 py-2"} rounded-lg text-[13.5px] font-semibold no-underline`}
-            style={{
-              background: "rgba(79,140,255,0.12)",
-              color: "#7eb8ff",
-              border: "1px solid rgba(79,140,255,0.18)",
-            }}
-          >
-            <MessageCircle size={collapsed ? 18 : 16} className="shrink-0" />
-            {!collapsed && "IA Analyste"}
-          </NavLink>
+          {/* IA Analyste — admin only for now, "Bientot" badge for others */}
+          {user?.is_admin ? (
+            <NavLink
+              to="/ai-analyst"
+              title={collapsed ? "IA Analyste" : undefined}
+              className={`flex items-center ${collapsed ? "justify-center" : "gap-[9px]"} ${collapsed ? "px-0 py-2" : "px-2.5 py-2"} rounded-lg text-[13.5px] font-semibold no-underline`}
+              style={{
+                background: "rgba(79,140,255,0.12)",
+                color: "#7eb8ff",
+                border: "1px solid rgba(79,140,255,0.18)",
+              }}
+            >
+              <MessageCircle size={collapsed ? 18 : 16} className="shrink-0" />
+              {!collapsed && "IA Analyste"}
+            </NavLink>
+          ) : (
+            <div
+              className={`flex items-center ${collapsed ? "justify-center" : "gap-[9px]"} ${collapsed ? "px-0 py-2" : "px-2.5 py-2"} rounded-lg text-[13.5px] font-semibold opacity-50 cursor-default`}
+              style={{
+                background: "rgba(79,140,255,0.06)",
+                color: "#7eb8ff",
+                border: "1px solid rgba(79,140,255,0.10)",
+              }}
+              title="Bientot disponible"
+            >
+              <MessageCircle size={collapsed ? 18 : 16} className="shrink-0" />
+              {!collapsed && (
+                <>
+                  IA Analyste
+                  <span className="ml-auto px-1.5 py-0.5 rounded text-[9px] font-bold bg-[rgba(79,140,255,0.15)] text-[#7eb8ff]">Bientot</span>
+                </>
+              )}
+            </div>
+          )}
           {/* Admin link — visible aux admins uniquement */}
           {user?.is_admin && (
             <>

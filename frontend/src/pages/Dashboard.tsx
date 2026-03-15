@@ -344,7 +344,7 @@ function BankrollWidget({
     >
       <div className="grid grid-cols-3 divide-x divide-[#e3e6eb] max-sm:grid-cols-1 max-sm:divide-x-0 max-sm:divide-y max-sm:divide-[#e3e6eb]">
         {/* Bankroll initiale */}
-        <div className="flex flex-col gap-0.5 pr-4 max-sm:pr-0 max-sm:pb-3">
+        <div className="flex flex-col items-center text-center gap-0.5 pr-4 max-sm:pr-0 max-sm:pb-3">
           <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide">Bankroll initiale</span>
           <span className="text-[20px] font-extrabold tracking-tight text-[#111318] leading-none">
             {initialBankroll.toLocaleString("fr-FR")}€
@@ -353,7 +353,7 @@ function BankrollWidget({
         </div>
 
         {/* Solde actuel */}
-        <div className="flex flex-col gap-0.5 px-4 max-sm:px-0 max-sm:py-3">
+        <div className="flex flex-col items-center text-center gap-0.5 px-4 max-sm:px-0 max-sm:py-3">
           <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide">Solde actuel</span>
           <span
             className="text-[20px] font-extrabold tracking-tight leading-none"
@@ -369,7 +369,7 @@ function BankrollWidget({
         </div>
 
         {/* Variation P&L */}
-        <div className="flex flex-col gap-0.5 pl-4 max-sm:pl-0 max-sm:pt-3">
+        <div className="flex flex-col items-center text-center gap-0.5 pl-4 max-sm:pl-0 max-sm:pt-3">
           <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide">Variation P&L</span>
           <span
             className="text-[20px] font-extrabold tracking-tight leading-none"

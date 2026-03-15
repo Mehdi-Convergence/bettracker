@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { Navigate } from "react-router-dom";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { useAuth } from "@/contexts/AuthContext";
@@ -245,6 +246,12 @@ function WelcomeScreen({ onSend }: { onSend: (text: string) => void }) {
 
 export default function AIAnalyste() {
   const { user } = useAuth();
+
+  // Admin only for now
+  if (user && !user.is_admin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   const userInitials = useMemo(() => {
     if (!user?.display_name) return "U";
     return user.display_name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
