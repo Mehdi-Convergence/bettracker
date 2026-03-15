@@ -416,7 +416,59 @@ def get_errors(
 
 
 # ---------------------------------------------------------------------------
-# 7. POST /admin/scan/{sport}/force — Force scan
+# 7. GET /admin/users — Per-user details
+# ---------------------------------------------------------------------------
+
+
+@router.get("/users")
+def get_users_details(
+    _user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    now = _now_utc()
+    users = db.query(User).all()
+    results = []
+
+    for u in users:
+        bets = db.query(Bet).filter(
+            Bet.user_id == u.id,
+            Bet.is_backtest == False,  # noqa: E712
+        ).all()
+
+        total_bets = len(bets)
+        settled = [b for b in bets if b.result in ("won", "lost")]
+        staked = sum(b.stake for b in settled) if settled else 0.0
+        pnl = sum(b.profit_loss or 0.0 for b in settled) if settled else 0.0
+        roi = round(pnl / staked * 100, 2) if staked > 0 else None
+
+        # Sports preferes
+        sport_counts: dict[str, int] = {}
+        for b in bets:
+            sport_counts[b.sport] = sport_counts.get(b.sport, 0) + 1
+        fav_sports = sorted(sport_counts.keys(), key=lambda s: sport_counts[s], reverse=True)[:3]
+
+        # Derniere activite
+        last_bet = max((b.created_at for b in bets), default=None)
+
+        results.append({
+            "id": u.id,
+            "email": u.email,
+            "tier": getattr(u, "tier", "free"),
+            "is_admin": getattr(u, "is_admin", False),
+            "total_bets": total_bets,
+            "settled_bets": len(settled),
+            "roi_pct": roi,
+            "pnl": round(pnl, 2),
+            "favorite_sports": fav_sports,
+            "last_bet_at": last_bet.isoformat() if last_bet else None,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+        })
+
+    return sorted(results, key=lambda r: r["total_bets"], reverse=True)
+
+
+# ---------------------------------------------------------------------------
+# 8. POST /admin/scan/{sport}/force — Force scan
 # ---------------------------------------------------------------------------
 
 

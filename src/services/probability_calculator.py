@@ -36,8 +36,8 @@ from typing import Literal
 MAX_POINTS = 23
 BASE_POINTS = 3  # always available (odds)
 
-GREEN_THRESHOLD = 0.55
-YELLOW_THRESHOLD = 0.30
+GREEN_THRESHOLD = 0.70
+YELLOW_THRESHOLD = 0.45
 
 HOME_ADV = 1.10         # Poisson home advantage factor
 LEAGUE_AVG_GOALS = 2.6  # default if not provided

@@ -25,6 +25,7 @@ import {
   getAdminAnalytics,
   getAdminAlerts,
   getAdminErrors,
+  getAdminUsers,
   forceScan,
 } from "@/services/api";
 import type {
@@ -34,6 +35,7 @@ import type {
   AdminSportAnalytics,
   AdminAlert,
   AdminError,
+  AdminUserDetail,
 } from "@/types";
 
 /* ── helpers ── */
@@ -118,15 +120,17 @@ function AdminDashboard() {
   const [forcingScans, setForcingScans] = useState<Record<string, boolean>>({});
   const [forceMessages, setForceMessages] = useState<Record<string, string>>({});
   const [errorsExpanded, setErrorsExpanded] = useState(false);
+  const [users, setUsers] = useState<AdminUserDetail[]>([]);
 
   const load = useCallback(async () => {
-    const [sys, sc, q, an, al, er] = await Promise.allSettled([
+    const [sys, sc, q, an, al, er, us] = await Promise.allSettled([
       getAdminSystem(),
       getAdminScans(),
       getAdminQuota(),
       getAdminAnalytics(),
       getAdminAlerts(),
       getAdminErrors(),
+      getAdminUsers(),
     ]);
     if (sys.status === "fulfilled") setSystem(sys.value);
     if (sc.status === "fulfilled") setScans(sc.value);
@@ -134,6 +138,7 @@ function AdminDashboard() {
     if (an.status === "fulfilled") setAnalytics(an.value);
     if (al.status === "fulfilled") setAlerts(al.value);
     if (er.status === "fulfilled") setErrors(er.value);
+    if (us.status === "fulfilled") setUsers(us.value);
     setLoading(false);
     setLastRefresh(new Date());
   }, []);
@@ -444,7 +449,76 @@ function AdminDashboard() {
         )}
       </SectionCard>
 
-      {/* ── Section 5: Alerts ── */}
+      {/* ── Section 5: Users ── */}
+      <SectionCard
+        title="Utilisateurs"
+        icon={<Users size={14} className="text-[#3b5bdb]" />}
+        action={
+          users.length > 0 ? (
+            <span className="font-mono text-[11px] text-[#8a919e]">{users.length} compte{users.length > 1 ? "s" : ""}</span>
+          ) : undefined
+        }
+      >
+        {users.length === 0 ? (
+          <p className="text-[12px] text-[#b0b7c3] text-center py-4">Aucun utilisateur</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12.5px]">
+              <thead>
+                <tr className="border-b border-[#e3e6eb]">
+                  {["Email", "Tier", "Paris", "Settled", "ROI", "P&L", "Sports", "Derniere activite", "Inscription"].map((h) => (
+                    <th key={h} className="text-left py-2 px-3 text-[11px] font-semibold text-[#8a919e] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className="border-b border-[#f0f1f3] last:border-0 hover:bg-[#fafbfc] transition-colors">
+                    <td className="py-2.5 px-3 text-[#111318] font-medium">
+                      <div className="flex items-center gap-1.5">
+                        {u.email}
+                        {u.is_admin && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#3b5bdb]/10 text-[#3b5bdb]">Admin</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${
+                        u.tier === "premium" ? "bg-[#7c3aed]/10 text-[#7c3aed]" :
+                        u.tier === "pro" ? "bg-[#3b5bdb]/10 text-[#3b5bdb]" :
+                        "bg-[#f4f5f7] text-[#8a919e]"
+                      }`}>
+                        {u.tier}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-[#3c4149]">{u.total_bets}</td>
+                    <td className="py-2.5 px-3 font-mono text-[#3c4149]">{u.settled_bets}</td>
+                    <td className="py-2.5 px-3 font-mono font-bold" style={{
+                      color: u.roi_pct == null ? "#8a919e" : u.roi_pct >= 0 ? "#12b76a" : "#f04438"
+                    }}>
+                      {u.roi_pct != null ? `${u.roi_pct >= 0 ? "+" : ""}${u.roi_pct.toFixed(1)}%` : "—"}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono font-bold" style={{
+                      color: u.pnl >= 0 ? "#12b76a" : "#f04438"
+                    }}>
+                      {u.pnl !== 0 ? `${u.pnl >= 0 ? "+" : ""}${u.pnl.toFixed(2)}` : "—"}
+                    </td>
+                    <td className="py-2.5 px-3 text-[#3c4149]">
+                      {u.favorite_sports.length > 0 ? u.favorite_sports.map((s) => (
+                        <span key={s} className="inline-block px-1.5 py-0.5 rounded text-[9.5px] font-medium bg-[#f4f5f7] text-[#3c4149] mr-1 capitalize">{s}</span>
+                      )) : "—"}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-[11px] text-[#8a919e]">{fmtTs(u.last_bet_at)}</td>
+                    <td className="py-2.5 px-3 font-mono text-[11px] text-[#8a919e]">{fmtTs(u.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+
+      {/* ── Section 6: Alerts ── */}
       <SectionCard
         title="Alertes actives"
         icon={<AlertTriangle size={14} className="text-[#f79009]" />}

@@ -1700,7 +1700,7 @@ function MatchCard({
     null as typeof outcomes[0] | null
   );
 
-  const maxPts = am.sport === "tennis" ? 18 : am.sport === "nba" || am.sport === "mlb" ? 6 : am.sport === "rugby" ? 7 : 20;
+  const maxPts = am.sport === "tennis" ? 18 : am.sport === "nba" || am.sport === "mlb" ? 6 : am.sport === "rugby" ? 7 : am.sport === "pmu" ? 7 : 23;
   const dataScore = Math.round((am.data_score ?? 0) * maxPts);
   const confidence = Math.max(am.model_prob_home ?? 0, am.model_prob_draw ?? 0, am.model_prob_away ?? 0) * 100;
 

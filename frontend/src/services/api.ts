@@ -493,6 +493,10 @@ export function getAdminErrors() {
   return request<import("../types").AdminError[]>("/admin/errors");
 }
 
+export function getAdminUsers() {
+  return request<import("../types").AdminUserDetail[]>("/admin/users");
+}
+
 export function forceScan(sport: string) {
   return request<{ ok: boolean; message: string }>(`/admin/scan/${sport}/force`, { method: "POST" });
 }

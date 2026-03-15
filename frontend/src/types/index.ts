@@ -763,3 +763,17 @@ export interface AdminError {
   message: string;
   traceback: string | null;
 }
+
+export interface AdminUserDetail {
+  id: number;
+  email: string;
+  tier: string;
+  is_admin: boolean;
+  total_bets: number;
+  settled_bets: number;
+  roi_pct: number | null;
+  pnl: number;
+  favorite_sports: string[];
+  last_bet_at: string | null;
+  created_at: string | null;
+}
