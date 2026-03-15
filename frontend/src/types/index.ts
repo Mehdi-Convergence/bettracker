@@ -777,3 +777,16 @@ export interface AdminUserDetail {
   last_bet_at: string | null;
   created_at: string | null;
 }
+
+export interface AdminAIStats {
+  total_conversations: number;
+  conversations_7d: number;
+  total_messages: number;
+  messages_24h: number;
+  messages_7d: number;
+  user_messages: number;
+  assistant_messages: number;
+  active_ai_users: number;
+  avg_msgs_per_conv: number;
+  per_user_usage: { user_id: number; email: string; tier: string; used_today: number }[];
+}

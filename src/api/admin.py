@@ -501,3 +501,103 @@ def force_scan(
         "ok": True,
         "message": f"Cache {sport} invalide — le worker relancera le scan au prochain cycle",
     }
+
+
+# ---------------------------------------------------------------------------
+# 9. GET /admin/ai — AI Analyste monitoring (conversations, tokens, usage)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/ai")
+def get_ai_stats(
+    _user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    from src.models.ai_conversation import AIConversation, AIMessage
+
+    now = _now_utc()
+    cutoff_7d = now - timedelta(days=7)
+    cutoff_24h = now - timedelta(hours=24)
+
+    try:
+        total_conversations = db.query(func.count(AIConversation.id)).scalar() or 0
+        conversations_7d = (
+            db.query(func.count(AIConversation.id))
+            .filter(AIConversation.created_at >= cutoff_7d)
+            .scalar() or 0
+        )
+
+        total_messages = db.query(func.count(AIMessage.id)).scalar() or 0
+        messages_24h = (
+            db.query(func.count(AIMessage.id))
+            .filter(AIMessage.created_at >= cutoff_24h)
+            .scalar() or 0
+        )
+        messages_7d = (
+            db.query(func.count(AIMessage.id))
+            .filter(AIMessage.created_at >= cutoff_7d)
+            .scalar() or 0
+        )
+
+        # Messages by role
+        user_messages = (
+            db.query(func.count(AIMessage.id))
+            .filter(AIMessage.role == "user")
+            .scalar() or 0
+        )
+        assistant_messages = (
+            db.query(func.count(AIMessage.id))
+            .filter(AIMessage.role == "assistant")
+            .scalar() or 0
+        )
+
+        # Active AI users (users with conversations in last 7d)
+        active_ai_users = (
+            db.query(func.count(func.distinct(AIConversation.user_id)))
+            .filter(AIConversation.created_at >= cutoff_7d)
+            .scalar() or 0
+        )
+
+        # Per-user rate limit usage (from Redis)
+        users_list = db.query(User).all()
+        per_user_usage = []
+        for u in users_list:
+            used = cache_get(f"ai:daily:{u.id}")
+            if used is not None and int(used) > 0:
+                per_user_usage.append({
+                    "user_id": u.id,
+                    "email": u.email,
+                    "tier": getattr(u, "tier", "free"),
+                    "used_today": int(used),
+                })
+
+        # Average messages per conversation
+        avg_msgs_per_conv = round(total_messages / total_conversations, 1) if total_conversations > 0 else 0
+
+    except Exception as exc:
+        logger.exception("AI stats error: %s", exc)
+        return {
+            "total_conversations": 0,
+            "conversations_7d": 0,
+            "total_messages": 0,
+            "messages_24h": 0,
+            "messages_7d": 0,
+            "user_messages": 0,
+            "assistant_messages": 0,
+            "active_ai_users": 0,
+            "avg_msgs_per_conv": 0,
+            "per_user_usage": [],
+        }
+
+    return {
+        "total_conversations": total_conversations,
+        "conversations_7d": conversations_7d,
+        "total_messages": total_messages,
+        "messages_24h": messages_24h,
+        "messages_7d": messages_7d,
+        "user_messages": user_messages,
+        "assistant_messages": assistant_messages,
+        "active_ai_users": active_ai_users,
+        "avg_msgs_per_conv": avg_msgs_per_conv,
+        "per_user_usage": per_user_usage,
+    }

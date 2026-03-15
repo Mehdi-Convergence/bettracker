@@ -15,6 +15,7 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
+  MessageCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
@@ -26,6 +27,7 @@ import {
   getAdminAlerts,
   getAdminErrors,
   getAdminUsers,
+  getAdminAI,
   forceScan,
 } from "@/services/api";
 import type {
@@ -36,6 +38,7 @@ import type {
   AdminAlert,
   AdminError,
   AdminUserDetail,
+  AdminAIStats,
 } from "@/types";
 
 /* ── helpers ── */
@@ -121,9 +124,10 @@ function AdminDashboard() {
   const [forceMessages, setForceMessages] = useState<Record<string, string>>({});
   const [errorsExpanded, setErrorsExpanded] = useState(false);
   const [users, setUsers] = useState<AdminUserDetail[]>([]);
+  const [aiStats, setAiStats] = useState<AdminAIStats | null>(null);
 
   const load = useCallback(async () => {
-    const [sys, sc, q, an, al, er, us] = await Promise.allSettled([
+    const [sys, sc, q, an, al, er, us, ai] = await Promise.allSettled([
       getAdminSystem(),
       getAdminScans(),
       getAdminQuota(),
@@ -131,6 +135,7 @@ function AdminDashboard() {
       getAdminAlerts(),
       getAdminErrors(),
       getAdminUsers(),
+      getAdminAI(),
     ]);
     if (sys.status === "fulfilled") setSystem(sys.value);
     if (sc.status === "fulfilled") setScans(sc.value);
@@ -139,6 +144,7 @@ function AdminDashboard() {
     if (al.status === "fulfilled") setAlerts(al.value);
     if (er.status === "fulfilled") setErrors(er.value);
     if (us.status === "fulfilled") setUsers(us.value);
+    if (ai.status === "fulfilled") setAiStats(ai.value);
     setLoading(false);
     setLastRefresh(new Date());
   }, []);
@@ -518,7 +524,54 @@ function AdminDashboard() {
         )}
       </SectionCard>
 
-      {/* ── Section 6: Alerts ── */}
+      {/* ── Section 6: AI Analyste ── */}
+      <SectionCard title="IA Analyste" icon={<MessageCircle size={14} className="text-[#7c3aed]" />}>
+        {aiStats ? (
+          <div className="flex flex-col gap-5">
+            {/* KPIs grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: "Conversations", value: String(aiStats.total_conversations), sub: `${aiStats.conversations_7d} cette semaine`, color: "#7c3aed" },
+                { label: "Messages 24h", value: String(aiStats.messages_24h), sub: `${aiStats.messages_7d} cette semaine`, color: "#3b5bdb" },
+                { label: "Utilisateurs actifs", value: String(aiStats.active_ai_users), sub: "7 derniers jours", color: "#12b76a" },
+                { label: "Moy. msg/conv", value: String(aiStats.avg_msgs_per_conv), sub: `${aiStats.user_messages} user / ${aiStats.assistant_messages} IA`, color: "#f79009" },
+              ].map((kpi) => (
+                <div key={kpi.label} className="flex flex-col gap-1 p-3 rounded-xl border border-[#e3e6eb] bg-[#fafbfc]">
+                  <span className="text-[10.5px] font-semibold text-[#8a919e] uppercase tracking-wide">{kpi.label}</span>
+                  <span className="text-[22px] font-extrabold font-mono" style={{ color: kpi.color }}>{kpi.value}</span>
+                  <span className="text-[10.5px] text-[#b0b7c3]">{kpi.sub}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Per-user usage today */}
+            {aiStats.per_user_usage.length > 0 && (
+              <div>
+                <p className="text-[11px] font-semibold text-[#8a919e] uppercase tracking-wide mb-2">Usage quotidien par utilisateur</p>
+                <div className="flex flex-col gap-1.5">
+                  {aiStats.per_user_usage.map((u) => (
+                    <div key={u.user_id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#fafbfc] border border-[#e3e6eb]">
+                      <span className="text-[12px] text-[#111318] font-medium flex-1 min-w-0 truncate">{u.email}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        u.tier === "premium" ? "bg-[#7c3aed]/10 text-[#7c3aed]" :
+                        u.tier === "pro" ? "bg-[#3b5bdb]/10 text-[#3b5bdb]" :
+                        "bg-[#f4f5f7] text-[#8a919e]"
+                      }`}>
+                        {u.tier}
+                      </span>
+                      <span className="font-mono text-[12px] font-bold text-[#7c3aed]">{u.used_today} msg</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-[12px] text-[#b0b7c3] text-center py-4">Donnees IA indisponibles</p>
+        )}
+      </SectionCard>
+
+      {/* ── Section 7: Alerts ── */}
       <SectionCard
         title="Alertes actives"
         icon={<AlertTriangle size={14} className="text-[#f79009]" />}

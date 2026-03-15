@@ -523,3 +523,7 @@ export function getAdminUsers() {
 export function forceScan(sport: string) {
   return request<{ ok: boolean; message: string }>(`/admin/scan/${sport}/force`, { method: "POST" });
 }
+
+export function getAdminAI() {
+  return request<import("../types").AdminAIStats>("/admin/ai");
+}
