@@ -657,7 +657,7 @@ export default function Portfolio() {
 
       {/* ══════ LIST VIEW ══════ */}
       {viewMode === "list" && (
-        <div className="flex flex-col gap-3 flex-1 min-h-0" style={{ animation: "fu .3s ease both" }}>
+        <div className="flex flex-col gap-3 flex-1" style={{ animation: "fu .3s ease both" }}>
           {/* List KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             <LKpi label="ROI période" value={`${listKpis.roi >= 0 ? "+" : ""}${listKpis.roi.toFixed(1)}%`} color={listKpis.roi >= 0 ? C.green : C.red} />
@@ -719,8 +719,8 @@ export default function Portfolio() {
           </div>
 
           {/* Table */}
-          <div data-tour="bets-table" className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl overflow-hidden flex flex-col flex-1 min-h-0" style={{ boxShadow: SH_SM }}>
-            <div className="overflow-x-auto flex-1 min-h-0 overflow-y-auto">
+          <div data-tour="bets-table" className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl overflow-hidden flex flex-col flex-1" style={{ boxShadow: SH_SM }}>
+            <div className="overflow-x-auto flex-1 overflow-y-auto">
               <table className="w-full text-[12.5px] border-collapse">
                 <thead className="bg-[#f4f5f7] border-b-[1.5px] border-[#e3e6eb]">
                   <tr>

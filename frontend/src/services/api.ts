@@ -491,6 +491,10 @@ export function getAIRateLimit() {
   return request<import("../types").AIRateLimit>("/ai/rate-limit");
 }
 
+export function getAIContext() {
+  return request<import("../types").AIContext>("/ai/context");
+}
+
 // Admin
 export function getAdminSystem() {
   return request<import("../types").AdminSystemStatus>("/admin/system");

@@ -298,7 +298,7 @@ export default function Parametres() {
   };
 
   return (
-    <div className="animate-fade-up">
+    <div className="animate-fade-up overflow-x-hidden">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-[22px] font-extrabold tracking-tight text-[#111318]">Paramètres</h1>

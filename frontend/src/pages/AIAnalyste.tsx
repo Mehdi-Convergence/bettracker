@@ -8,9 +8,14 @@ import {
   getAIConversations,
   getAIConversationMessages,
   deleteAIConversation,
-  getAIRateLimit,
+  getAIContext,
 } from "@/services/api";
-import type { AIConversation, AIMessageData, AIRateLimit } from "@/types";
+import type {
+  AIConversation,
+  AIMessageData,
+  AIContext,
+  AIContextValueBet,
+} from "@/types";
 import {
   MessageCircle,
   Send,
@@ -19,7 +24,6 @@ import {
   Zap,
   BarChart3,
   CreditCard,
-  Info,
   CheckSquare,
   Clock,
   Trash2,
@@ -27,11 +31,14 @@ import {
   Loader2,
   AlertCircle,
   Gauge,
+  Trophy,
+  Target,
+  Settings,
 } from "lucide-react";
 
-/* ═══════════════════════════════════════════════════════
-   MARKDOWN RENDERING
-   ═══════════════════════════════════════════════════════ */
+/* ================================================================
+   MARKDOWN
+   ================================================================ */
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -41,9 +48,9 @@ function renderMarkdown(text: string): string {
   return DOMPurify.sanitize(html);
 }
 
-/* ═══════════════════════════════════════════════════════
+/* ================================================================
    TYPES
-   ═══════════════════════════════════════════════════════ */
+   ================================================================ */
 
 interface ChatMessage {
   id: string;
@@ -61,106 +68,236 @@ const QUICK_ACTIONS = [
   { label: "Simulation bankroll", icon: CreditCard },
 ];
 
-/* ═══════════════════════════════════════════════════════
-   CONTEXT PANEL — real data widgets
-   ═══════════════════════════════════════════════════════ */
+const SPORT_LABELS: Record<string, string> = {
+  football: "Football",
+  tennis: "Tennis",
+  nba: "NBA",
+  mlb: "MLB",
+  rugby: "Rugby",
+  pmu: "PMU",
+};
+
+const SPORT_COLORS: Record<string, string> = {
+  football: "#12b76a",
+  tennis: "#f79009",
+  nba: "#3b5bdb",
+  mlb: "#ef4444",
+  rugby: "#8b5cf6",
+  pmu: "#06b6d4",
+};
+
+/* ================================================================
+   MINI SPARKLINE (SVG)
+   ================================================================ */
+
+function Sparkline({ data, color = "#12b76a", w = 120, h = 32 }: { data: number[]; color?: string; w?: number; h?: number }) {
+  if (!data.length) return null;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const pts = data.map((v, i) => {
+    const x = (i / Math.max(data.length - 1, 1)) * w;
+    const y = h - ((v - min) / range) * (h - 4) - 2;
+    return `${x},${y}`;
+  });
+  const lastVal = data[data.length - 1];
+  const lineColor = lastVal >= 0 ? color : "#f04438";
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="block">
+      <defs>
+        <linearGradient id={`spark-grad-${lineColor}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={lineColor} stopOpacity="0.15" />
+          <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon
+        points={`0,${h} ${pts.join(" ")} ${w},${h}`}
+        fill={`url(#spark-grad-${lineColor})`}
+      />
+      <polyline
+        points={pts.join(" ")}
+        fill="none"
+        stroke={lineColor}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/* ================================================================
+   CONTEXT PANEL — right sidebar with real data
+   ================================================================ */
 
 function ContextPanel({
-  rateLimit,
+  context,
   conversations,
   onSelectConversation,
   onDeleteConversation,
   onNewConversation,
   onSendMessage,
 }: {
-  rateLimit: AIRateLimit | null;
+  context: AIContext | null;
   conversations: AIConversation[];
   onSelectConversation: (id: number) => void;
   onDeleteConversation: (id: number) => void;
   onNewConversation: () => void;
   onSendMessage: (text: string) => void;
 }) {
+  const rl = context?.rate_limit;
+  const perf = context?.performance;
+  const vbs = context?.value_bets || [];
+
   return (
-    <div className="w-[320px] min-w-[320px] border-l border-[#e3e6eb] bg-white flex flex-col overflow-hidden max-lg:hidden">
-      {/* Context header */}
-      <div className="shrink-0 px-4 py-3.5 border-b border-[#e3e6eb] flex items-center justify-between">
-        <div className="flex items-center gap-[7px] text-[13px] font-bold text-[#111318]">
-          <Info size={14} className="text-[#7c3aed]" />
-          Contexte
+    <div className="w-[310px] min-w-[310px] border-l border-[#e3e6eb] bg-[#fafbfc] flex flex-col overflow-hidden max-lg:hidden">
+      {/* Header */}
+      <div className="shrink-0 px-4 py-3 border-b border-[#e3e6eb] flex items-center justify-between bg-white">
+        <div className="flex items-center gap-2 text-[13px] font-bold text-[#111318]">
+          <div className="w-2 h-2 rounded-full bg-[#12b76a] animate-pulse" />
+          Contexte actif
         </div>
-        {rateLimit && (
-          <span className="px-2 py-0.5 rounded-[4px] text-[10px] font-semibold font-mono bg-[rgba(124,58,237,.07)] text-[#7c3aed]">
-            {rateLimit.remaining}/{rateLimit.limit} msg
-          </span>
-        )}
+        <span className="px-2 py-0.5 rounded text-[9.5px] font-semibold bg-[rgba(18,183,106,.08)] text-[#12b76a] tracking-wide uppercase">
+          Mis a jour
+        </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3.5 flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3">
 
-        {/* Rate limit gauge */}
-        {rateLimit && (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-[5px] text-[10.5px] font-bold text-[#b0b7c3] uppercase tracking-wider">
-              <Gauge size={11} className="text-[#3b5bdb]" />
+        {/* ── QUOTA ── */}
+        {rl && (
+          <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
+              <Gauge size={10} className="text-[#3b5bdb]" />
               Quota quotidien
             </div>
-            <div className="rounded-[10px] p-3 border border-[#e3e6eb]">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[12px] text-[#8a919e]">Messages utilises</span>
-                <span className="text-[13px] font-bold font-mono text-[#111318]">
-                  {rateLimit.used}/{rateLimit.limit}
-                </span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-[#f0f1f3] overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${Math.min((rateLimit.used / rateLimit.limit) * 100, 100)}%`,
-                    backgroundColor: rateLimit.remaining <= 2 ? "#f04438" : rateLimit.remaining <= 5 ? "#f79009" : "#12b76a",
-                  }}
-                />
-              </div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11.5px] text-[#8a919e]">Messages</span>
+              <span className="text-[13px] font-bold font-mono text-[#111318]">
+                {rl.used}/{rl.limit}
+              </span>
+            </div>
+            <div className="w-full h-[6px] rounded-full bg-[#f0f1f3] overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min((rl.used / rl.limit) * 100, 100)}%`,
+                  backgroundColor: rl.remaining <= 2 ? "#f04438" : rl.remaining <= 10 ? "#f79009" : "#12b76a",
+                }}
+              />
             </div>
           </div>
         )}
 
-        {/* Conversations history */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-[5px] text-[10.5px] font-bold text-[#b0b7c3] uppercase tracking-wider">
-              <Clock size={11} className="text-[#3b5bdb]" />
+        {/* ── PERFORMANCES 30J ── */}
+        {perf && perf.total_bets > 0 && (
+          <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2.5">
+              <Trophy size={10} className="text-[#f79009]" />
+              Mes performances - 30j
+            </div>
+
+            {/* ROI big number */}
+            <div className="text-center mb-2">
+              <span className={`text-[28px] font-extrabold font-mono leading-none ${perf.roi >= 0 ? "text-[#12b76a]" : "text-[#f04438]"}`}>
+                {perf.roi >= 0 ? "+" : ""}{perf.roi}%
+              </span>
+              <span className="text-[11px] text-[#8a919e] ml-1.5">ROI global</span>
+            </div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-2 gap-2 mb-2.5">
+              <div className="text-center">
+                <div className="text-[15px] font-bold font-mono text-[#111318]">{perf.total_bets}</div>
+                <div className="text-[9.5px] text-[#b0b7c3]">Tickets</div>
+              </div>
+              <div className="text-center">
+                <div className={`text-[15px] font-bold font-mono ${perf.win_rate >= 50 ? "text-[#12b76a]" : "text-[#f79009]"}`}>{perf.win_rate}%</div>
+                <div className="text-[9.5px] text-[#b0b7c3]">Reussite</div>
+              </div>
+              <div className="text-center">
+                <div className="text-[15px] font-bold font-mono text-[#111318]">{perf.total_stake.toLocaleString("fr-FR")}</div>
+                <div className="text-[9.5px] text-[#b0b7c3]">Mise totale</div>
+              </div>
+              <div className="text-center">
+                <div className={`text-[15px] font-bold font-mono ${perf.total_pl >= 0 ? "text-[#12b76a]" : "text-[#f04438]"}`}>
+                  {perf.total_pl >= 0 ? "+" : ""}{perf.total_pl.toLocaleString("fr-FR")}
+                </div>
+                <div className="text-[9.5px] text-[#b0b7c3]">Gain net</div>
+              </div>
+            </div>
+
+            {/* Sparkline */}
+            {perf.timeline.length > 1 && (
+              <Sparkline data={perf.timeline.map((t) => t.pl)} w={260} h={36} />
+            )}
+
+            {/* By sport mini bars */}
+            {Object.keys(perf.by_sport).length > 0 && (
+              <div className="flex gap-3 mt-2 justify-center">
+                {Object.entries(perf.by_sport).map(([sport, s]) => (
+                  <div key={sport} className="text-center">
+                    <div className={`text-[12px] font-bold font-mono ${s.roi >= 0 ? "text-[#12b76a]" : "text-[#f04438]"}`}>
+                      {s.roi >= 0 ? "+" : ""}{s.roi}%
+                    </div>
+                    <div className="text-[9px] text-[#b0b7c3]">{SPORT_LABELS[sport] || sport}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── VALUE BETS DU JOUR ── */}
+        {vbs.length > 0 && (
+          <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
+              <Target size={10} className="text-[#3b5bdb]" />
+              Value bets du jour - {vbs.length}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {vbs.map((vb, i) => (
+                <ValueBetRow key={i} vb={vb} onSend={onSendMessage} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── CONVERSATIONS ── */}
+        <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider">
+              <Clock size={10} className="text-[#3b5bdb]" />
               Conversations
             </div>
             <button
               onClick={onNewConversation}
-              className="flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-semibold text-[#7c3aed] bg-[rgba(124,58,237,.07)] hover:bg-[rgba(124,58,237,.12)] transition-colors cursor-pointer border-none font-[inherit]"
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-[9.5px] font-semibold text-[#7c3aed] bg-[rgba(124,58,237,.06)] hover:bg-[rgba(124,58,237,.12)] transition-colors cursor-pointer border-none font-[inherit]"
             >
-              <RotateCcw size={10} />
+              <RotateCcw size={9} />
               Nouveau
             </button>
           </div>
           {conversations.length === 0 ? (
-            <div className="text-[12px] text-[#b0b7c3] text-center py-3">Aucune conversation</div>
+            <div className="text-[11px] text-[#b0b7c3] text-center py-2">Aucune conversation</div>
           ) : (
-            <div className="flex flex-col gap-[5px] max-h-[200px] overflow-y-auto">
-              {conversations.slice(0, 15).map((c) => (
+            <div className="flex flex-col gap-1 max-h-[150px] overflow-y-auto">
+              {conversations.slice(0, 10).map((c) => (
                 <div
                   key={c.id}
-                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-[#e3e6eb] bg-[#f7f8fa] cursor-pointer transition-all hover:border-[rgba(124,58,237,.18)] hover:bg-[rgba(124,58,237,.04)] group"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all hover:bg-[#f7f8fa] group"
                   onClick={() => onSelectConversation(c.id)}
                 >
-                  <MessageCircle size={12} className="text-[#b0b7c3] shrink-0" />
+                  <MessageCircle size={11} className="text-[#b0b7c3] shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-semibold text-[#111318] truncate">{c.title || "Sans titre"}</div>
-                    <div className="text-[10px] text-[#b0b7c3]">
-                      {c.message_count} msg
-                    </div>
+                    <div className="text-[11px] font-medium text-[#111318] truncate">{c.title || "Sans titre"}</div>
+                    <div className="text-[9px] text-[#b0b7c3]">{c.message_count} msg</div>
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); onDeleteConversation(c.id); }}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded text-[#b0b7c3] hover:text-[#f04438] transition-all cursor-pointer border-none bg-transparent"
+                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-[#b0b7c3] hover:text-[#f04438] transition-all cursor-pointer border-none bg-transparent"
                   >
-                    <Trash2 size={11} />
+                    <Trash2 size={10} />
                   </button>
                 </div>
               ))}
@@ -168,13 +305,13 @@ function ContextPanel({
           )}
         </div>
 
-        {/* Suggested questions */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-[5px] text-[10.5px] font-bold text-[#b0b7c3] uppercase tracking-wider">
-            <MessageCircle size={11} className="text-[#3b5bdb]" />
+        {/* ── QUESTIONS SUGGEREES ── */}
+        <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
+            <MessageCircle size={10} className="text-[#3b5bdb]" />
             Questions suggerees
           </div>
-          <div className="flex gap-[5px] flex-wrap">
+          <div className="flex gap-1 flex-wrap">
             {[
               "Quel est mon ROI ce mois-ci ?",
               "Value bets football ce soir",
@@ -186,7 +323,7 @@ function ContextPanel({
               <button
                 key={q}
                 onClick={() => onSendMessage(q)}
-                className="px-[9px] py-1 rounded-[6px] text-[11.5px] font-medium border border-[#e3e6eb] bg-[#f7f8fa] text-[#8a919e] cursor-pointer transition-all hover:border-[rgba(124,58,237,.18)] hover:text-[#7c3aed] hover:bg-[rgba(124,58,237,.07)] whitespace-nowrap font-[inherit]"
+                className="px-2 py-[3px] rounded text-[10px] font-medium border border-[#e3e6eb] bg-[#f7f8fa] text-[#8a919e] cursor-pointer transition-all hover:border-[rgba(124,58,237,.15)] hover:text-[#7c3aed] hover:bg-[rgba(124,58,237,.05)] whitespace-nowrap font-[inherit]"
               >
                 {q}
               </button>
@@ -198,9 +335,33 @@ function ContextPanel({
   );
 }
 
-/* ═══════════════════════════════════════════════════════
-   WELCOME SCREEN (empty conversation)
-   ═══════════════════════════════════════════════════════ */
+/* value bet row in context panel */
+function ValueBetRow({ vb, onSend }: { vb: AIContextValueBet; onSend: (t: string) => void }) {
+  const sportColor = SPORT_COLORS[vb.sport] || "#8a919e";
+  return (
+    <div
+      className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all hover:bg-[#f7f8fa]"
+      onClick={() => onSend(`Analyse le match ${vb.match}`)}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="text-[11px] font-semibold text-[#111318] truncate">{vb.match}</div>
+        <div className="text-[9px] text-[#b0b7c3] truncate">
+          {vb.league}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-[12px] font-bold font-mono" style={{ color: sportColor }}>
+          {vb.prob}%
+        </span>
+        <span className="text-[10px] font-semibold text-[#12b76a]">+{vb.edge}%</span>
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================
+   WELCOME SCREEN
+   ================================================================ */
 
 function WelcomeScreen({ onSend }: { onSend: (text: string) => void }) {
   const suggestions = [
@@ -240,9 +401,9 @@ function WelcomeScreen({ onSend }: { onSend: (text: string) => void }) {
   );
 }
 
-/* ═══════════════════════════════════════════════════════
+/* ================================================================
    MAIN COMPONENT
-   ═══════════════════════════════════════════════════════ */
+   ================================================================ */
 
 export default function AIAnalyste() {
   const { user } = useAuth();
@@ -261,14 +422,13 @@ export default function AIAnalyste() {
 
   // Sidebar state
   const [conversations, setConversations] = useState<AIConversation[]>([]);
-  const [rateLimit, setRateLimit] = useState<AIRateLimit | null>(null);
+  const [context, setContext] = useState<AIContext | null>(null);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-
-  // Auto-scroll on new messages
+  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isStreaming]);
@@ -281,10 +441,10 @@ export default function AIAnalyste() {
     }
   }, [input]);
 
-  // Load conversations + rate limit on mount
+  // Load context + conversations on mount
   useEffect(() => {
     loadConversations();
-    loadRateLimit();
+    loadContext();
   }, []);
 
   async function loadConversations() {
@@ -296,10 +456,10 @@ export default function AIAnalyste() {
     }
   }
 
-  async function loadRateLimit() {
+  async function loadContext() {
     try {
-      const data = await getAIRateLimit();
-      setRateLimit(data);
+      const data = await getAIContext();
+      setContext(data);
     } catch {
       // silent
     }
@@ -352,7 +512,6 @@ export default function AIAnalyste() {
     setInput("");
     setError(null);
 
-    // Add user message
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
@@ -360,7 +519,6 @@ export default function AIAnalyste() {
       time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
     };
 
-    // Add placeholder assistant message for streaming
     const assistantId = `assistant-${Date.now()}`;
     const assistantMsg: ChatMessage = {
       id: assistantId,
@@ -413,7 +571,7 @@ export default function AIAnalyste() {
           m.id === assistantId ? { ...m, streaming: false } : m
         )
       );
-      loadRateLimit();
+      loadContext();
       loadConversations();
     }
   }, [input, isStreaming, conversationId]);
@@ -434,35 +592,34 @@ export default function AIAnalyste() {
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)] -mx-6 -my-5 bg-white overflow-x-hidden">
 
-      {/* ══ HEADER ══ */}
-      <div className="shrink-0 px-5 py-3 bg-white border-b border-[#e3e6eb] flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <h1 className="text-[22px] font-extrabold tracking-tight text-[#111318]">IA Analyste</h1>
-          {rateLimit && (
+      {/* == HEADER == */}
+      <div className="shrink-0 px-5 py-2.5 bg-white border-b border-[#e3e6eb] flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h1 className="text-[20px] font-extrabold tracking-tight text-[#111318]">IA Analyste</h1>
+          {context?.rate_limit && (
             <span className="text-[11px] text-[#b0b7c3] font-mono max-sm:hidden">
-              {rateLimit.remaining} msg restants
+              {context.rate_limit.remaining} msg restants
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={handleNewConversation}
+            onClick={() => { handleNewConversation(); }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-white text-[#8a919e] text-[12px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] transition-colors font-[inherit]"
           >
             <RotateCcw size={13} />
-            <span className="max-sm:hidden">Nouvelle conversation</span>
+            <span className="max-sm:hidden">Nouveau contexte</span>
           </button>
-          {/* Mobile sidebar toggle */}
           <button
             onClick={() => setShowMobileSidebar(!showMobileSidebar)}
             className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-white text-[#8a919e] text-[12px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] transition-colors font-[inherit]"
           >
-            <Clock size={13} />
+            <Settings size={13} />
           </button>
         </div>
       </div>
 
-      {/* ══ BODY: CHAT + CONTEXT ══ */}
+      {/* == BODY == */}
       <div className="flex-1 flex overflow-hidden relative">
 
         {/* ── CHAT ZONE ── */}
@@ -472,8 +629,8 @@ export default function AIAnalyste() {
           {error && (
             <div className="mx-5 mt-3 px-3.5 py-2.5 rounded-lg bg-[rgba(240,68,56,.06)] border border-[rgba(240,68,56,.15)] flex items-center gap-2 text-[13px] text-[#f04438]">
               <AlertCircle size={14} />
-              {error}
-              <button onClick={() => setError(null)} className="ml-auto text-[#f04438] hover:text-[#d92d2d] cursor-pointer border-none bg-transparent font-[inherit] text-[12px] font-semibold">
+              <span className="flex-1">{error}</span>
+              <button onClick={() => setError(null)} className="text-[#f04438] hover:text-[#d92d2d] cursor-pointer border-none bg-transparent font-[inherit] text-[12px] font-semibold">
                 Fermer
               </button>
             </div>
@@ -491,48 +648,48 @@ export default function AIAnalyste() {
                 >
                   {/* Avatar */}
                   {msg.role === "assistant" ? (
-                    <div className="w-[30px] h-[30px] rounded-full shrink-0 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#7c3aed,#4f8cff)" }}>
-                      <MessageCircle size={14} className="text-white" />
+                    <div className="w-[32px] h-[32px] rounded-full shrink-0 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#7c3aed,#4f8cff)" }}>
+                      <MessageCircle size={15} className="text-white" />
                     </div>
                   ) : (
-                    <div className="w-[30px] h-[30px] rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold text-white" style={{ background: "linear-gradient(135deg,#4f8cff,#a78bfa)" }}>
+                    <div className="w-[32px] h-[32px] rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold text-white" style={{ background: "linear-gradient(135deg,#4f8cff,#a78bfa)" }}>
                       {userInitials}
                     </div>
                   )}
 
-                  {/* Content */}
-                  <div className={`max-w-[80%] max-sm:max-w-[92%] flex flex-col gap-1 ${msg.role === "user" ? "items-end" : ""}`}>
+                  {/* Message content */}
+                  <div className={`max-w-[75%] max-sm:max-w-[90%] flex flex-col gap-1 ${msg.role === "user" ? "items-end" : ""}`}>
                     <div
-                      className={`px-3.5 py-[11px] text-[13.5px] leading-relaxed ${
+                      className={`px-4 py-3 text-[13.5px] leading-relaxed ${
                         msg.role === "assistant"
-                          ? "bg-white border border-[#e3e6eb] text-[#111318] rounded-[4px_12px_12px_12px] ai-message-content"
-                          : "bg-[#3b5bdb] text-white rounded-[12px_4px_12px_12px]"
+                          ? "bg-white border border-[#e3e6eb] text-[#111318] rounded-[4px_14px_14px_14px] ai-message-content"
+                          : "bg-[#3b5bdb] text-white rounded-[14px_4px_14px_14px]"
                       }`}
-                      style={msg.role === "assistant" ? { boxShadow: "0 1px 3px rgba(16,24,40,.06)" } : undefined}
+                      style={msg.role === "assistant" ? { boxShadow: "0 1px 4px rgba(16,24,40,.05)" } : undefined}
                     >
                       {msg.role === "assistant" ? (
                         <>
                           <div dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content || "") }} />
                           {msg.streaming && (
-                            <span className="inline-block w-2 h-4 bg-[#7c3aed] rounded-sm ml-0.5 animate-pulse" />
+                            <span className="inline-block w-1.5 h-4 bg-[#7c3aed] rounded-sm ml-0.5 animate-pulse" />
                           )}
                         </>
                       ) : (
                         <span>{msg.content}</span>
                       )}
                     </div>
-                    <span className={`text-[10.5px] text-[#b0b7c3] ${msg.role === "user" ? "text-right" : ""}`}>{msg.time}</span>
+                    <span className={`text-[10px] text-[#b0b7c3] ${msg.role === "user" ? "text-right" : ""}`}>{msg.time}</span>
                   </div>
                 </div>
               ))}
 
-              {/* Streaming indicator when no content yet */}
+              {/* Loading indicator */}
               {isStreaming && messages.length > 0 && messages[messages.length - 1].role === "assistant" && messages[messages.length - 1].content === "" && (
                 <div className="flex gap-2.5 items-start">
-                  <div className="w-[30px] h-[30px] rounded-full shrink-0 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#7c3aed,#4f8cff)" }}>
-                    <MessageCircle size={14} className="text-white" />
+                  <div className="w-[32px] h-[32px] rounded-full shrink-0 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#7c3aed,#4f8cff)" }}>
+                    <MessageCircle size={15} className="text-white" />
                   </div>
-                  <div className="flex items-center gap-2 px-3.5 py-3 bg-white border border-[#e3e6eb] rounded-[4px_12px_12px_12px]" style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+                  <div className="flex items-center gap-2 px-4 py-3 bg-white border border-[#e3e6eb] rounded-[4px_14px_14px_14px]" style={{ boxShadow: "0 1px 4px rgba(16,24,40,.05)" }}>
                     <Loader2 size={14} className="text-[#7c3aed] animate-spin" />
                     <span className="text-[12px] text-[#8a919e]">Analyse en cours...</span>
                   </div>
@@ -546,16 +703,16 @@ export default function AIAnalyste() {
           {/* ── INPUT BAR ── */}
           <div className="shrink-0 px-5 py-3 bg-white border-t border-[#e3e6eb]">
             {/* Quick action chips */}
-            {messages.length === 0 ? null : (
-              <div className="flex gap-1.5 flex-wrap mb-2.5 max-sm:hidden">
+            {messages.length > 0 && (
+              <div className="flex gap-1.5 flex-wrap mb-2 max-sm:hidden">
                 {QUICK_ACTIONS.map((qa) => (
                   <button
                     key={qa.label}
                     onClick={() => handleSend(qa.label)}
                     disabled={isStreaming}
-                    className="flex items-center gap-[5px] px-2.5 py-1 rounded-full text-[11.5px] font-medium border border-[#e3e6eb] bg-[#f7f8fa] text-[#8a919e] cursor-pointer transition-all hover:border-[rgba(124,58,237,.18)] hover:text-[#7c3aed] hover:bg-[rgba(124,58,237,.07)] whitespace-nowrap font-[inherit] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-[5px] px-2.5 py-1 rounded-full text-[11px] font-medium border border-[#e3e6eb] bg-[#f7f8fa] text-[#8a919e] cursor-pointer transition-all hover:border-[rgba(124,58,237,.18)] hover:text-[#7c3aed] hover:bg-[rgba(124,58,237,.07)] whitespace-nowrap font-[inherit] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <qa.icon size={12} />
+                    <qa.icon size={11} />
                     {qa.label}
                   </button>
                 ))}
@@ -587,7 +744,7 @@ export default function AIAnalyste() {
 
         {/* ── CONTEXT PANEL (desktop) ── */}
         <ContextPanel
-          rateLimit={rateLimit}
+          context={context}
           conversations={conversations}
           onSelectConversation={loadConversation}
           onDeleteConversation={handleDeleteConversation}
@@ -595,7 +752,7 @@ export default function AIAnalyste() {
           onSendMessage={handleSend}
         />
 
-        {/* ── MOBILE SIDEBAR OVERLAY ── */}
+        {/* ── MOBILE SIDEBAR ── */}
         {showMobileSidebar && (
           <div className="absolute inset-0 z-50 lg:hidden flex">
             <div className="absolute inset-0 bg-black/30" onClick={() => setShowMobileSidebar(false)} />
@@ -604,13 +761,13 @@ export default function AIAnalyste() {
                 <button onClick={() => setShowMobileSidebar(false)} className="p-1 rounded cursor-pointer border-none bg-transparent text-[#8a919e] hover:text-[#111318]">
                   <ChevronLeft size={18} />
                 </button>
-                <span className="text-[14px] font-bold text-[#111318]">Historique</span>
+                <span className="text-[14px] font-bold text-[#111318]">Contexte</span>
               </div>
               <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
-                {rateLimit && (
+                {context?.rate_limit && (
                   <div className="flex items-center justify-between px-2 py-2 rounded-lg bg-[#f7f8fa] text-[12px]">
                     <span className="text-[#8a919e]">Quota</span>
-                    <span className="font-bold font-mono text-[#111318]">{rateLimit.remaining}/{rateLimit.limit}</span>
+                    <span className="font-bold font-mono text-[#111318]">{context.rate_limit.remaining}/{context.rate_limit.limit}</span>
                   </div>
                 )}
                 <button

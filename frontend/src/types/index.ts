@@ -663,6 +663,41 @@ export interface AIRateLimit {
   remaining: number;
 }
 
+export interface AIContextValueBet {
+  sport: string;
+  match: string;
+  league: string;
+  date: string;
+  edge: number;
+  outcome: string;
+  odds: number;
+  prob: number;
+}
+
+export interface AIContextPerformance {
+  roi: number;
+  total_bets: number;
+  win_rate: number;
+  total_stake: number;
+  total_pl: number;
+  by_sport: Record<string, { count: number; roi: number; pl: number }>;
+  timeline: { date: string; pl: number }[];
+}
+
+export interface AIContextCampaign {
+  name: string;
+  bet_count: number;
+  pl: number;
+  bankroll: number;
+}
+
+export interface AIContext {
+  performance: AIContextPerformance;
+  value_bets: AIContextValueBet[];
+  campaigns: AIContextCampaign[];
+  rate_limit: AIRateLimit;
+}
+
 // --- PMU types ---
 
 export interface PMURunnerCard {

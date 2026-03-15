@@ -149,7 +149,7 @@ export default function Dashboard() {
   const betGroups = useMemo(() => groupBets(recentBets).slice(0, 5), [recentBets]);
 
   return (
-    <div className="flex flex-col gap-2 animate-fade-up h-full overflow-hidden max-md:h-auto max-md:overflow-visible max-md:overflow-x-hidden">
+    <div className="flex flex-col gap-2 animate-fade-up h-full overflow-hidden max-md:h-auto max-md:overflow-y-auto max-md:overflow-x-hidden">
       {/* ── HEADER ── */}
       <div className="flex items-end justify-between max-md:flex-col max-md:items-start max-md:gap-2">
         <div>
@@ -269,8 +269,8 @@ export default function Dashboard() {
                   Performance & Répartition
                 </div>
               </div>
-              <div className="p-3 flex-1 flex items-center gap-4">
-                <div className="flex-1 min-w-0">
+              <div className="p-3 flex-1 flex items-center gap-4 min-w-0 overflow-hidden">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <SportBarsCompact data={sportBreakdown} />
                 </div>
                 <div className="shrink-0">

@@ -307,7 +307,7 @@ export default function Settings() {
         <p className="text-[13px] text-[#8a919e] mt-1">Gérez vos informations, sécurité et abonnement</p>
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: "252px 1fr" }}>
+      <div className="flex flex-col md:grid gap-4" style={{ gridTemplateColumns: "252px 1fr" }}>
         {/* ── LEFT: Avatar Card ── */}
         <div data-tour="profile-card" className="bg-white border border-[#e3e6eb] rounded-xl shadow-sm overflow-hidden animate-fade-up">
           <div className="p-5 flex flex-col items-center text-center">

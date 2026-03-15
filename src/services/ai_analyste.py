@@ -359,7 +359,23 @@ def chat_stream(
             while choice.finish_reason == "tool_calls" and choice.message.tool_calls and rounds < max_tool_rounds:
                 rounds += 1
                 # Add assistant message with tool calls to history
-                full_messages.append(choice.message.model_dump())
+                # Strip unsupported fields (e.g. 'annotations') that Groq SDK adds
+                assistant_dump = {
+                    "role": "assistant",
+                    "content": choice.message.content or "",
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments,
+                            },
+                        }
+                        for tc in choice.message.tool_calls
+                    ],
+                }
+                full_messages.append(assistant_dump)
 
                 # Execute each tool call and append results
                 for tool_call in choice.message.tool_calls:
