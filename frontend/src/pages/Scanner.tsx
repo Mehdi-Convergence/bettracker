@@ -1198,9 +1198,10 @@ export default function Scanner() {
           {/* PMU filter bar */}
           {sports.has("pmu") && (() => {
             const PMU_TYPES = [
-              { key: "Plat", label: "Plat", flag: "🏇" },
-              { key: "Trot", label: "Trot", flag: "🐎" },
-              { key: "Obstacle", label: "Obstacle", flag: "🚧" },
+              { key: "plat", label: "Plat", flag: "🏇" },
+              { key: "trot_attele", label: "Trot attele", flag: "🐎" },
+              { key: "trot_monte", label: "Trot monte", flag: "🐎" },
+              { key: "obstacle", label: "Obstacle", flag: "🚧" },
             ];
             const activePmuCount = pmuRaceTypeFilter === "all"
               ? pmuRaces.length

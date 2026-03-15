@@ -10,14 +10,14 @@ interface PMURaceCardProps {
 }
 
 const RACE_TYPE_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  Plat:      { label: "Plat",      color: "#3b5bdb", bg: "#3b5bdb0f", border: "#3b5bdb30" },
-  Trot:      { label: "Trot",      color: "#059669", bg: "#0596690f", border: "#05966930" },
-  Obstacle:  { label: "Obstacle",  color: "#d97706", bg: "#d977060f", border: "#d9770630" },
-  Galop:     { label: "Galop",     color: "#3b5bdb", bg: "#3b5bdb0f", border: "#3b5bdb30" },
+  plat:         { label: "Plat",         color: "#3b5bdb", bg: "#3b5bdb0f", border: "#3b5bdb30" },
+  trot_attele:  { label: "Trot attele",  color: "#059669", bg: "#0596690f", border: "#05966930" },
+  trot_monte:   { label: "Trot monte",   color: "#0d9488", bg: "#0d94880f", border: "#0d948830" },
+  obstacle:     { label: "Obstacle",     color: "#d97706", bg: "#d977060f", border: "#d9770630" },
 };
 
 function getRaceTypeConfig(raceType: string) {
-  return RACE_TYPE_CONFIG[raceType] ?? { label: raceType, color: "#8a919e", bg: "#8a919e0f", border: "#8a919e30" };
+  return RACE_TYPE_CONFIG[raceType.toLowerCase()] ?? RACE_TYPE_CONFIG[raceType] ?? { label: raceType, color: "#8a919e", bg: "#8a919e0f", border: "#8a919e30" };
 }
 
 function FormBadge({ position }: { position: number }) {

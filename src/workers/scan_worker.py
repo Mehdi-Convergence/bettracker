@@ -2136,6 +2136,17 @@ async def run_pmu_scan():
                 except Exception:
                     continue
 
+            # Build ISO post_time from race_date + race_time (e.g. "14h30")
+            _post_time: str | None = None
+            if race.race_time and race.race_date:
+                try:
+                    _rt = race.race_time.replace("h", ":").replace("H", ":")
+                    if len(_rt) == 4 and ":" not in _rt:
+                        _rt = f"{_rt[:2]}:{_rt[2:]}"
+                    _post_time = f"{race.race_date.isoformat()}T{_rt}:00"
+                except Exception:
+                    _post_time = race.race_time
+
             races_out.append(PMURaceCard(
                 race_id=race.race_id,
                 hippodrome=race.hippodrome,
@@ -2143,7 +2154,7 @@ async def run_pmu_scan():
                 race_type=race.race_type,
                 distance=race.distance,
                 terrain=race.terrain,
-                post_time=race.race_time,
+                post_time=_post_time,
                 prize_pool=race.prize_pool,
                 num_runners=race.num_runners or len(runner_cards),
                 is_quinteplus=race.is_quinteplus,
