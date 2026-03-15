@@ -7,7 +7,7 @@ Rugby has draws unlike NBA — we fetch all three outcomes (H/D/A).
 
 Each match dict returned by get_matches():
     home_team, away_team, date, league,
-    bookmakers: {
+    odds: {
         "h2h": {
             "Home": {"pinnacle": 1.55, "bet365": 1.52, ...},
             "Draw": {"pinnacle": 15.0, "bet365": 14.0, ...},
@@ -69,7 +69,7 @@ class RugbyClient:
 
         Each dict:
             home_team, away_team, date, league,
-            bookmakers: {
+            odds: {
                 "h2h": {
                     "Home": {bk_key: price, ...},
                     "Draw": {bk_key: price, ...},
@@ -227,7 +227,7 @@ class RugbyClient:
                         "away_team": away,
                         "date": commence,
                         "league": competition,
-                        "bookmakers": {
+                        "odds": {
                             "h2h": {
                                 "Home": h2h_home,
                                 "Draw": h2h_draw,
