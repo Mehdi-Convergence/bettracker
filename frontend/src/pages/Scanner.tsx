@@ -150,8 +150,7 @@ export default function Scanner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hasScanned, setHasScanned] = useState(false);
-  const [isCached, setIsCached] = useState(false);
-  const [cachedAt, setCachedAt] = useState<string | null>(null);
+  const [sportCacheInfo, setSportCacheInfo] = useState<Record<string, { cached: boolean; cached_at: string | null }>>({});
   const [sports, setSports] = useState<Set<"football" | "tennis" | "nba" | "rugby" | "mlb" | "pmu">>(new Set(["football"]));
 
   function toggleSport(s: "football" | "tennis" | "nba" | "rugby" | "mlb" | "pmu") {
@@ -243,12 +242,14 @@ export default function Scanner() {
           }))
         );
         const matches = results.flatMap(d => d.matches ?? []);
-        const first = results[0];
         if (matches.length > 0 || !silent) {
           setAiMatches(matches);
-          setAiDuration(first.research_duration_seconds);
-          setIsCached(first.cached);
-          setCachedAt(first.cached_at);
+          setAiDuration(results[0]?.research_duration_seconds ?? 0);
+          const cacheMap: Record<string, { cached: boolean; cached_at: string | null }> = {};
+          for (const r of results) {
+            if (r.sport) cacheMap[r.sport] = { cached: r.cached, cached_at: r.cached_at };
+          }
+          setSportCacheInfo(cacheMap);
           setHasScanned(matches.length > 0);
         }
       }
@@ -1410,7 +1411,7 @@ export default function Scanner() {
           <Search size={13} />
           {loading || pmuLoading ? "Scan..." : "Scanner"}
         </button>
-        {hasScanned && isCached && cachedAt && (
+        {hasScanned && Object.values(sportCacheInfo).some(c => c.cached) && (
           <button onClick={() => handleAIScan(true)} disabled={loading}
             className="px-3 py-[6px] rounded-lg text-[11px] flex items-center gap-1.5 bg-white text-[#8a919e] border border-[#e3e6eb] hover:bg-[#3b5bdb]/5 hover:text-[#3b5bdb] hover:border-[#3b5bdb]/30 transition-colors disabled:opacity-50"
             title="Forcer un nouveau scan live">
@@ -1419,25 +1420,26 @@ export default function Scanner() {
           </button>
         )}
 
-        {/* Cache status */}
-        {hasScanned && (
-          <>
-            {isCached ? (
-              <span className="flex items-center gap-1 text-[10px] bg-white text-[#8a919e] px-2 py-1 rounded-full border border-[#e3e6eb]">
+        {/* Cache status badges per sport */}
+        {hasScanned && Object.entries(sportCacheInfo).map(([sport, info]) => {
+          const label = sport === "football" ? "Foot" : sport === "tennis" ? "Tennis" : sport.toUpperCase();
+          if (info.cached && info.cached_at) {
+            const ago = Math.round((Date.now() - new Date(info.cached_at).getTime()) / 60000);
+            const ageStr = ago < 1 ? "< 1 min" : `${ago} min`;
+            return (
+              <span key={sport} className="flex items-center gap-1 text-[10px] bg-white text-[#8a919e] px-2 py-1 rounded-full border border-[#e3e6eb]">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#b0b7c3]" />
-                Cache {cachedAt && (() => {
-                  const ago = Math.round((Date.now() - new Date(cachedAt).getTime()) / 60000);
-                  return ago < 1 ? "< 1 min" : `${ago} min`;
-                })()}
+                {label} {ageStr}
               </span>
-            ) : (
-              <span className="flex items-center gap-1 text-[10px] bg-[#12b76a]/10 text-[#12b76a] px-2 py-1 rounded-full border border-[#12b76a]/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#12b76a]" />
-                Live
-              </span>
-            )}
-          </>
-        )}
+            );
+          }
+          return (
+            <span key={sport} className="flex items-center gap-1 text-[10px] bg-[#12b76a]/10 text-[#12b76a] px-2 py-1 rounded-full border border-[#12b76a]/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#12b76a]" />
+              {label} Live
+            </span>
+          );
+        })}
 
         <div className="ml-auto flex items-center gap-3">
           {/* Results count */}
@@ -1449,7 +1451,7 @@ export default function Scanner() {
               )}
             </span>
           )}
-          {aiDuration > 0 && !isCached && (
+          {aiDuration > 0 && !Object.values(sportCacheInfo).every(c => c.cached) && (
             <span className="text-[10px] text-[#b0b7c3]">{aiDuration.toFixed(0)}s</span>
           )}
 
