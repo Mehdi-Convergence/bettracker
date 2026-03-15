@@ -1282,7 +1282,7 @@ export default function Scanner() {
 
           {/* Leagues dropdown panel (football) */}
           {showLeagues && sports.has("football") && (
-            <div className="mt-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-xl p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="mt-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {LEAGUES_BY_COUNTRY.map(({ country, flag, leagues }) => {
                 const countryCodes = leagues.map((l) => l.code);
                 const allActive = countryCodes.every((c) => activeLeagues.has(c));
@@ -1472,7 +1472,7 @@ export default function Scanner() {
       </div>
 
       {/* ═══ BOTTOM: Results (left) + Ticket (right), resizable ═══ */}
-      <div className="flex-1 flex min-h-0 overflow-hidden">
+      <div className="flex-1 flex min-h-0 overflow-hidden max-md:flex-col">
 
         {/* Match list / PMU Race list */}
         <div className="flex-1 overflow-y-auto px-3 py-2 scanner-scroll">
@@ -1567,7 +1567,7 @@ export default function Scanner() {
 
         {/* Resize handle */}
         <div
-          className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-[#3b5bdb]/20 active:bg-[#3b5bdb]/30 transition-colors"
+          className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-[#3b5bdb]/20 active:bg-[#3b5bdb]/30 transition-colors max-md:hidden"
           onMouseDown={(e) => {
             e.preventDefault();
             const startX = e.clientX;
@@ -1591,14 +1591,14 @@ export default function Scanner() {
         />
 
         {/* Ticket Builder */}
-        <div data-ticket-panel data-tour="ticket-tab" className="w-[420px] min-w-[420px] shrink-0 border-l border-[#e3e6eb] bg-white overflow-hidden">
+        <div data-ticket-panel data-tour="ticket-tab" className="w-[420px] min-w-[420px] shrink-0 border-l border-[#e3e6eb] bg-white overflow-hidden max-md:hidden">
           <TicketBuilder {...ticketCallbacks} />
         </div>
       </div>
 
       {/* ═══ DETAIL PANEL (420px, slide-in from right, overlaps everything) ═══ */}
       {detailMatch && (
-        <div data-tour="detail-panel" className="fixed top-14 right-0 w-[420px] h-[calc(100vh-3.5rem)] z-50 animate-slide-in">
+        <div data-tour="detail-panel" className="fixed top-14 right-0 w-[420px] h-[calc(100vh-3.5rem)] z-50 animate-slide-in max-md:w-full max-md:left-0">
           <AIScanMatchDetailPanel
             am={detailMatch.am}
             home={detailMatch.home}
@@ -1724,7 +1724,7 @@ function MatchCard({
       {/* ── Top: mc-info + mc-conf + mc-outcomes ── */}
       <div className="flex items-stretch">
         {/* mc-info */}
-        <div className="w-[200px] min-w-[200px] shrink-0 px-3 py-2 border-r border-[#f0f1f3]">
+        <div className="w-[200px] min-w-[200px] shrink-0 px-3 py-2 border-r border-[#f0f1f3] max-md:w-auto max-md:min-w-0 max-md:flex-1">
           {/* Line 1: time + date */}
           <div className="flex items-center gap-1.5">
             {timeStr && <span className="text-[#111318] text-[11px] font-semibold font-mono">{timeStr}</span>}
@@ -1779,7 +1779,7 @@ function MatchCard({
         {/* mc-conf (confidence zone) */}
         <div
           {...(dataTour ? { "data-tour": "confidence-stars" } : {})}
-          className="w-[100px] min-w-[100px] shrink-0 flex flex-col items-center justify-center border-r border-[#f0f1f3] cursor-grab active:cursor-grabbing"
+          className="w-[100px] min-w-[100px] shrink-0 flex flex-col items-center justify-center border-r border-[#f0f1f3] cursor-grab active:cursor-grabbing max-md:w-auto max-md:min-w-0 max-md:px-2"
           draggable={bestOutcome != null && bestOutcome.odds > 0}
           onDragStart={(e) => bestOutcome && handleAIMatchDragStart(e, am, bestOutcome.key)}
         >
@@ -1804,7 +1804,7 @@ function MatchCard({
         </div>
 
         {/* mc-outcomes */}
-        <div {...(dataTour ? { "data-tour": "outcome-buttons" } : {})} className={`grid flex-1 min-w-0 ${isFootball || isRugby ? "grid-cols-3" : "grid-cols-2"}`}>
+        <div {...(dataTour ? { "data-tour": "outcome-buttons" } : {})} className={`grid flex-1 min-w-0 ${isFootball || isRugby ? "grid-cols-3 max-sm:grid-cols-3" : "grid-cols-2"}`}>
           {outcomes.map(({ key, label, odds, bk }) => {
             const inTicket = isAiOutcomeInTicket(am, key);
             const noOdds = !odds;

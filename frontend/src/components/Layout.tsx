@@ -448,7 +448,7 @@ export default function Layout() {
           </div>
 
           {/* Content */}
-          <main className="flex-1 overflow-y-auto px-6 py-5 flex flex-col">
+          <main className="flex-1 overflow-y-auto px-3 py-3 md:px-6 md:py-5 flex flex-col">
             <BreadcrumbProvider>
               <Outlet />
             </BreadcrumbProvider>

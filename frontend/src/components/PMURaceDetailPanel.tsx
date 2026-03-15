@@ -76,7 +76,7 @@ export default function PMURaceDetailPanel({ race, runnerIndex, onClose }: Props
   return (
     <>
       <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white border-l border-slate-200 z-50 flex flex-col shadow-2xl">
+      <div className="fixed right-0 top-0 h-full w-full max-w-md max-md:max-w-full bg-white border-l border-slate-200 z-50 flex flex-col shadow-2xl">
 
         {/* Header */}
         <div className="shrink-0 px-5 py-4 border-b border-slate-200 flex items-start justify-between">

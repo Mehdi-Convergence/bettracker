@@ -62,10 +62,10 @@ export default function AIScanMatchDetailPanel({ am, home, away, onClose, inline
       }>
 
         {/* Header */}
-        <div className="shrink-0 px-5 py-4 border-b border-slate-200 flex items-start justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">{home} vs {away}</h3>
-            <p className="text-sm text-slate-500 mt-0.5">
+        <div className="shrink-0 px-4 sm:px-5 py-4 border-b border-slate-200 flex items-start justify-between">
+          <div className="min-w-0 flex-1 pr-2">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">{home} vs {away}</h3>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 leading-snug">
               {am.league} &bull; {dateStr}
               {am.venue && <span className="text-slate-400"> &bull; {am.venue}</span>}
               {isTennis && am.surface && <span className="text-slate-400"> &bull; {am.surface}</span>}
@@ -79,7 +79,7 @@ export default function AIScanMatchDetailPanel({ am, home, away, onClose, inline
         </div>
 
         {/* Tabs — top */}
-        <div className="shrink-0 bg-white px-5 flex gap-1 pt-1">
+        <div className="shrink-0 bg-white px-5 flex gap-1 pt-1 overflow-x-auto">
           {tabs.map(({ key, label }) => (
             <button
               key={key}
@@ -97,7 +97,7 @@ export default function AIScanMatchDetailPanel({ am, home, away, onClose, inline
         <div className="shrink-0 h-px bg-slate-200 mx-0" />
 
         {/* Tab content — scrollable */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4">
           {tab === "analyse" && (
             <>
               {am.model_prob_home != null && <PredictionSection am={am} home={home} away={away} />}
@@ -217,8 +217,8 @@ function PredictionSection({ am, home, away }: { am: AIScanMatch; home: string; 
           </span>
         )}
       </div>
-      <div className="flex items-center gap-6">
-        <div className="w-28 h-28 shrink-0">
+      <div className="flex items-center gap-3 sm:gap-6">
+        <div className="w-24 h-24 sm:w-28 sm:h-28 shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie data={pieData} cx="50%" cy="50%" innerRadius={28} outerRadius={52} dataKey="value" strokeWidth={0}>
@@ -631,7 +631,7 @@ function IADataTab({ am, home, away }: { am: AIScanMatch; home: string; away: st
             <Zap size={11} className="text-amber-500" />
             Marches secondaires
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {am.btts_edge != null && (
               <div className="bg-white border border-slate-200 rounded-lg p-3">
                 <div className="text-[10px] text-slate-500 font-medium mb-1">Les 2 equipes marquent</div>
@@ -1212,7 +1212,7 @@ function CotesTab({ am }: { am: AIScanMatch }) {
 
             {isCard ? (
               /* ── Horizontal cards (style épuré) ── */
-              <div className={`grid gap-2 ${entries.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+              <div className={`grid gap-2 ${entries.length === 2 ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-3"}`}>
                 {entries.map(([outcome, val]) => {
                   const bkOptions = buildBkOptions(val);
                   if (bkOptions.length === 0) return null;
@@ -1701,7 +1701,7 @@ function CompoTab({ am, home, away }: { am: AIScanMatch; home: string; away: str
       </div>
 
       {hasLineup ? (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4">
           {[{ label: home, lineup: lineupH, keyPlayers: keyH, color: "text-blue-600" }, { label: away, lineup: lineupA, keyPlayers: keyA, color: "text-red-600" }].map(({ label, lineup, keyPlayers, color }) => (
             <div key={label}>
               <div className={`text-xs font-semibold mb-2 truncate ${color}`}>{label}</div>
@@ -1726,7 +1726,7 @@ function CompoTab({ am, home, away }: { am: AIScanMatch; home: string; away: str
         </div>
       ) : (
         /* No lineup but key players exist — show key players only */
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4">
           {[{ label: home, players: keyH, color: "text-blue-600" }, { label: away, players: keyA, color: "text-red-600" }].map(({ label, players, color }) => (
             <div key={label}>
               <div className={`text-xs font-semibold mb-2 truncate ${color}`}>{label}</div>
@@ -2224,7 +2224,7 @@ function RugbyStatsTab({ am, home, away }: { am: AIScanMatch; home: string; away
       {/* Scoring guide */}
       <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
         <div className="text-xs font-semibold text-amber-700 mb-1.5">Systeme de points rugby</div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px] text-amber-800">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 text-[11px] text-amber-800">
           <span>Essai : 5 pts</span>
           <span>Transformation : 2 pts</span>
           <span>Penalite : 3 pts</span>

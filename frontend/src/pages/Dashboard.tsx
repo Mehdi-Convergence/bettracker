@@ -156,7 +156,7 @@ export default function Dashboard() {
           <h1 className="text-[20px] font-extrabold tracking-tight text-[#111318]">Bonjour, {firstName}</h1>
           <p className="text-[12.5px] text-[#8a919e] mt-0.5">Voici un aperçu de vos performances · Semaine {getWeekNumber()}</p>
         </div>
-        <div className="flex items-center gap-2" data-tour="period-selector">
+        <div className="flex flex-col gap-1.5 items-end max-md:items-start max-md:w-full" data-tour="period-selector">
           <div className="flex gap-1 bg-[#f4f5f7] border border-[#e3e6eb] rounded-[9px] p-[3px]">
             {PERIODS.filter((p) => p.key !== "custom").map((p) => (
               <button key={p.key} onClick={() => { setPeriod(p.key); setShowCustom(false); }}
@@ -170,10 +170,10 @@ export default function Dashboard() {
             </button>
           </div>
           {showCustom && (
-            <div className="flex items-center gap-1.5 bg-white border border-[#e3e6eb] rounded-[9px] px-2.5 py-[3px] shadow-[0_1px_3px_rgba(16,24,40,0.06)]">
-              <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="text-[12px] border-none bg-transparent outline-none text-[#111318] w-[110px]" />
+            <div className="flex items-center gap-1.5 bg-white border border-[#e3e6eb] rounded-[9px] px-2.5 py-[3px] shadow-[0_1px_3px_rgba(16,24,40,0.06)] max-md:w-full max-md:flex-wrap">
+              <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="text-[12px] border-none bg-transparent outline-none text-[#111318] w-[110px] max-sm:flex-1" />
               <span className="text-[11px] text-[#b0b7c3]">→</span>
-              <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="text-[12px] border-none bg-transparent outline-none text-[#111318] w-[110px]" />
+              <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="text-[12px] border-none bg-transparent outline-none text-[#111318] w-[110px] max-sm:flex-1" />
               <button onClick={() => { setShowCustom(false); setPeriod("30d"); setCustomFrom(""); setCustomTo(""); }} className="ml-1 text-[#8a919e] hover:text-[#f04438] cursor-pointer bg-transparent border-none"><X size={12} /></button>
             </div>
           )}
@@ -182,14 +182,14 @@ export default function Dashboard() {
 
       {/* ── BANNER ── */}
       {campaignSummaries.filter((c) => c.total_bets > 0).length > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 rounded-[10px]" data-tour="campaign-banner" style={{ background: "linear-gradient(90deg, rgba(59,91,219,0.06), rgba(59,91,219,0.02))", border: "1px solid rgba(59,91,219,0.18)" }}>
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-[10px] max-md:flex-wrap max-md:gap-2 max-md:px-3" data-tour="campaign-banner" style={{ background: "linear-gradient(90deg, rgba(59,91,219,0.06), rgba(59,91,219,0.02))", border: "1px solid rgba(59,91,219,0.18)" }}>
           <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(59,91,219,0.07)" }}><Flag size={14} className="text-[#3b5bdb]" /></div>
-          <div className="flex-1 text-[12.5px]">
+          <div className="flex-1 min-w-0 text-[12.5px]">
             {campaignSummaries.filter((c) => c.total_bets > 0).map((c, i) => (
               <span key={c.id}>{i > 0 && " · "}<strong className="text-[#3b5bdb]">{c.total_bets} matchs</strong><span className="text-[#8a919e]"> sur <strong className="text-[#3c4149]">{c.name}</strong> ({c.won}W-{c.lost}L{c.pending > 0 ? `, ${c.pending} en attente` : ""})</span></span>
             ))}
           </div>
-          <Link to="/campaign" className="px-3 py-[6px] rounded-lg bg-[#3b5bdb] text-white text-[11.5px] font-semibold no-underline whitespace-nowrap transition-all hover:bg-[#2f4ac7]">Campagnes →</Link>
+          <Link to="/campaign" className="px-3 py-[6px] rounded-lg bg-[#3b5bdb] text-white text-[11.5px] font-semibold no-underline whitespace-nowrap transition-all hover:bg-[#2f4ac7] max-md:w-full max-md:text-center">Campagnes →</Link>
         </div>
       )}
 
@@ -231,7 +231,7 @@ export default function Dashboard() {
                   <TrendingUp size={13} className="text-[#3b5bdb]" /> Évolution ROI
                 </div>
               </div>
-              <div className="px-3 py-2 flex-1 flex items-center">
+              <div className="px-3 py-2 flex-1 flex items-center max-md:min-h-[160px]">
                 <ROIChart data={history} />
               </div>
             </div>
@@ -251,7 +251,7 @@ export default function Dashboard() {
                   <div className="text-[11px] text-[#8a919e] mt-0.5">sur {totalStaked.toLocaleString("fr-FR")}€ misés</div>
                 </div>
                 {history.length >= 2 && (
-                  <div className="flex-1 min-h-0 mt-1">
+                  <div className="flex-1 min-h-0 mt-1 max-md:min-h-[120px]">
                     <PnLSparkline data={history} />
                   </div>
                 )}
@@ -297,14 +297,14 @@ export default function Dashboard() {
         </div>
 
         {/* RIGHT column: Tickets récents */}
-        <div data-tour="recent-bets" className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col min-h-0">
+        <div data-tour="recent-bets" className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col min-h-0 max-md:min-h-[300px]">
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#e3e6eb] shrink-0">
             <div className="flex items-center gap-2 text-[13px] font-bold text-[#111318]">
               <CheckSquare size={13} className="text-[#3b5bdb]" /> Tickets récents
             </div>
             <Link to="/portfolio" className="px-2.5 py-1 rounded-[6px] border border-[#e3e6eb] bg-transparent text-[#8a919e] text-[11px] font-medium no-underline transition-all hover:border-[#cdd1d9] hover:text-[#3c4149]">Voir tout</Link>
           </div>
-          <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="flex-1 overflow-y-auto min-h-0 max-md:max-h-[320px]">
             {betGroups.length === 0 ? (
               <div className="py-6 text-center text-[12px] text-[#b0b7c3]">Aucun ticket</div>
             ) : (
@@ -342,9 +342,9 @@ function BankrollWidget({
       className="rounded-xl border border-[#e3e6eb] px-4 py-3 shadow-[0_1px_3px_rgba(16,24,40,0.06)]"
       style={{ background: "linear-gradient(90deg, #f8f9fb 0%, #ffffff 100%)" }}
     >
-      <div className="grid grid-cols-3 divide-x divide-[#e3e6eb]">
+      <div className="grid grid-cols-3 divide-x divide-[#e3e6eb] max-sm:grid-cols-1 max-sm:divide-x-0 max-sm:divide-y max-sm:divide-[#e3e6eb]">
         {/* Bankroll initiale */}
-        <div className="flex flex-col gap-0.5 pr-4">
+        <div className="flex flex-col gap-0.5 pr-4 max-sm:pr-0 max-sm:pb-3">
           <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide">Bankroll initiale</span>
           <span className="text-[20px] font-extrabold tracking-tight text-[#111318] leading-none">
             {initialBankroll.toLocaleString("fr-FR")}€
@@ -353,7 +353,7 @@ function BankrollWidget({
         </div>
 
         {/* Solde actuel */}
-        <div className="flex flex-col gap-0.5 px-4">
+        <div className="flex flex-col gap-0.5 px-4 max-sm:px-0 max-sm:py-3">
           <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide">Solde actuel</span>
           <span
             className="text-[20px] font-extrabold tracking-tight leading-none"
@@ -369,7 +369,7 @@ function BankrollWidget({
         </div>
 
         {/* Variation P&L */}
-        <div className="flex flex-col gap-0.5 pl-4">
+        <div className="flex flex-col gap-0.5 pl-4 max-sm:pl-0 max-sm:pt-3">
           <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide">Variation P&L</span>
           <span
             className="text-[20px] font-extrabold tracking-tight leading-none"

@@ -190,11 +190,11 @@ export default function Parametres() {
         <p className="text-[13px] text-[#8a919e] mt-1">Configuration fonctionnelle : bankroll, notifications, partage, affichage</p>
       </div>
 
-      <div className="flex gap-5">
+      <div className="flex flex-col md:flex-row gap-5">
         {/* ── LEFT: Sidebar navigation ── */}
-        <div className="w-[210px] min-w-[210px] sticky top-4 self-start">
+        <div className="md:w-[210px] md:min-w-[210px] md:sticky top-4 self-start">
           <div className="bg-white border border-[#e3e6eb] rounded-xl shadow-sm overflow-hidden">
-            <div className="p-2.5 flex flex-col gap-0.5">
+            <div className="p-2.5 flex flex-row gap-1 overflow-x-auto md:flex-col md:gap-0.5">
               {SECTIONS.map((s, i) => {
                 const Icon = s.icon;
                 const isActive = activeSection === s.id;
@@ -203,7 +203,7 @@ export default function Parametres() {
                 return (
                   <div key={s.id}>
                     {showGroup && (
-                      <div className="text-[10px] font-bold text-[#b0b7c3] uppercase tracking-[0.1em] px-3 pt-2.5 pb-1 first:pt-0">
+                      <div className="hidden md:block text-[10px] font-bold text-[#b0b7c3] uppercase tracking-[0.1em] px-3 pt-2.5 pb-1 first:pt-0">
                         {s.group}
                       </div>
                     )}
@@ -222,10 +222,10 @@ export default function Parametres() {
                   </div>
                 );
               })}
-              <div className="h-px bg-[#e3e6eb] my-2.5 mx-2" />
+              <div className="hidden md:block h-px bg-[#e3e6eb] my-2.5 mx-2" />
               <a
                 href="/settings"
-                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-[#8a919e] hover:bg-[#f4f5f7] transition-all no-underline"
+                className="hidden md:flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-[#8a919e] hover:bg-[#f4f5f7] transition-all no-underline"
               >
                 <User size={15} style={{ color: C.muted2 }} />
                 Mon profil & Plan →
