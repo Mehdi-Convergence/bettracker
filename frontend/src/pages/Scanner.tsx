@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import {
   Search, AlertTriangle, Filter, Calendar, Clock, HelpCircle,
   X, Eye, Star, ChevronDown, RefreshCw,
@@ -176,11 +176,7 @@ export default function Scanner() {
   const [pmuRaceTypeFilter, setPmuRaceTypeFilter] = useState<string>("all");
   const [pmuHasScanned, setPmuHasScanned] = useState(false);
 
-  // Auto-load cached scan on mount
-  useEffect(() => {
-    handleAIScan(false, true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // No auto-scan on mount — user must click "Scanner" to trigger
 
   // Tickets
   const [tickets, setTickets] = useState<Ticket[]>([]);
