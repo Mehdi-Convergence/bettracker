@@ -15,16 +15,8 @@ console.log(
   'color: #6366f1; font-family: monospace; font-size: 10px; line-height: 1.2;'
 )
 console.log(
-  '%cValue betting. Edge over bookmakers.',
-  'color: #8b5cf6; font-size: 13px; font-weight: 600;'
-)
-console.log(
-  '%c⚽ Football  |  🎾 Tennis  |  📊 Backtest  |  🤖 AI Scanner',
+  '%c⚽ Football  |  🎾 Tennis  |  🏀 NBA  |  ⚾ MLB  |  🏉 Rugby  |  🐴 PMU',
   'color: #a78bfa; font-size: 11px;'
-)
-console.log(
-  '%cCurious? We\'re building something serious here.',
-  'color: #6b7280; font-size: 11px; font-style: italic;'
 )
 
 createRoot(document.getElementById('root')!).render(
