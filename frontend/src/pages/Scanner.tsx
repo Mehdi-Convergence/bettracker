@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import {
   Search, AlertTriangle, Filter, Calendar, Clock, HelpCircle,
-  X, Eye, Star, ChevronDown, RefreshCw,
+  X, Eye, Star, ChevronDown, RefreshCw, Layers,
   ScanSearch, TrendingUp, Shield, CheckCircle2,
 } from "lucide-react";
 import { aiScan, pmuScan } from "@/services/api";
@@ -150,6 +150,7 @@ export default function Scanner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hasScanned, setHasScanned] = useState(false);
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const [sportCacheInfo, setSportCacheInfo] = useState<Record<string, { cached: boolean; cached_at: string | null }>>({});
   const [sports, setSports] = useState<Set<"football" | "tennis" | "nba" | "rugby" | "mlb" | "pmu">>(new Set(["football"]));
 
@@ -188,6 +189,9 @@ export default function Scanner() {
 
   // Detail side panel
   const [detailMatch, setDetailMatch] = useState<{ am: AIScanMatch; home: string; away: string } | null>(null);
+
+  // Mobile ticket drawer
+  const [mobileTicketOpen, setMobileTicketOpen] = useState(false);
 
   // Filters
   const [searchTeam, setSearchTeam] = useState("");
@@ -258,7 +262,11 @@ export default function Scanner() {
     } catch (e) {
       if (!silent) setError((e as Error).message);
     }
-    if (!silent) setLoading(false);
+    if (!silent) {
+      setLoading(false);
+      // Auto-collapse filters on mobile after scan to maximize results space
+      if (window.innerWidth < 768) setFiltersCollapsed(true);
+    }
   }
 
   async function handlePMUScan(forceRefresh = false) {
@@ -381,11 +389,12 @@ export default function Scanner() {
       const maxO = maxOdds ? Number(maxOdds) : null;
       result = result.filter((am) => {
         const isFootball = am.sport === "football";
+        const isTennis = am.sport === "tennis";
         const rawOdds = isFootball
           ? (am.odds?.["1x2"] as Record<string, unknown> | undefined)
           : (am.odds?.["winner"] as Record<string, unknown> | undefined);
         if (!rawOdds) return true;
-        const keys = isFootball ? ["H", "D", "A"] : ["P1", "P2"];
+        const keys = isFootball ? ["H", "D", "A"] : isTennis ? ["P1", "P2"] : ["Home", "Away"];
         return keys.some((k) => {
           const val = rawOdds[k];
           let best = 0;
@@ -414,7 +423,7 @@ export default function Scanner() {
     if (minDataScore) {
       const minD = Number(minDataScore);
       result = result.filter((am) => {
-        const maxPts = am.sport === "tennis" ? 18 : 20;
+        const maxPts = am.sport === "tennis" ? 18 : (am.sport === "nba" || am.sport === "mlb") ? 6 : am.sport === "rugby" ? 7 : 23;
         return (am.data_score ?? 0) * maxPts >= minD;
       });
     }
@@ -750,7 +759,7 @@ export default function Scanner() {
      ═══════════════════════════════════════════════════════════════════ */
 
   return (
-    <div className="-mx-6 -my-5 h-[calc(100vh-3.5rem)] flex flex-col overflow-hidden">
+    <div className="-mx-3 -my-3 md:-mx-6 md:-my-5 h-[calc(100vh-3.5rem)] flex flex-col overflow-hidden">
 
       {/* ═══ TOP: Header + Filters + Action bar (full width) ═══ */}
 
@@ -782,10 +791,18 @@ export default function Scanner() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="shrink-0 bg-white border-b border-[#e3e6eb]">
+      {/* Filters — collapsible */}
+      <div className="shrink-0 bg-white border-b border-[#e3e6eb] overflow-x-hidden">
+        {/* Collapse toggle */}
+        <button
+          onClick={() => setFiltersCollapsed(!filtersCollapsed)}
+          className="w-full flex items-center justify-between px-5 py-1.5 text-[11px] font-semibold text-[#8a919e] hover:text-[#111318] transition-colors"
+        >
+          <span>{filtersCollapsed ? "Afficher les filtres" : "Masquer les filtres"}</span>
+          <ChevronDown size={14} className={`transition-transform ${filtersCollapsed ? "" : "rotate-180"}`} />
+        </button>
         {/* Row 1: Sport + Search + Period + Time + Edge + Odds */}
-        <div className="px-5 py-2.5 border-b border-[#f0f1f3]">
+        <div className={`px-3 md:px-5 py-2.5 border-b border-[#f0f1f3] overflow-x-hidden ${filtersCollapsed ? "hidden" : ""}`}>
           <div className="flex gap-2.5 items-end flex-wrap">
             {/* Sport pills */}
             <div data-tour="sport-toggle">
@@ -896,7 +913,7 @@ export default function Scanner() {
         </div>
 
         {/* Row 2: Leagues + toggle filters */}
-        <div data-tour="filters" className="px-5 py-2.5">
+        <div data-tour="filters" className={`px-3 md:px-5 py-2.5 overflow-x-hidden ${filtersCollapsed ? "hidden" : ""}`}>
           {/* Football filter bar */}
           {sports.has("football") && (
             <div className="flex items-center gap-3 flex-wrap mb-1">
@@ -1406,7 +1423,7 @@ export default function Scanner() {
       </div>
 
       {/* Action Bar */}
-      <div className="shrink-0 px-5 py-2 bg-[#f4f5f7] border-b border-[#e3e6eb] flex items-center gap-3">
+      <div className="shrink-0 px-3 md:px-5 py-2 bg-[#f4f5f7] border-b border-[#e3e6eb] flex items-center gap-2 md:gap-3 flex-wrap overflow-x-hidden">
         <button data-tour="refresh-btn" onClick={() => handleAIScan(!hasScanned)} disabled={loading || pmuLoading}
           className="bg-[#3b5bdb] hover:bg-[#2b4bc7] disabled:bg-[#b0b7c3] text-white px-4 py-[6px] rounded-lg text-[12px] flex items-center gap-1.5 font-semibold shadow-sm transition-colors">
           <Search size={13} />
@@ -1547,12 +1564,18 @@ export default function Scanner() {
               </div>
 
               {hasScanned && aiMatches.length === 0 && !loading && (
-                <div className="text-center py-12 text-[#8a919e]">Aucun match trouve. Essayez d'autres filtres ou relancez un scan.</div>
+                <div className="text-center py-12">
+                  <div className="text-[#8a919e] text-sm">Aucun match disponible pour le moment.</div>
+                  <div className="text-[11px] text-[#b0b7c3] mt-2">Les sports selectionnes n'ont pas de matchs a venir avec cotes, ou le prochain scan est en cours.</div>
+                </div>
               )}
               {filteredAiMatches.length === 0 && aiMatches.length > 0 && !loading && (
-                <div className="text-center py-12 text-[#8a919e]">
-                  Aucun match avec ces filtres.
-                  <span className="block mt-1 text-[11px] text-[#b0b7c3]">({aiMatches.length} matchs en memoire)</span>
+                <div className="text-center py-12">
+                  <div className="text-[#8a919e] text-sm">Aucun match ne correspond a vos filtres.</div>
+                  <div className="text-[11px] text-[#b0b7c3] mt-2">
+                    {aiMatches.length} match{aiMatches.length > 1 ? "s" : ""} disponible{aiMatches.length > 1 ? "s" : ""} au total.
+                    Essayez d'elargir vos criteres (edge, cotes, date, score de donnees).
+                  </div>
                 </div>
               )}
               {!hasScanned && !loading && (
@@ -1615,6 +1638,38 @@ export default function Scanner() {
           runnerIndex={pmuDetailRace.runnerIndex}
           onClose={() => setPmuDetailRace(null)}
         />
+      )}
+
+      {/* ═══ MOBILE TICKET FAB + DRAWER ═══ */}
+      {!mobileTicketOpen && (
+        <button
+          onClick={() => setMobileTicketOpen(true)}
+          className="fixed bottom-5 right-5 z-40 sm:hidden w-14 h-14 rounded-full bg-[#3b5bdb] text-white shadow-lg flex items-center justify-center hover:bg-[#2b4bc7] active:scale-95 transition-all"
+          title="Ouvrir le ticket"
+        >
+          <Layers size={22} />
+          {tickets.some(t => t.legs.length > 0) && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#12b76a] text-white text-[10px] font-bold flex items-center justify-center">
+              {tickets.reduce((s, t) => s + t.legs.length, 0)}
+            </span>
+          )}
+        </button>
+      )}
+      {mobileTicketOpen && (
+        <>
+          <div className="fixed inset-0 bg-black/30 z-40 sm:hidden" onClick={() => setMobileTicketOpen(false)} />
+          <div className="fixed bottom-0 left-0 right-0 z-50 sm:hidden bg-white rounded-t-2xl shadow-2xl max-h-[80vh] flex flex-col overflow-hidden animate-slide-up">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+              <span className="font-bold text-sm text-slate-800">Ticket Builder</span>
+              <button onClick={() => setMobileTicketOpen(false)} className="text-slate-400 hover:text-slate-700 p-1">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <TicketBuilder {...ticketCallbacks} />
+            </div>
+          </div>
+        </>
       )}
 
       {showTour && <SpotlightTour steps={scannerTour} onComplete={completeTour} />}
@@ -1721,9 +1776,9 @@ function MatchCard({
       style={{ boxShadow: "0 1px 4px rgba(16,24,40,.06), 0 4px 16px rgba(16,24,40,.06)" }}
     >
       {/* ── Top: mc-info + mc-conf + mc-outcomes ── */}
-      <div className="flex items-stretch">
+      <div className="flex items-stretch max-sm:flex-col">
         {/* mc-info */}
-        <div className="w-[200px] min-w-[200px] shrink-0 px-3 py-2 border-r border-[#f0f1f3] max-md:w-auto max-md:min-w-0 max-md:flex-1">
+        <div className="w-[200px] min-w-[200px] shrink-0 px-3 py-2 border-r border-[#f0f1f3] max-sm:w-full max-sm:min-w-0 max-sm:border-r-0 max-sm:border-b max-sm:pb-2">
           {/* Line 1: time + date */}
           <div className="flex items-center gap-1.5">
             {timeStr && <span className="text-[#111318] text-[11px] font-semibold font-mono">{timeStr}</span>}
@@ -1778,7 +1833,7 @@ function MatchCard({
         {/* mc-conf (confidence zone) */}
         <div
           {...(dataTour ? { "data-tour": "confidence-stars" } : {})}
-          className="w-[100px] min-w-[100px] shrink-0 flex flex-col items-center justify-center border-r border-[#f0f1f3] cursor-grab active:cursor-grabbing max-md:w-auto max-md:min-w-0 max-md:px-2"
+          className="w-[100px] min-w-[100px] shrink-0 flex flex-col items-center justify-center border-r border-[#f0f1f3] cursor-grab active:cursor-grabbing max-sm:w-full max-sm:min-w-0 max-sm:flex-row max-sm:gap-3 max-sm:px-3 max-sm:py-2 max-sm:border-r-0 max-sm:border-b max-sm:justify-start"
           draggable={bestOutcome != null && bestOutcome.odds > 0}
           onDragStart={(e) => bestOutcome && handleAIMatchDragStart(e, am, bestOutcome.key)}
         >
@@ -1925,6 +1980,85 @@ function MatchCard({
         </div>
       )}
 
+      {/* ── Bottom row — NBA ── */}
+      {isNBA && (am.home_season_record || am.home_win_rate_10 != null || am.home_pts_avg_10 != null || am.home_streak != null) && (
+        <div className="px-3 py-1.5 border-t border-[#f0f1f3] bg-[#f9fafb] flex flex-wrap items-center gap-x-3 gap-y-1">
+          {am.home_season_record && am.away_season_record && (
+            <span className="text-[10px] text-[#8a919e] font-medium" title="Bilan saison">
+              {am.home_season_record} vs {am.away_season_record}
+            </span>
+          )}
+          {am.home_win_rate_10 != null && am.away_win_rate_10 != null && (
+            <span className="text-[10px] text-[#3b5bdb]" title="Win rate 10 derniers matchs">
+              WR {(am.home_win_rate_10 * 100).toFixed(0)}% | {(am.away_win_rate_10 * 100).toFixed(0)}%
+            </span>
+          )}
+          {am.home_pts_avg_10 != null && am.away_pts_avg_10 != null && (
+            <span className="text-[10px] text-[#8a919e]" title="Points par match (10j)">
+              Pts {am.home_pts_avg_10.toFixed(1)} | {am.away_pts_avg_10.toFixed(1)}
+            </span>
+          )}
+          {am.total_line != null && (
+            <span className="text-[10px] text-[#f79009] font-medium" title="Ligne Over/Under">
+              O/U {am.total_line}
+            </span>
+          )}
+          {(am.home_streak != null || am.away_streak != null) && (
+            <span className="text-[10px] text-[#8a919e]" title="Series en cours">
+              {am.home_streak != null ? `${am.home_streak > 0 ? am.home_streak + "W" : Math.abs(am.home_streak) + "L"}` : "?"} | {am.away_streak != null ? `${am.away_streak > 0 ? am.away_streak + "W" : Math.abs(am.away_streak) + "L"}` : "?"}
+            </span>
+          )}
+          {(am.home_b2b || am.away_b2b) && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#f04438]/10 text-[#f04438] font-bold" title="Back-to-back">
+              B2B {am.home_b2b ? home.split(" ").pop() : ""}{am.home_b2b && am.away_b2b ? " + " : ""}{am.away_b2b ? away.split(" ").pop() : ""}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── Bottom row — Rugby ── */}
+      {isRugby && (am.form_home || am.position_home != null || am.home_pts_avg_10 != null || am.home_tries_avg_10 != null) && (
+        <div className="px-3 py-1.5 border-t border-[#f0f1f3] bg-[#f9fafb] flex flex-wrap items-center gap-x-3 gap-y-1">
+          {(am.form_home || am.form_away) && (
+            <div className="flex items-center gap-1">
+              {am.form_home && (
+                <span className="text-[10px] font-mono font-bold tracking-wider">
+                  {am.form_home.split("").map((c: string, j: number) => (
+                    <span key={j} className={c === "V" ? "text-[#12b76a]" : c === "D" ? "text-[#f04438]" : "text-[#8a919e]"}>{c}</span>
+                  ))}
+                </span>
+              )}
+              {am.form_home && am.form_away && <span className="text-[#e3e6eb] text-[10px] font-bold mx-0.5">|</span>}
+              {am.form_away && (
+                <span className="text-[10px] font-mono font-bold tracking-wider">
+                  {am.form_away.split("").map((c: string, j: number) => (
+                    <span key={j} className={c === "V" ? "text-[#12b76a]" : c === "D" ? "text-[#f04438]" : "text-[#8a919e]"}>{c}</span>
+                  ))}
+                </span>
+              )}
+            </div>
+          )}
+          {am.position_home != null && am.position_away != null && (
+            <span className="text-[10px] text-[#8a919e] font-medium">#{am.position_home} vs #{am.position_away}</span>
+          )}
+          {am.home_pts_avg_10 != null && am.away_pts_avg_10 != null && (
+            <span className="text-[10px] text-[#3b5bdb]" title="Points par match (10j)">
+              Pts {am.home_pts_avg_10.toFixed(1)} | {am.away_pts_avg_10.toFixed(1)}
+            </span>
+          )}
+          {am.home_tries_avg_10 != null && am.away_tries_avg_10 != null && (
+            <span className="text-[10px] text-[#059669]" title="Essais par match (10j)">
+              Essais {am.home_tries_avg_10.toFixed(1)} | {am.away_tries_avg_10.toFixed(1)}
+            </span>
+          )}
+          {am.total_line != null && (
+            <span className="text-[10px] text-[#f79009] font-medium" title="Ligne Over/Under">
+              O/U {am.total_line}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* ── Bottom row — MLB ── */}
       {isMLB && (am.starter_home_name || am.starter_away_name || am.home_runs_avg_10 != null || am.away_runs_avg_10 != null) && (
         <div className="px-3 py-1.5 border-t border-[#f0f1f3] bg-[#f9fafb] flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -1943,11 +2077,16 @@ function MatchCard({
               RA/m {am.home_runs_allowed_10.toFixed(1)} | {am.away_runs_allowed_10.toFixed(1)}
             </span>
           )}
+          {am.total_line != null && (
+            <span className="text-[10px] text-[#f79009] font-medium" title="Ligne Over/Under">
+              O/U {am.total_line}
+            </span>
+          )}
         </div>
       )}
 
       {/* ── Bottom row — tennis ── */}
-      {!isFootball && !isMLB && (am.ranking_p1 != null || am.form_home || am.p1_surface_record || am.p1_serve_pct != null || am.h2h_surface || am.h2h_last3?.length) && (
+      {isTennis && (am.ranking_p1 != null || am.form_home || am.p1_surface_record || am.p1_serve_pct != null || am.h2h_surface || am.h2h_last3?.length) && (
         <div className="px-3 py-1.5 border-t border-[#f0f1f3] bg-[#f9fafb] flex flex-wrap items-center gap-x-3 gap-y-1">
           {am.ranking_p1 != null && am.ranking_p2 != null && (
             <span className="text-[10px] text-[#8a919e] font-medium" title="Classement ATP/WTA">
