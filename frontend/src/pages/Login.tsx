@@ -271,7 +271,7 @@ export default function Login() {
           {mode === "login" && twoFactorRequired && (
             <form onSubmit={handleTwoFactorSubmit}>
               <div className="flex flex-col gap-3.5">
-                <div className="flex items-center gap-3 px-4 py-3.5 rounded-[10px]" style={{ background: "rgba(59,91,219,0.06)", border: "1px solid rgba(59,91,219,0.18)" }}>
+                <div className="flex items-center gap-3 px-4 py-3.5 rounded-[10px]" style={{ background: "var(--accent-bg)", border: "1px solid var(--accent-border)" }}>
                   <ShieldCheck size={20} className="text-[#3b5bdb] shrink-0" />
                   <div>
                     <div className="text-[13px] font-semibold text-[#111318]">Double authentification activee</div>
@@ -280,7 +280,7 @@ export default function Login() {
                 </div>
 
                 {error && (
-                  <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "rgba(240,68,56,0.06)", border: "1px solid rgba(240,68,56,0.2)" }}>
+                  <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "var(--red-bg)", border: "1px solid rgba(240,68,56,0.2)" }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
                     {error}
                   </div>
@@ -362,7 +362,7 @@ export default function Login() {
                 <form onSubmit={handleLogin}>
                   <div className="flex flex-col gap-3.5">
                     {error && (
-                      <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "rgba(240,68,56,0.06)", border: "1px solid rgba(240,68,56,0.2)" }}>
+                      <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "var(--red-bg)", border: "1px solid rgba(240,68,56,0.2)" }}>
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
                         {error}
                       </div>
@@ -450,13 +450,13 @@ export default function Login() {
                   {emailCodeStep === "email" ? (
                     <form onSubmit={handleRequestEmailCode}>
                       <div className="flex flex-col gap-3.5">
-                        <div className="flex items-start gap-3 px-3.5 py-3 rounded-[10px] text-[12.5px] text-[#3c4149]" style={{ background: "rgba(59,91,219,0.05)", border: "1px solid rgba(59,91,219,0.15)" }}>
+                        <div className="flex items-start gap-3 px-3.5 py-3 rounded-[10px] text-[12.5px] text-[#3c4149]" style={{ background: "var(--accent-bg)", border: "1px solid var(--accent-border)" }}>
                           <KeyRound size={15} className="text-[#3b5bdb] shrink-0 mt-0.5" />
                           <span>Entrez votre email pour recevoir un code de connexion a 6 chiffres valable 10 minutes.</span>
                         </div>
 
                         {error && (
-                          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "rgba(240,68,56,0.06)", border: "1px solid rgba(240,68,56,0.2)" }}>
+                          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "var(--red-bg)", border: "1px solid rgba(240,68,56,0.2)" }}>
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
                             {error}
                           </div>
@@ -503,14 +503,14 @@ export default function Login() {
                     <form onSubmit={handleVerifyEmailCode}>
                       <div className="flex flex-col gap-3.5">
                         {emailCodeSuccess && (
-                          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#12b76a]" style={{ background: "rgba(18,183,106,0.06)", border: "1px solid rgba(18,183,106,0.2)" }}>
+                          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#12b76a]" style={{ background: "var(--green-bg)", border: "1px solid rgba(18,183,106,0.2)" }}>
                             <Check size={15} className="shrink-0" />
                             {emailCodeSuccess}
                           </div>
                         )}
 
                         {error && (
-                          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "rgba(240,68,56,0.06)", border: "1px solid rgba(240,68,56,0.2)" }}>
+                          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "var(--red-bg)", border: "1px solid rgba(240,68,56,0.2)" }}>
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
                             {error}
                           </div>
@@ -567,14 +567,14 @@ export default function Login() {
                 {/* Trial badge */}
                 <div
                   className="flex items-center gap-2.5 px-3.5 py-3 rounded-[10px] text-[12.5px] text-[#3c4149]"
-                  style={{ background: "linear-gradient(90deg, rgba(18,183,106,0.07), rgba(18,183,106,0.03))", border: "1px solid rgba(18,183,106,0.2)" }}
+                  style={{ background: "var(--green-bg)", border: "1px solid rgba(18,183,106,0.2)" }}
                 >
                   <Check size={16} className="text-[#12b76a] shrink-0" />
                   <span><strong className="text-[#12b76a]">7 jours gratuits</strong> · Aucune CB requise · Résiliation en 1 clic</span>
                 </div>
 
                 {signupErr && (
-                  <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "rgba(240,68,56,0.06)", border: "1px solid rgba(240,68,56,0.2)" }}>
+                  <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "var(--red-bg)", border: "1px solid rgba(240,68,56,0.2)" }}>
                     {signupErr}
                   </div>
                 )}

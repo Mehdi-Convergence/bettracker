@@ -91,7 +91,10 @@ export default function NotificationBell() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="w-8 h-8 rounded-lg bg-[#f4f5f7] flex items-center justify-center cursor-pointer text-[#5a6272] hover:bg-[#e8eaed] hover:text-[#111318] transition-all relative border-none"
+        className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-all relative border-none"
+        style={{ background: "var(--bg-surface)", color: "var(--text-muted)" }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-elevated)"; e.currentTarget.style.color = "var(--text-primary)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-surface)"; e.currentTarget.style.color = "var(--text-muted)"; }}
       >
         <Bell size={15} />
         {unreadCount > 0 && (
@@ -102,10 +105,10 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-10 w-[360px] bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#e3e6eb] z-50 overflow-hidden">
+        <div className="absolute right-0 top-10 w-[360px] rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] z-50 overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[#e3e6eb]">
-            <span className="text-[14px] font-semibold text-[#111318]">Notifications</span>
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
+            <span className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>Notifications</span>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAll}
@@ -119,24 +122,28 @@ export default function NotificationBell() {
           {/* List */}
           <div className="max-h-[400px] overflow-y-auto">
             {loading ? (
-              <div className="py-8 text-center text-[13px] text-[#8a919e]">Chargement...</div>
+              <div className="py-8 text-center text-[13px]" style={{ color: "var(--text-muted)" }}>Chargement...</div>
             ) : notifications.length === 0 ? (
-              <div className="py-8 text-center text-[13px] text-[#8a919e]">
+              <div className="py-8 text-center text-[13px]" style={{ color: "var(--text-muted)" }}>
                 Aucune notification
               </div>
             ) : (
               notifications.map((n) => {
                 const Icon = ICON_MAP[n.type] || Bell;
-                const color = COLOR_MAP[n.type] || "#8a919e";
+                const color = COLOR_MAP[n.type] || "var(--text-muted)";
                 return (
                   <div
                     key={n.id}
                     onClick={() => !n.is_read && handleMarkRead(n.id)}
-                    className={`flex gap-3 px-4 py-3 border-b border-[#f4f5f7] transition-colors ${
+                    className={`flex gap-3 px-4 py-3 transition-colors ${
                       n.is_read
-                        ? "bg-white"
-                        : "bg-[#f8f9fb] cursor-pointer hover:bg-[#f0f2f5]"
+                        ? ""
+                        : "cursor-pointer"
                     }`}
+                    style={{
+                      borderBottom: "1px solid var(--border-light)",
+                      background: n.is_read ? "var(--bg-card)" : "var(--bg-surface)",
+                    }}
                   >
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
@@ -148,8 +155,9 @@ export default function NotificationBell() {
                       <div className="flex items-start justify-between gap-2">
                         <span
                           className={`text-[13px] leading-tight ${
-                            n.is_read ? "text-[#8a919e]" : "text-[#111318] font-semibold"
+                            n.is_read ? "" : "font-semibold"
                           }`}
+                          style={{ color: n.is_read ? "var(--text-muted)" : "var(--text-primary)" }}
                         >
                           {n.title}
                         </span>
@@ -157,10 +165,10 @@ export default function NotificationBell() {
                           <span className="w-2 h-2 rounded-full bg-[#3b5bdb] shrink-0 mt-1.5" />
                         )}
                       </div>
-                      <p className="text-[12px] text-[#8a919e] mt-0.5 leading-relaxed line-clamp-2 m-0">
+                      <p className="text-[12px] mt-0.5 leading-relaxed line-clamp-2 m-0" style={{ color: "var(--text-muted)" }}>
                         {n.message}
                       </p>
-                      <span className="text-[11px] text-[#b0b7c3] mt-1 block">
+                      <span className="text-[11px] mt-1 block" style={{ color: "var(--text-muted2)" }}>
                         {timeAgo(n.created_at)}
                       </span>
                     </div>

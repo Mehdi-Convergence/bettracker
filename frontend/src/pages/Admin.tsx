@@ -55,15 +55,15 @@ function fmtAge(minutes: number | null): string {
 }
 
 function scanStatusColor(status: AdminScanStatus["status"]): { bg: string; text: string; dot: string } {
-  if (status === "ok") return { bg: "rgba(18,183,106,0.08)", text: "#12b76a", dot: "#12b76a" };
-  if (status === "warning") return { bg: "rgba(247,144,9,0.08)", text: "#f79009", dot: "#f79009" };
-  return { bg: "rgba(240,68,56,0.08)", text: "#f04438", dot: "#f04438" };
+  if (status === "ok") return { bg: "var(--green-bg)", text: "var(--green)", dot: "var(--green)" };
+  if (status === "warning") return { bg: "var(--amber-bg)", text: "var(--amber)", dot: "var(--amber)" };
+  return { bg: "var(--red-bg)", text: "var(--red)", dot: "var(--red)" };
 }
 
 function alertSeverityConfig(severity: AdminAlert["severity"]): { bg: string; text: string; label: string } {
-  if (severity === "CRITICAL") return { bg: "rgba(240,68,56,0.1)", text: "#f04438", label: "CRITIQUE" };
-  if (severity === "WARNING") return { bg: "rgba(247,144,9,0.1)", text: "#f79009", label: "ALERTE" };
-  return { bg: "rgba(59,91,219,0.08)", text: "#3b5bdb", label: "INFO" };
+  if (severity === "CRITICAL") return { bg: "var(--red-bg)", text: "var(--red)", label: "CRITIQUE" };
+  if (severity === "WARNING") return { bg: "var(--amber-bg)", text: "var(--amber)", label: "ALERTE" };
+  return { bg: "var(--accent-bg)", text: "var(--accent)", label: "INFO" };
 }
 
 /* ── Section Card wrapper ── */
@@ -74,7 +74,7 @@ function SectionCard({ title, icon, children, action }: {
   action?: React.ReactNode;
 }) {
   return (
-    <div className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden">
+    <div className="border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden" style={{ background: "var(--bg-card)" }}>
       <div className="flex items-center justify-between px-5 py-3 border-b border-[#e3e6eb]">
         <div className="flex items-center gap-2 text-[13px] font-bold text-[#111318]">
           {icon}
@@ -92,7 +92,7 @@ function StatusDot({ ok }: { ok: boolean }) {
   return (
     <span
       className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-      style={{ background: ok ? "#12b76a" : "#f04438" }}
+      style={{ background: ok ? "var(--green)" : "var(--red)" }}
     />
   );
 }
@@ -182,7 +182,7 @@ function AdminDashboard() {
 
   const quotaPct = quota ? Math.round((quota.used_today / quota.limit_daily) * 100) : 0;
   const quotaMonthPct = quota ? Math.round((quota.used_month / quota.limit_month) * 100) : 0;
-  const quotaColor = quotaPct >= 90 ? "#f04438" : quotaPct >= 70 ? "#f79009" : "#12b76a";
+  const quotaColor = quotaPct >= 90 ? "var(--red)" : quotaPct >= 70 ? "var(--amber)" : "var(--green)";
 
   const visibleErrors = errorsExpanded ? errors : errors.slice(0, 5);
 
@@ -198,7 +198,8 @@ function AdminDashboard() {
         </div>
         <button
           onClick={() => { setLoading(true); load(); }}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#f4f5f7] border border-[#e3e6eb] text-[13px] font-medium text-[#3c4149] hover:bg-[#e8eaed] transition-all cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e3e6eb] text-[13px] font-medium text-[#3c4149] transition-all cursor-pointer"
+          style={{ background: "var(--bg-surface)" }}
         >
           <RefreshCw size={13} />
           Actualiser
@@ -209,7 +210,7 @@ function AdminDashboard() {
       <SectionCard title="Etat du systeme" icon={<Activity size={14} className="text-[#3b5bdb]" />}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {/* Redis */}
-          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb] bg-[#fafbfc]">
+          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb]" style={{ background: "var(--bg-surface)" }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#3c4149]">
                 <Zap size={13} className="text-[#f79009]" />
@@ -227,7 +228,7 @@ function AdminDashboard() {
           </div>
 
           {/* DB */}
-          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb] bg-[#fafbfc]">
+          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb]" style={{ background: "var(--bg-surface)" }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#3c4149]">
                 <Database size={13} className="text-[#3b5bdb]" />
@@ -245,7 +246,7 @@ function AdminDashboard() {
           </div>
 
           {/* Worker */}
-          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb] bg-[#fafbfc]">
+          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb]" style={{ background: "var(--bg-surface)" }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#3c4149]">
                 <Cpu size={13} className="text-[#7c3aed]" />
@@ -263,7 +264,7 @@ function AdminDashboard() {
           </div>
 
           {/* Last deploy */}
-          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb] bg-[#fafbfc]">
+          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb]" style={{ background: "var(--bg-surface)" }}>
             <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#3c4149]">
               <Clock size={13} className="text-[#12b76a]" />
               Dernier deploy
@@ -301,7 +302,7 @@ function AdminDashboard() {
                       <td className="py-2.5 px-3 font-mono text-[#3c4149]">{fmtAge(scan.cache_age_minutes)}</td>
                       <td className="py-2.5 px-3 font-mono text-[#3c4149]">{scan.match_count ?? "—"}</td>
                       <td className="py-2.5 px-3 font-mono">
-                        <span style={{ color: scan.errors_24h > 0 ? "#f04438" : "#12b76a" }}>
+                        <span style={{ color: scan.errors_24h > 0 ? "var(--red)" : "var(--green)" }}>
                           {scan.errors_24h}
                         </span>
                       </td>
@@ -363,14 +364,14 @@ function AdminDashboard() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[12px] font-semibold text-[#3c4149]">Ce mois</span>
-                  <span className="font-mono text-[12px] font-bold" style={{ color: quotaMonthPct >= 90 ? "#f04438" : "#3b5bdb" }}>
+                  <span className="font-mono text-[12px] font-bold" style={{ color: quotaMonthPct >= 90 ? "var(--red)" : "var(--accent)" }}>
                     {quota.used_month} / {quota.limit_month}
                   </span>
                 </div>
                 <div className="h-2.5 bg-[#f4f5f7] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(quotaMonthPct, 100)}%`, background: quotaMonthPct >= 90 ? "#f04438" : "#3b5bdb" }}
+                    style={{ width: `${Math.min(quotaMonthPct, 100)}%`, background: quotaMonthPct >= 90 ? "var(--red)" : "var(--accent)" }}
                   />
                 </div>
                 <div className="text-[10.5px] text-[#8a919e] mt-1">{quotaMonthPct}% utilise</div>
@@ -435,7 +436,7 @@ function AdminDashboard() {
                     <td className="py-2.5 px-3 font-semibold text-[#111318] capitalize">{row.sport}</td>
                     <td className="py-2.5 px-3 font-mono text-[#3c4149]">{row.bets_7d}</td>
                     <td className="py-2.5 px-3 font-mono text-[#3c4149]">{row.bets_30d}</td>
-                    <td className="py-2.5 px-3 font-mono font-bold" style={{ color: row.roi_pct == null ? "#8a919e" : row.roi_pct >= 0 ? "#12b76a" : "#f04438" }}>
+                    <td className="py-2.5 px-3 font-mono font-bold" style={{ color: row.roi_pct == null ? "var(--text-muted)" : row.roi_pct >= 0 ? "var(--green)" : "var(--red)" }}>
                       {row.roi_pct != null ? `${row.roi_pct >= 0 ? "+" : ""}${row.roi_pct.toFixed(1)}%` : "—"}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-[#3c4149]">
@@ -500,12 +501,12 @@ function AdminDashboard() {
                     <td className="py-2.5 px-3 font-mono text-[#3c4149]">{u.total_bets}</td>
                     <td className="py-2.5 px-3 font-mono text-[#3c4149]">{u.settled_bets}</td>
                     <td className="py-2.5 px-3 font-mono font-bold" style={{
-                      color: u.roi_pct == null ? "#8a919e" : u.roi_pct >= 0 ? "#12b76a" : "#f04438"
+                      color: u.roi_pct == null ? "var(--text-muted)" : u.roi_pct >= 0 ? "var(--green)" : "var(--red)"
                     }}>
                       {u.roi_pct != null ? `${u.roi_pct >= 0 ? "+" : ""}${u.roi_pct.toFixed(1)}%` : "—"}
                     </td>
                     <td className="py-2.5 px-3 font-mono font-bold" style={{
-                      color: u.pnl >= 0 ? "#12b76a" : "#f04438"
+                      color: u.pnl >= 0 ? "var(--green)" : "var(--red)"
                     }}>
                       {u.pnl !== 0 ? `${u.pnl >= 0 ? "+" : ""}${u.pnl.toFixed(2)}` : "—"}
                     </td>

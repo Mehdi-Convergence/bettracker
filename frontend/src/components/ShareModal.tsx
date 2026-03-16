@@ -11,20 +11,20 @@ import { formatOdds } from "@/utils/odds";
 
 // ── Design tokens ──
 const C = {
-  border: "#e3e6eb",
-  border2: "#cdd1d9",
-  text: "#111318",
-  text2: "#3c4149",
-  muted: "#8a919e",
-  muted2: "#b0b7c3",
-  accent: "#3b5bdb",
-  accentBg: "rgba(59,91,219,0.07)",
-  accentBd: "rgba(59,91,219,0.18)",
-  bg: "#f4f5f7",
+  border: "var(--border-color)",
+  border2: "var(--border-strong)",
+  text: "var(--text-primary)",
+  text2: "var(--text-secondary)",
+  muted: "var(--text-muted)",
+  muted2: "var(--text-muted2)",
+  accent: "var(--accent)",
+  accentBg: "var(--accent-bg)",
+  accentBd: "var(--accent-border)",
+  bg: "var(--bg-surface)",
 };
 
 const inputCls =
-  "w-full py-2 px-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg text-[13px] text-[#111318] outline-none transition-all focus:border-[#3b5bdb] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,91,219,0.07)] placeholder:text-[#b0b7c3]";
+  "w-full py-2 px-3 rounded-lg text-[13px] outline-none transition-all focus:shadow-[0_0_0_3px_rgba(59,91,219,0.07)]";
 
 function buildTweetText(bet: Bet, showGainEuros: boolean, currSymbol: string, oddsFormat: string): string {
   const match = `${bet.home_team} vs ${bet.away_team}`;
@@ -193,18 +193,21 @@ export default function ShareModal({ bet, onClose }: ShareModalProps) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white rounded-2xl shadow-xl w-[720px] max-w-[95vw] max-h-[90vh] overflow-y-auto flex flex-col animate-fade-up">
+      <div className="rounded-2xl shadow-xl w-[720px] max-w-[95vw] max-h-[90vh] overflow-y-auto flex flex-col animate-fade-up" style={{ background: "var(--bg-card)" }}>
         {/* Header */}
-        <div className="px-5 py-4 border-b border-[#e3e6eb] flex items-center justify-between shrink-0">
+        <div className="px-5 py-4 flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid var(--border-color)" }}>
           <div>
-            <h3 className="text-[15px] font-bold text-[#111318]">Partager ce ticket</h3>
-            <div className="text-[12px] text-[#8a919e] mt-0.5">
+            <h3 className="text-[15px] font-bold" style={{ color: "var(--text-primary)" }}>Partager ce ticket</h3>
+            <div className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
               {matchLabel} · {outcomeAndOdds}
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-[30px] h-[30px] rounded-lg border-none bg-transparent cursor-pointer text-[#8a919e] hover:bg-[#f4f5f7] hover:text-[#111318] transition-all flex items-center justify-center"
+            className="w-[30px] h-[30px] rounded-lg border-none bg-transparent cursor-pointer transition-all flex items-center justify-center"
+            style={{ color: "var(--text-muted)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-surface)"; e.currentTarget.style.color = "var(--text-primary)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text-muted)"; }}
           >
             <X size={15} />
           </button>
@@ -214,7 +217,7 @@ export default function ShareModal({ bet, onClose }: ShareModalProps) {
         <div className="p-5 flex gap-5 flex-1 flex-wrap">
           {/* Preview + tweet text */}
           <div className="shrink-0 w-[280px]">
-            <div className="text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2.5">
+            <div className="text-[11px] font-bold uppercase tracking-wider mb-2.5" style={{ color: "var(--text-muted2)" }}>
               Apercu
             </div>
             <TicketShareCard
@@ -230,11 +233,11 @@ export default function ShareModal({ bet, onClose }: ShareModalProps) {
             />
 
             {/* Tweet preview */}
-            <div className="mt-2.5 p-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg">
-              <div className="text-[10.5px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-1.5">
+            <div className="mt-2.5 p-3 rounded-lg" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-color)" }}>
+              <div className="text-[10.5px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-muted2)" }}>
                 Texte X/Twitter
               </div>
-              <div className="text-[12px] text-[#3c4149] leading-relaxed whitespace-pre-wrap">
+              <div className="text-[12px] leading-relaxed whitespace-pre-wrap" style={{ color: "var(--text-secondary)" }}>
                 {tweetPreview}
               </div>
             </div>
@@ -244,31 +247,32 @@ export default function ShareModal({ bet, onClose }: ShareModalProps) {
           <div className="flex-1 min-w-[220px] flex flex-col gap-4">
             {/* Options */}
             <div>
-              <div className="text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-1">
+              <div className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: "var(--text-muted2)" }}>
                 Options pour ce partage
               </div>
-              <div className="text-[11.5px] text-[#8a919e] mb-2">
+              <div className="text-[11.5px] mb-2" style={{ color: "var(--text-muted)" }}>
                 Modifiables a la volee, sans changer vos parametres globaux
               </div>
-              <div className="border border-[#e3e6eb] rounded-[10px] overflow-hidden">
+              <div className="rounded-[10px] overflow-hidden" style={{ border: "1px solid var(--border-color)" }}>
                 {options.map((opt) => (
                   <div
                     key={opt.label}
-                    className="flex items-center justify-between px-3.5 py-2.5 border-b border-[#e3e6eb] last:border-b-0"
+                    className="flex items-center justify-between px-3.5 py-2.5 last:border-b-0"
+                    style={{ borderBottom: "1px solid var(--border-color)" }}
                   >
                     <div>
-                      <div className="text-[13px] font-medium text-[#111318]">{opt.label}</div>
+                      <div className="text-[13px] font-medium" style={{ color: "var(--text-primary)" }}>{opt.label}</div>
                       {opt.desc && (
-                        <div className="text-[11px] text-[#8a919e] mt-0.5">{opt.desc}</div>
+                        <div className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{opt.desc}</div>
                       )}
                     </div>
                     <Toggle checked={opt.value} onChange={opt.onChange} />
                   </div>
                 ))}
-                <div className="flex items-center justify-between px-3.5 py-2.5 bg-[#f4f5f7]">
+                <div className="flex items-center justify-between px-3.5 py-2.5" style={{ background: "var(--bg-surface)" }}>
                   <div>
-                    <div className="text-[13px] font-medium text-[#111318]">Watermark BetTracker</div>
-                    <div className="text-[11px] text-[#8a919e] mt-0.5">Toujours present</div>
+                    <div className="text-[13px] font-medium" style={{ color: "var(--text-primary)" }}>Watermark BetTracker</div>
+                    <div className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>Toujours present</div>
                   </div>
                   <Toggle checked={true} onChange={() => {}} disabled />
                 </div>
@@ -277,7 +281,7 @@ export default function ShareModal({ bet, onClose }: ShareModalProps) {
 
             {/* Pseudo */}
             <div>
-              <div className="text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
+              <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted2)" }}>
                 Pseudo affiche
               </div>
               <input
@@ -286,12 +290,13 @@ export default function ShareModal({ bet, onClose }: ShareModalProps) {
                 onChange={(e) => setLocalPseudo(e.target.value)}
                 placeholder="@votre_pseudo"
                 className={inputCls}
+                style={{ background: "var(--bg-surface)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
               />
             </div>
 
             {/* Actions */}
             <div>
-              <div className="text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
+              <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted2)" }}>
                 Actions
               </div>
               <div className="grid grid-cols-3 gap-2">
@@ -299,34 +304,36 @@ export default function ShareModal({ bet, onClose }: ShareModalProps) {
                 <button
                   onClick={handleCopy}
                   disabled={copying}
-                  className="p-2.5 rounded-[9px] border-[1.5px] border-[#e3e6eb] bg-transparent cursor-pointer flex flex-col items-center gap-1.5 transition-all hover:border-[rgba(59,91,219,0.18)] hover:bg-[rgba(59,91,219,0.07)] disabled:opacity-60"
+                  className="p-2.5 rounded-[9px] bg-transparent cursor-pointer flex flex-col items-center gap-1.5 transition-all hover:border-[rgba(59,91,219,0.18)] hover:bg-[rgba(59,91,219,0.07)] disabled:opacity-60"
+                  style={{ border: "1.5px solid var(--border-color)" }}
                 >
                   {copied ? (
                     <Check size={18} style={{ color: "#12b76a" }} />
                   ) : (
                     <Copy size={18} style={{ color: C.muted }} />
                   )}
-                  <span className="text-[12px] font-semibold text-[#3c4149]">
+                  <span className="text-[12px] font-semibold" style={{ color: "var(--text-secondary)" }}>
                     {copied ? "Copie !" : "Copier l'image"}
                   </span>
-                  <span className="text-[10.5px] text-[#8a919e]">PNG presse-papier</span>
+                  <span className="text-[10.5px]" style={{ color: "var(--text-muted)" }}>PNG presse-papier</span>
                 </button>
 
                 {/* Telecharger */}
                 <button
                   onClick={handleDownload}
                   disabled={downloading}
-                  className="p-2.5 rounded-[9px] border-[1.5px] border-[#e3e6eb] bg-transparent cursor-pointer flex flex-col items-center gap-1.5 transition-all hover:border-[rgba(59,91,219,0.18)] hover:bg-[rgba(59,91,219,0.07)] disabled:opacity-60"
+                  className="p-2.5 rounded-[9px] bg-transparent cursor-pointer flex flex-col items-center gap-1.5 transition-all hover:border-[rgba(59,91,219,0.18)] hover:bg-[rgba(59,91,219,0.07)] disabled:opacity-60"
+                  style={{ border: "1.5px solid var(--border-color)" }}
                 >
                   {downloaded ? (
                     <Check size={18} style={{ color: "#12b76a" }} />
                   ) : (
                     <Download size={18} style={{ color: C.muted }} />
                   )}
-                  <span className="text-[12px] font-semibold text-[#3c4149]">
+                  <span className="text-[12px] font-semibold" style={{ color: "var(--text-secondary)" }}>
                     {downloaded ? "Telecharge !" : "Telecharger"}
                   </span>
-                  <span className="text-[10.5px] text-[#8a919e]">Fichier PNG local</span>
+                  <span className="text-[10.5px]" style={{ color: "var(--text-muted)" }}>Fichier PNG local</span>
                 </button>
 
                 {/* Partager sur X */}
@@ -354,13 +361,16 @@ export default function ShareModal({ bet, onClose }: ShareModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-[#e3e6eb] flex items-center justify-between shrink-0">
-          <span className="text-[12px] text-[#8a919e]">
+        <div className="px-5 py-4 flex items-center justify-between shrink-0" style={{ borderTop: "1px solid var(--border-color)" }}>
+          <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
             Generation cote client, aucune donnee envoyee
           </span>
           <button
             onClick={onClose}
-            className="px-3.5 py-2 rounded-lg border border-[#e3e6eb] bg-transparent text-[#8a919e] text-[12.5px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] transition-all"
+            className="px-3.5 py-2 rounded-lg bg-transparent text-[12.5px] font-medium cursor-pointer transition-all"
+            style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--border-strong)"; e.currentTarget.style.color = "var(--text-secondary)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border-color)"; e.currentTarget.style.color = "var(--text-muted)"; }}
           >
             Fermer
           </button>

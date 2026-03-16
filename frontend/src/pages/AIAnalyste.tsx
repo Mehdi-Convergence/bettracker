@@ -192,14 +192,14 @@ function ContextPanel({
   const vbs = context?.value_bets || [];
 
   return (
-    <div className="w-[310px] min-w-[310px] border-l border-[#e3e6eb] bg-[#fafbfc] flex flex-col overflow-hidden max-lg:hidden">
+    <div className="w-[310px] min-w-[310px] border-l border-[#e3e6eb] flex flex-col overflow-hidden max-lg:hidden" style={{ background: "var(--bg-surface)" }}>
       {/* Header */}
-      <div className="shrink-0 px-4 py-3 border-b border-[#e3e6eb] flex items-center justify-between bg-white">
+      <div className="shrink-0 px-4 py-3 border-b border-[#e3e6eb] flex items-center justify-between" style={{ background: "var(--bg-card)" }}>
         <div className="flex items-center gap-2 text-[13px] font-bold text-[#111318]">
           <div className="w-2 h-2 rounded-full bg-[#12b76a] animate-pulse" />
           Contexte actif
         </div>
-        <span className="px-2 py-0.5 rounded text-[9.5px] font-semibold bg-[rgba(18,183,106,.08)] text-[#12b76a] tracking-wide uppercase">
+        <span className="px-2 py-0.5 rounded text-[9.5px] font-semibold tracking-wide uppercase" style={{ background: "var(--green-bg)", color: "var(--green)" }}>
           Mis a jour
         </span>
       </div>
@@ -208,7 +208,7 @@ function ContextPanel({
 
         {/* ── QUOTA ── */}
         {rl && (
-          <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+          <div className="rounded-xl border border-[#e3e6eb] p-3" style={{ background: "var(--bg-card)" }}>
             <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
               <Gauge size={10} className="text-[#3b5bdb]" />
               Quota quotidien
@@ -224,7 +224,7 @@ function ContextPanel({
                 className="h-full rounded-full transition-all duration-500"
                 style={{
                   width: `${Math.min((rl.used / rl.limit) * 100, 100)}%`,
-                  backgroundColor: rl.remaining <= 2 ? "#f04438" : rl.remaining <= 10 ? "#f79009" : "#12b76a",
+                  backgroundColor: rl.remaining <= 2 ? "var(--red)" : rl.remaining <= 10 ? "var(--amber)" : "var(--green)",
                 }}
               />
             </div>
@@ -233,7 +233,7 @@ function ContextPanel({
 
         {/* ── PERFORMANCES ── */}
         {perf && (
-          <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+          <div className="rounded-xl border border-[#e3e6eb] p-3" style={{ background: "var(--bg-card)" }}>
             <div className="flex items-center justify-between mb-2.5">
               <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider">
                 <Trophy size={10} className="text-[#f79009]" />
@@ -324,7 +324,7 @@ function ContextPanel({
         )}
 
         {/* ── VALUE BETS DU JOUR ── */}
-        <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+        <div className="rounded-xl border border-[#e3e6eb] p-3" style={{ background: "var(--bg-card)" }}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider">
               <Target size={10} className="text-[#3b5bdb]" />
@@ -347,7 +347,7 @@ function ContextPanel({
         </div>
 
         {/* ── QUESTIONS SUGGEREES ── */}
-        <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+        <div className="rounded-xl border border-[#e3e6eb] p-3" style={{ background: "var(--bg-card)" }}>
           <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
             <MessageCircle size={10} className="text-[#3b5bdb]" />
             Questions suggerees
@@ -373,7 +373,7 @@ function ContextPanel({
         </div>
 
         {/* ── NOTES / DONNEES PERSO ── */}
-        <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+        <div className="rounded-xl border border-[#e3e6eb] p-3" style={{ background: "var(--bg-card)" }}>
           <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
             <StickyNote size={10} className="text-[#f79009]" />
             Notes & donnees
@@ -677,10 +677,10 @@ export default function AIAnalyste() {
 
   /* ── Render ── */
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem)] -mx-6 -my-5 bg-white overflow-x-hidden">
+    <div className="flex flex-col h-[calc(100vh-3.5rem)] -mx-6 -my-5 overflow-x-hidden" style={{ background: "var(--bg-card)" }}>
 
       {/* == HEADER == */}
-      <div className="shrink-0 px-5 py-2.5 bg-white border-b border-[#e3e6eb] flex items-center justify-between">
+      <div className="shrink-0 px-5 py-2.5 border-b border-[#e3e6eb] flex items-center justify-between" style={{ background: "var(--bg-card)" }}>
         <div className="flex items-center gap-3">
           <h1 className="text-[20px] font-extrabold tracking-tight text-[#111318]">IA Analyste</h1>
           {context?.rate_limit && (
@@ -692,7 +692,8 @@ export default function AIAnalyste() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => { handleNewConversation(); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-white text-[#8a919e] text-[12px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] transition-colors font-[inherit]"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] text-[#8a919e] text-[12px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] transition-colors font-[inherit]"
+            style={{ background: "var(--bg-card)" }}
           >
             <Plus size={13} />
             <span className="max-sm:hidden">Nouvelle conversation</span>
@@ -704,14 +705,14 @@ export default function AIAnalyste() {
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12px] font-medium cursor-pointer transition-colors font-[inherit] ${
                 showHistory
                   ? "border-[#7c3aed] bg-[rgba(124,58,237,.05)] text-[#7c3aed]"
-                  : "border-[#e3e6eb] bg-white text-[#8a919e] hover:border-[#cdd1d9] hover:text-[#3c4149]"
+                  : "border-[#e3e6eb] text-[#8a919e] hover:border-[#cdd1d9] hover:text-[#3c4149]"
               }`}
             >
               <History size={13} />
               <span className="max-sm:hidden">Historique</span>
             </button>
             {showHistory && (
-              <div className="absolute right-0 top-full mt-1.5 w-[320px] max-sm:w-[280px] bg-white rounded-xl border border-[#e3e6eb] shadow-[0_8px_24px_rgba(16,24,40,.12)] z-50 overflow-hidden">
+              <div className="absolute right-0 top-full mt-1.5 w-[320px] max-sm:w-[280px] rounded-xl border border-[#e3e6eb] shadow-[0_8px_24px_rgba(16,24,40,.12)] z-50 overflow-hidden" style={{ background: "var(--bg-card)" }}>
                 <div className="px-3 py-2.5 border-b border-[#e3e6eb] flex items-center justify-between">
                   <span className="text-[12px] font-bold text-[#111318]">Conversations</span>
                   <span className="text-[10px] text-[#b0b7c3]">{conversations.length} conv.</span>
@@ -754,7 +755,8 @@ export default function AIAnalyste() {
           </div>
           <button
             onClick={() => setShowMobileSidebar(!showMobileSidebar)}
-            className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-white text-[#8a919e] text-[12px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] transition-colors font-[inherit]"
+            className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] text-[#8a919e] text-[12px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] transition-colors font-[inherit]"
+            style={{ background: "var(--bg-card)" }}
           >
             <Settings size={13} />
           </button>
@@ -804,10 +806,10 @@ export default function AIAnalyste() {
                     <div
                       className={`px-4 py-3 text-[13.5px] leading-relaxed ${
                         msg.role === "assistant"
-                          ? "bg-white border border-[#e3e6eb] text-[#111318] rounded-[4px_14px_14px_14px] ai-message-content"
+                          ? "border border-[#e3e6eb] text-[#111318] rounded-[4px_14px_14px_14px] ai-message-content"
                           : "bg-[#3b5bdb] text-white rounded-[14px_4px_14px_14px]"
                       }`}
-                      style={msg.role === "assistant" ? { boxShadow: "0 1px 4px rgba(16,24,40,.05)" } : undefined}
+                      style={msg.role === "assistant" ? { background: "var(--bg-card)", boxShadow: "0 1px 4px rgba(16,24,40,.05)" } : undefined}
                     >
                       {msg.role === "assistant" ? (
                         <>
@@ -831,7 +833,7 @@ export default function AIAnalyste() {
                   <div className="w-[32px] h-[32px] rounded-full shrink-0 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#7c3aed,#4f8cff)" }}>
                     <MessageCircle size={15} className="text-white" />
                   </div>
-                  <div className="flex items-center gap-2 px-4 py-3 bg-white border border-[#e3e6eb] rounded-[4px_14px_14px_14px]" style={{ boxShadow: "0 1px 4px rgba(16,24,40,.05)" }}>
+                  <div className="flex items-center gap-2 px-4 py-3 border border-[#e3e6eb] rounded-[4px_14px_14px_14px]" style={{ background: "var(--bg-card)", boxShadow: "0 1px 4px rgba(16,24,40,.05)" }}>
                     <Loader2 size={14} className="text-[#7c3aed] animate-spin" />
                     <span className="text-[12px] text-[#8a919e]">Analyse en cours...</span>
                   </div>
@@ -843,7 +845,7 @@ export default function AIAnalyste() {
           )}
 
           {/* ── INPUT BAR ── */}
-          <div className="shrink-0 px-5 py-3 bg-white border-t border-[#e3e6eb]">
+          <div className="shrink-0 px-5 py-3 border-t border-[#e3e6eb]" style={{ background: "var(--bg-card)" }}>
             {/* Quick action chips */}
             {messages.length > 0 && (
               <div className="flex gap-1.5 flex-wrap mb-2 max-sm:hidden">
@@ -896,8 +898,8 @@ export default function AIAnalyste() {
         {showMobileSidebar && (
           <div className="absolute inset-0 z-50 lg:hidden flex">
             <div className="absolute inset-0 bg-black/30" onClick={() => setShowMobileSidebar(false)} />
-            <div className="relative ml-auto w-[310px] max-w-[85vw] bg-[#fafbfc] h-full flex flex-col animate-slide-in overflow-hidden">
-              <div className="shrink-0 px-4 py-3 border-b border-[#e3e6eb] bg-white flex items-center justify-between">
+            <div className="relative ml-auto w-[310px] max-w-[85vw] h-full flex flex-col animate-slide-in overflow-hidden" style={{ background: "var(--bg-surface)" }}>
+              <div className="shrink-0 px-4 py-3 border-b border-[#e3e6eb] flex items-center justify-between" style={{ background: "var(--bg-card)" }}>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setShowMobileSidebar(false)} className="p-1 rounded cursor-pointer border-none bg-transparent text-[#8a919e] hover:text-[#111318]">
                     <ChevronLeft size={18} />
@@ -908,7 +910,7 @@ export default function AIAnalyste() {
                   </div>
                 </div>
                 {context?.rate_limit && (
-                  <span className="px-2 py-0.5 rounded text-[9.5px] font-semibold bg-[rgba(18,183,106,.08)] text-[#12b76a] tracking-wide uppercase">
+                  <span className="px-2 py-0.5 rounded text-[9.5px] font-semibold tracking-wide uppercase" style={{ background: "var(--green-bg)", color: "var(--green)" }}>
                     {context.rate_limit.remaining}/{context.rate_limit.limit}
                   </span>
                 )}
@@ -916,7 +918,7 @@ export default function AIAnalyste() {
               <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3">
                 {/* Quota */}
                 {context?.rate_limit && (
-                  <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+                  <div className="rounded-xl border border-[#e3e6eb] p-3" style={{ background: "var(--bg-card)" }}>
                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
                       <Gauge size={10} className="text-[#3b5bdb]" />
                       Quota quotidien
@@ -928,7 +930,7 @@ export default function AIAnalyste() {
                     <div className="w-full h-[6px] rounded-full bg-[#f0f1f3] overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-500" style={{
                         width: `${Math.min((context.rate_limit.used / context.rate_limit.limit) * 100, 100)}%`,
-                        backgroundColor: context.rate_limit.remaining <= 2 ? "#f04438" : context.rate_limit.remaining <= 10 ? "#f79009" : "#12b76a",
+                        backgroundColor: context.rate_limit.remaining <= 2 ? "var(--red)" : context.rate_limit.remaining <= 10 ? "var(--amber)" : "var(--green)",
                       }} />
                     </div>
                   </div>
@@ -936,7 +938,7 @@ export default function AIAnalyste() {
 
                 {/* Performance */}
                 {context?.performance && (
-                  <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+                  <div className="rounded-xl border border-[#e3e6eb] p-3" style={{ background: "var(--bg-card)" }}>
                     <div className="flex items-center justify-between mb-2.5">
                       <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider">
                         <Trophy size={10} className="text-[#f79009]" />
@@ -1005,7 +1007,7 @@ export default function AIAnalyste() {
                 )}
 
                 {/* Value bets */}
-                <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+                <div className="rounded-xl border border-[#e3e6eb] p-3" style={{ background: "var(--bg-card)" }}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider">
                       <Target size={10} className="text-[#3b5bdb]" />
@@ -1028,7 +1030,7 @@ export default function AIAnalyste() {
                 </div>
 
                 {/* Questions suggerees */}
-                <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+                <div className="rounded-xl border border-[#e3e6eb] p-3" style={{ background: "var(--bg-card)" }}>
                   <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
                     <MessageCircle size={10} className="text-[#3b5bdb]" />
                     Questions suggerees
@@ -1044,7 +1046,7 @@ export default function AIAnalyste() {
                 </div>
 
                 {/* Notes & donnees */}
-                <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+                <div className="rounded-xl border border-[#e3e6eb] p-3" style={{ background: "var(--bg-card)" }}>
                   <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
                     <StickyNote size={10} className="text-[#f79009]" />
                     Notes & donnees

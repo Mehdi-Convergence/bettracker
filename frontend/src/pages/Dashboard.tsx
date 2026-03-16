@@ -157,24 +157,26 @@ export default function Dashboard() {
           <p className="text-[12.5px] text-[#8a919e] mt-0.5">Voici un aperçu de vos performances · Semaine {getWeekNumber()}</p>
         </div>
         <div className="flex flex-col gap-1.5 items-end max-md:items-start max-md:w-full" data-tour="period-selector">
-          <div className="flex flex-wrap gap-1 bg-[#f4f5f7] border border-[#e3e6eb] rounded-[9px] p-[3px]">
+          <div className="flex flex-wrap gap-1 rounded-[9px] p-[3px]" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-color)" }}>
             {PERIODS.filter((p) => p.key !== "custom").map((p) => (
               <button key={p.key} onClick={() => { setPeriod(p.key); setShowCustom(false); }}
-                className={`px-3.5 py-[5px] rounded-[7px] text-[12px] font-medium cursor-pointer transition-all border-none whitespace-nowrap ${period === p.key ? "bg-white text-[#111318] font-semibold shadow-[0_1px_3px_rgba(16,24,40,0.06)]" : "bg-transparent text-[#8a919e] hover:text-[#3c4149]"}`}>
+                className={`px-3.5 py-[5px] rounded-[7px] text-[12px] font-medium cursor-pointer transition-all border-none whitespace-nowrap ${period === p.key ? "font-semibold shadow-[0_1px_3px_rgba(16,24,40,0.06)]" : "bg-transparent"}`}
+              style={period === p.key ? { background: "var(--bg-card)", color: "var(--text-primary)" } : { color: "var(--text-muted)" }}>
                 {p.label}
               </button>
             ))}
             <button onClick={() => { setPeriod("custom"); setShowCustom(true); }}
-              className={`px-2.5 py-[5px] rounded-[7px] text-[12px] font-medium cursor-pointer transition-all border-none flex items-center gap-1.5 ${period === "custom" ? "bg-white text-[#111318] font-semibold shadow-[0_1px_3px_rgba(16,24,40,0.06)]" : "bg-transparent text-[#8a919e] hover:text-[#3c4149]"}`}>
+              className={`px-2.5 py-[5px] rounded-[7px] text-[12px] font-medium cursor-pointer transition-all border-none flex items-center gap-1.5 ${period === "custom" ? "font-semibold shadow-[0_1px_3px_rgba(16,24,40,0.06)]" : "bg-transparent"}`}
+              style={period === "custom" ? { background: "var(--bg-card)", color: "var(--text-primary)" } : { color: "var(--text-muted)" }}>
               <Calendar size={12} /> Dates
             </button>
           </div>
           {showCustom && (
-            <div className="flex items-center gap-1.5 bg-white border border-[#e3e6eb] rounded-[9px] px-2.5 py-[3px] shadow-[0_1px_3px_rgba(16,24,40,0.06)] max-md:w-full max-md:flex-wrap">
-              <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="text-[12px] border-none bg-transparent outline-none text-[#111318] w-[110px] max-sm:flex-1" />
-              <span className="text-[11px] text-[#b0b7c3]">→</span>
-              <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="text-[12px] border-none bg-transparent outline-none text-[#111318] w-[110px] max-sm:flex-1" />
-              <button onClick={() => { setShowCustom(false); setPeriod("30d"); setCustomFrom(""); setCustomTo(""); }} className="ml-1 text-[#8a919e] hover:text-[#f04438] cursor-pointer bg-transparent border-none"><X size={12} /></button>
+            <div className="flex items-center gap-1.5 rounded-[9px] px-2.5 py-[3px] shadow-[0_1px_3px_rgba(16,24,40,0.06)] max-md:w-full max-md:flex-wrap" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+              <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="text-[12px] border-none bg-transparent outline-none w-[110px] max-sm:flex-1" style={{ color: "var(--text-primary)" }} />
+              <span className="text-[11px]" style={{ color: "var(--text-muted2)" }}>→</span>
+              <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="text-[12px] border-none bg-transparent outline-none w-[110px] max-sm:flex-1" style={{ color: "var(--text-primary)" }} />
+              <button onClick={() => { setShowCustom(false); setPeriod("30d"); setCustomFrom(""); setCustomTo(""); }} className="ml-1 cursor-pointer bg-transparent border-none" style={{ color: "var(--text-muted)" }}><X size={12} /></button>
             </div>
           )}
         </div>
@@ -182,8 +184,8 @@ export default function Dashboard() {
 
       {/* ── BANNER ── */}
       {campaignSummaries.filter((c) => c.total_bets > 0).length > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 rounded-[10px] max-md:flex-wrap max-md:gap-2 max-md:px-3" data-tour="campaign-banner" style={{ background: "linear-gradient(90deg, rgba(59,91,219,0.06), rgba(59,91,219,0.02))", border: "1px solid rgba(59,91,219,0.18)" }}>
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(59,91,219,0.07)" }}><Flag size={14} className="text-[#3b5bdb]" /></div>
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-[10px] max-md:flex-wrap max-md:gap-2 max-md:px-3" data-tour="campaign-banner" style={{ background: "linear-gradient(90deg, var(--accent-bg), rgba(59,91,219,0.02))", border: "1px solid var(--accent-border)" }}>
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--accent-bg)" }}><Flag size={14} className="text-[#3b5bdb]" /></div>
           <div className="flex-1 min-w-0 text-[12.5px]">
             {campaignSummaries.filter((c) => c.total_bets > 0).map((c, i) => (
               <span key={c.id}>{i > 0 && " · "}<strong className="text-[#3b5bdb]">{c.total_bets} matchs</strong><span className="text-[#8a919e]"> sur <strong className="text-[#3c4149]">{c.name}</strong> ({c.won}W-{c.lost}L{c.pending > 0 ? `, ${c.pending} en attente` : ""})</span></span>
@@ -211,10 +213,10 @@ export default function Dashboard() {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <KPICard dataTour="kpi-roi" label={`ROI (${PERIODS.find((p) => p.key === period)?.label ?? "période"})`} value={`${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`} valueColor={roi >= 0 ? "#12b76a" : "#f04438"} icon={<TrendingUp size={14} />} iconBg={roi >= 0 ? "rgba(18,183,106,0.08)" : "rgba(240,68,56,0.07)"} iconColor={roi >= 0 ? "#12b76a" : "#f04438"} delta={roiDelta != null ? `${roiDelta >= 0 ? "+" : ""}${roiDelta.toFixed(1)}% vs mois dernier` : undefined} deltaUp={roiDelta != null ? roiDelta >= 0 : undefined} />
-          <KPICard dataTour="kpi-staked" label={`Mise (${PERIODS.find((p) => p.key === period)?.label ?? "période"})`} value={`${totalStaked.toLocaleString("fr-FR")}€`} icon={<DollarSign size={14} />} iconBg="rgba(59,91,219,0.07)" iconColor="#3b5bdb" delta={stakedDelta != null ? `${stakedDelta >= 0 ? "+" : ""}${Math.round(stakedDelta)}€ vs mois dernier` : undefined} deltaUp={stakedDelta != null ? stakedDelta >= 0 : undefined} />
-          <KPICard dataTour="kpi-tickets" label={`Tickets (${PERIODS.find((p) => p.key === period)?.label ?? "période"})`} value={`${totalBets}`} icon={<CheckSquare size={14} />} iconBg="rgba(247,144,9,0.08)" iconColor="#f79009" delta={pendingBets > 0 ? `dont ${pendingBets} en attente` : undefined} />
-          <KPICard dataTour="kpi-winrate" label={`Taux de réussite (${PERIODS.find((p) => p.key === period)?.label ?? "période"})`} value={`${winRate.toFixed(1)}%`} valueColor={winRate >= 50 ? "#12b76a" : "#f04438"} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>} iconBg="rgba(18,183,106,0.08)" iconColor="#12b76a" delta={winRateDelta != null ? `${winRateDelta >= 0 ? "+" : ""}${winRateDelta.toFixed(1)}% vs mois dernier` : undefined} deltaUp={winRateDelta != null ? winRateDelta >= 0 : undefined} />
+          <KPICard dataTour="kpi-roi" label={`ROI (${PERIODS.find((p) => p.key === period)?.label ?? "période"})`} value={`${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`} valueColor={roi >= 0 ? "var(--green)" : "var(--red)"} icon={<TrendingUp size={14} />} iconBg={roi >= 0 ? "var(--green-bg)" : "var(--red-bg)"} iconColor={roi >= 0 ? "var(--green)" : "var(--red)"} delta={roiDelta != null ? `${roiDelta >= 0 ? "+" : ""}${roiDelta.toFixed(1)}% vs mois dernier` : undefined} deltaUp={roiDelta != null ? roiDelta >= 0 : undefined} />
+          <KPICard dataTour="kpi-staked" label={`Mise (${PERIODS.find((p) => p.key === period)?.label ?? "période"})`} value={`${totalStaked.toLocaleString("fr-FR")}€`} icon={<DollarSign size={14} />} iconBg="var(--accent-bg)" iconColor="var(--accent)" delta={stakedDelta != null ? `${stakedDelta >= 0 ? "+" : ""}${Math.round(stakedDelta)}€ vs mois dernier` : undefined} deltaUp={stakedDelta != null ? stakedDelta >= 0 : undefined} />
+          <KPICard dataTour="kpi-tickets" label={`Tickets (${PERIODS.find((p) => p.key === period)?.label ?? "période"})`} value={`${totalBets}`} icon={<CheckSquare size={14} />} iconBg="var(--amber-bg)" iconColor="var(--amber)" delta={pendingBets > 0 ? `dont ${pendingBets} en attente` : undefined} />
+          <KPICard dataTour="kpi-winrate" label={`Taux de réussite (${PERIODS.find((p) => p.key === period)?.label ?? "période"})`} value={`${winRate.toFixed(1)}%`} valueColor={winRate >= 50 ? "var(--green)" : "var(--red)"} icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>} iconBg="var(--green-bg)" iconColor="var(--green)" delta={winRateDelta != null ? `${winRateDelta >= 0 ? "+" : ""}${winRateDelta.toFixed(1)}% vs mois dernier` : undefined} deltaUp={winRateDelta != null ? winRateDelta >= 0 : undefined} />
         </div>
       )}
 
@@ -245,7 +247,7 @@ export default function Dashboard() {
               </div>
               <div className="px-4 pt-3 pb-2 flex-1 flex flex-col min-h-0">
                 <div className="shrink-0">
-                  <div className="text-[26px] font-extrabold tracking-tight leading-none" style={{ color: (stats?.total_pnl ?? 0) >= 0 ? "#12b76a" : "#f04438" }}>
+                  <div className="text-[26px] font-extrabold tracking-tight leading-none" style={{ color: (stats?.total_pnl ?? 0) >= 0 ? "var(--green)" : "var(--red)" }}>
                     {(stats?.total_pnl ?? 0) >= 0 ? "+" : ""}{(stats?.total_pnl ?? 0).toFixed(2)}€
                   </div>
                   <div className="text-[11px] text-[#8a919e] mt-0.5">sur {totalStaked.toLocaleString("fr-FR")}€ misés</div>
@@ -287,10 +289,10 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="p-3 flex-1 flex flex-col justify-center gap-1.5">
-                <StreakRow icon={<Flame size={13} className="text-[#12b76a]" />} label="Meilleure série" value={`${stats?.longest_winning_streak ?? 0} victoires`} color="#12b76a" />
-                <StreakRow icon={<Flame size={13} className="text-[#f04438]" />} label="Pire série" value={`${stats?.longest_losing_streak ?? 0} défaites`} color="#f04438" />
-                <StreakRow icon={<DollarSign size={13} className="text-[#3b5bdb]" />} label="P&L total" value={`${(stats?.total_pnl ?? 0) >= 0 ? "+" : ""}${(stats?.total_pnl ?? 0).toFixed(2)}€`} color={(stats?.total_pnl ?? 0) >= 0 ? "#12b76a" : "#f04438"} />
-                <StreakRow icon={<TrendingUp size={13} className="text-[#f79009]" />} label="Cote moyenne" value={recentBets.length > 0 ? `x${(recentBets.reduce((a, b) => a + b.odds_at_bet, 0) / recentBets.length).toFixed(2)}` : "—"} color="#3c4149" />
+                <StreakRow icon={<Flame size={13} className="text-[#12b76a]" />} label="Meilleure série" value={`${stats?.longest_winning_streak ?? 0} victoires`} color="var(--green)" />
+                <StreakRow icon={<Flame size={13} className="text-[#f04438]" />} label="Pire série" value={`${stats?.longest_losing_streak ?? 0} défaites`} color="var(--red)" />
+                <StreakRow icon={<DollarSign size={13} className="text-[#3b5bdb]" />} label="P&L total" value={`${(stats?.total_pnl ?? 0) >= 0 ? "+" : ""}${(stats?.total_pnl ?? 0).toFixed(2)}€`} color={(stats?.total_pnl ?? 0) >= 0 ? "var(--green)" : "var(--red)"} />
+                <StreakRow icon={<TrendingUp size={13} className="text-[#f79009]" />} label="Cote moyenne" value={recentBets.length > 0 ? `x${(recentBets.reduce((a, b) => a + b.odds_at_bet, 0) / recentBets.length).toFixed(2)}` : "—"} color="var(--text-secondary)" />
               </div>
             </div>
           </div>
@@ -339,8 +341,8 @@ function BankrollWidget({
 
   return (
     <div
-      className="rounded-xl border border-[#e3e6eb] px-4 py-3 shadow-[0_1px_3px_rgba(16,24,40,0.06)]"
-      style={{ background: "linear-gradient(90deg, #f8f9fb 0%, #ffffff 100%)" }}
+      className="rounded-xl px-4 py-3 shadow-[0_1px_3px_rgba(16,24,40,0.06)]"
+      style={{ background: "linear-gradient(90deg, var(--bg-surface) 0%, var(--bg-card) 100%)", border: "1px solid var(--border-color)" }}
     >
       <div className="grid grid-cols-3 divide-x divide-[#e3e6eb] max-sm:grid-cols-1 max-sm:divide-x-0 max-sm:divide-y max-sm:divide-[#e3e6eb]">
         {/* Bankroll initiale */}
@@ -357,7 +359,7 @@ function BankrollWidget({
           <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide">Solde actuel</span>
           <span
             className="text-[20px] font-extrabold tracking-tight leading-none"
-            style={{ color: pnlPositive ? "#12b76a" : "#f04438" }}
+            style={{ color: pnlPositive ? "var(--green)" : "var(--red)" }}
           >
             {currentBankroll.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
           </span>
@@ -373,7 +375,7 @@ function BankrollWidget({
           <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide">Variation P&L</span>
           <span
             className="text-[20px] font-extrabold tracking-tight leading-none"
-            style={{ color: pnlPositive ? "#12b76a" : "#f04438" }}
+            style={{ color: pnlPositive ? "var(--green)" : "var(--red)" }}
           >
             {pnlPositive ? "+" : ""}{pnl.toFixed(2)}€
           </span>
@@ -395,9 +397,9 @@ function KPICard({ label, value, valueColor, icon, iconBg, iconColor, delta, del
     <div data-tour={dataTour} className="bg-white border border-[#e3e6eb] rounded-xl p-[14px_16px] shadow-[0_1px_3px_rgba(16,24,40,0.06)] hover:shadow-[0_4px_16px_rgba(16,24,40,0.08)] transition-shadow flex flex-col items-center text-center gap-1">
       <div className="w-[28px] h-[28px] rounded-lg flex items-center justify-center" style={{ background: iconBg, color: iconColor }}>{icon}</div>
       <span className="text-[10px] font-medium text-[#8a919e] uppercase tracking-wide">{label}</span>
-      <div className="text-[26px] font-extrabold tracking-tight leading-none" style={{ color: valueColor || "#111318" }}>{value}</div>
+      <div className="text-[26px] font-extrabold tracking-tight leading-none" style={{ color: valueColor || "var(--text-primary)" }}>{value}</div>
       {delta && (
-        <div className="flex items-center gap-1 text-[10.5px] font-semibold" style={{ color: deltaUp === false ? "#f04438" : deltaUp === true ? "#12b76a" : "#8a919e" }}>
+        <div className="flex items-center gap-1 text-[10.5px] font-semibold" style={{ color: deltaUp === false ? "var(--red)" : deltaUp === true ? "var(--green)" : "var(--text-muted)" }}>
           {deltaUp === true && <ChevronUp size={11} />}{deltaUp === false && <ChevronDown size={11} />}{delta}
         </div>
       )}
@@ -418,8 +420,8 @@ function TicketCard({ group }: { group: BetGroup }) {
   };
   const st = statusConfig[group.result] || statusConfig.pending;
 
-  const oddsColor = group.result === "won" ? "#12b76a" : group.result === "lost" ? "#f04438" : "#e3e6eb";
-  const oddsText = group.result === "pending" ? "#3c4149" : "#fff";
+  const oddsColor = group.result === "won" ? "var(--green)" : group.result === "lost" ? "var(--red)" : "var(--border-color)";
+  const oddsText = group.result === "pending" ? "var(--text-secondary)" : "#fff";
 
   return (
     <div className="border-b border-[#f0f1f3] last:border-b-0">
@@ -492,7 +494,7 @@ function TicketCard({ group }: { group: BetGroup }) {
           <div className={`flex items-center gap-3 ${!isCombo ? "w-full justify-between" : "ml-auto"}`}>
             <span className="text-[10px] text-[#8a919e]">Mise <strong className="text-[#3c4149]">{group.stake.toFixed(0)}€</strong></span>
             {group.gains != null && (
-              <span className="text-[10px] text-[#8a919e]">Gains <strong style={{ color: group.gains > 0 ? "#12b76a" : "#f04438" }}>
+              <span className="text-[10px] text-[#8a919e]">Gains <strong style={{ color: group.gains > 0 ? "var(--green)" : "var(--red)" }}>
                 {group.gains > 0 ? `${group.gains.toFixed(2)}€` : "0€"}
               </strong></span>
             )}
@@ -631,7 +633,7 @@ function SportBarsCompact({ data }: { data: SportBreakdown[] }) {
           <div key={s.sport}>
             <div className="flex items-center justify-between mb-0.5">
               <span className="text-[11px] capitalize text-[#3c4149] font-medium">{s.sport}</span>
-              <span className="text-[11px] font-bold" style={{ color: isNeg ? "#f04438" : color }}>
+              <span className="text-[11px] font-bold" style={{ color: isNeg ? "var(--red)" : color }}>
                 {isNeg ? "" : "+"}{s.roi_pct.toFixed(0)}%
               </span>
             </div>

@@ -29,10 +29,10 @@ import { usePreferences } from "@/contexts/PreferencesContext";
 // DESIGN TOKENS
 // ══════════════════════════════════════════════
 const C = {
-  accent: "#3b5bdb", green: "#12b76a", red: "#f04438",
-  amber: "#f79009", purple: "#7c3aed",
-  text: "#111318", text2: "#3c4149", muted: "#8a919e", muted2: "#b0b7c3",
-  bg: "#f4f5f7", border: "#e3e6eb",
+  accent: "var(--accent)", green: "var(--green)", red: "var(--red)",
+  amber: "var(--amber)", purple: "#7c3aed",
+  text: "var(--text-primary)", text2: "var(--text-secondary)", muted: "var(--text-muted)", muted2: "var(--text-muted2)",
+  bg: "var(--bg-surface)", border: "var(--border-color)",
 };
 const SH_SM = "0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04)";
 
@@ -76,13 +76,13 @@ function TagBadge({ tag }: { tag: string }) {
 
 function StatusBadge({ result }: { result: string }) {
   const map: Record<string, { label: string; cls: string; dot?: boolean; pulse?: boolean }> = {
-    pending: { label: "En cours", cls: "bg-[rgba(59,91,219,.07)] text-[#3b5bdb]", dot: true, pulse: true },
-    won: { label: "Gagné", cls: "bg-[rgba(18,183,106,.08)] text-[#12b76a]", dot: true },
-    lost: { label: "Perdu", cls: "bg-[rgba(240,68,56,.07)] text-[#f04438]", dot: true },
+    pending: { label: "En cours", cls: "bg-[var(--accent-bg)] text-[#3b5bdb]", dot: true, pulse: true },
+    won: { label: "Gagné", cls: "bg-[var(--green-bg)] text-[#12b76a]", dot: true },
+    lost: { label: "Perdu", cls: "bg-[var(--red-bg)] text-[#f04438]", dot: true },
     void: { label: "Annulé", cls: "bg-[rgba(138,145,158,.1)] text-[#8a919e]" },
     ignored: { label: "Ignoré", cls: "bg-[rgba(138,145,158,.08)] text-[#8a919e] italic" },
     expired: { label: "Expiré", cls: "bg-[rgba(138,145,158,.1)] text-[#b0b7c3]" },
-    proposed: { label: "Proposé", cls: "bg-[rgba(247,144,9,.08)] text-[#f79009]", dot: true },
+    proposed: { label: "Proposé", cls: "bg-[var(--amber-bg)] text-[#f79009]", dot: true },
   };
   const s = map[result] || map.pending;
   return (
@@ -100,7 +100,7 @@ function ClvBadge({ clv }: { clv: number | null }) {
   const pos = clv >= 0;
   return (
     <span className={`text-[10px] font-[var(--font-mono)] font-semibold px-1 py-0.5 rounded ${
-      pos ? "bg-[rgba(18,183,106,.08)] text-[#12b76a]" : "bg-[rgba(240,68,56,.07)] text-[#f04438]"
+      pos ? "bg-[var(--green-bg)] text-[#12b76a]" : "bg-[var(--red-bg)] text-[#f04438]"
     }`}>
       {pos ? "+" : ""}{(clv * 100).toFixed(1)}%
     </span>
@@ -487,7 +487,7 @@ export default function Portfolio() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="animate-spin text-[#3b5bdb]" size={28} />
+        <Loader2 className="animate-spin" size={28} style={{ color: "var(--accent)" }} />
       </div>
     );
   }
@@ -498,13 +498,13 @@ export default function Portfolio() {
       {/* ══════ HEADER ══════ */}
       <div className="flex items-end justify-between gap-2 flex-wrap">
         <div className="min-w-0">
-          <h1 className="text-xl font-extrabold text-[#111318] tracking-tight">Tickets & Portfolio</h1>
-          <p className="text-[12.5px] text-[#8a919e] mt-0.5 max-md:hidden">Vue globale de tous vos paris, campagnes et hors campagne</p>
+          <h1 className="text-xl font-extrabold tracking-tight" style={{ color: "var(--text-primary)" }}>Tickets & Portfolio</h1>
+          <p className="text-[12.5px] mt-0.5 max-md:hidden" style={{ color: "var(--text-muted)" }}>Vue globale de tous vos paris, campagnes et hors campagne</p>
         </div>
         <div className="flex items-center gap-2">
           {viewMode !== "kanban" && (
             <button onClick={() => exportCsv(periodBets, "tickets-export.csv")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-white text-[#8a919e] text-xs font-medium hover:border-[rgba(18,183,106,.2)] hover:text-[#12b76a] transition-colors cursor-pointer max-md:hidden">
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium hover:text-[#12b76a] transition-colors cursor-pointer max-md:hidden" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)", color: "var(--text-muted)" }}>
               <Download size={12} /> Export CSV
             </button>
           )}
@@ -568,7 +568,7 @@ export default function Portfolio() {
       <div className="flex flex-col gap-2" style={{ animation: "fu .3s ease both", animationDelay: ".06s" }}>
         <div className="flex items-center justify-between gap-2 flex-wrap overflow-x-hidden">
           {/* Tabs */}
-          <div data-tour="view-toggle" className="flex gap-0 bg-white border border-[#e3e6eb] rounded-[10px] p-1 w-fit overflow-x-auto max-w-full">
+          <div data-tour="view-toggle" className="flex gap-0 border rounded-[10px] p-1 w-fit overflow-x-auto max-w-full" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
             {([
               { id: "kanban" as const, label: "Kanban", shortLabel: "Kanban", icon: <Columns3Icon /> },
               { id: "list" as const, label: "Liste / Historique", shortLabel: "Liste", icon: <ListIcon /> },
@@ -578,8 +578,9 @@ export default function Portfolio() {
                 className={`flex items-center gap-1 px-2.5 md:px-4 py-1.5 rounded-[7px] text-[12px] md:text-[13px] font-medium whitespace-nowrap transition-all cursor-pointer ${
                   viewMode === tab.id
                     ? "bg-[#3b5bdb] text-white font-semibold shadow-[0_1px_4px_rgba(59,91,219,.25)]"
-                    : "text-[#8a919e] hover:text-[#3c4149]"
-                }`}>
+                    : "hover:text-[#3c4149]"
+                }`}
+                style={viewMode !== tab.id ? { color: "var(--text-muted)" } : {}}>
                 {tab.icon} <span className="md:hidden">{tab.shortLabel}</span><span className="max-md:hidden">{tab.label}</span>
               </button>
             ))}
@@ -587,7 +588,7 @@ export default function Portfolio() {
 
           {/* Collapse toggle for filters on mobile */}
           <button onClick={() => setFiltersCollapsed(!filtersCollapsed)}
-            className="md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-white text-[12px] text-[#8a919e] font-medium cursor-pointer">
+            className="md:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12px] font-medium cursor-pointer" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)", color: "var(--text-muted)" }}>
             <SlidersHorizontal size={13} /> Filtres
             {filtersCollapsed ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
           </button>
@@ -599,21 +600,24 @@ export default function Portfolio() {
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#b0b7c3] pointer-events-none" />
             <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Match, equipe..."
-              className="w-full pl-8 pr-3 py-1.5 border border-[#e3e6eb] rounded-lg bg-white text-[12.5px] text-[#111318] outline-none focus:border-[#3b5bdb] focus:shadow-[0_0_0_3px_rgba(59,91,219,.07)] transition-all placeholder:text-[#b0b7c3]" />
+              className="w-full pl-8 pr-3 py-1.5 border rounded-lg text-[12.5px] outline-none focus:border-[#3b5bdb] focus:shadow-[0_0_0_3px_rgba(59,91,219,.07)] transition-all placeholder:text-[#b0b7c3]"
+              style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)", color: "var(--text-primary)" }} />
           </div>
           <select value={sportFilter} onChange={(e) => setSportFilter(e.target.value)}
-            className="px-2.5 py-1.5 border border-[#e3e6eb] rounded-lg bg-white text-[12px] md:text-[12.5px] text-[#3c4149] outline-none cursor-pointer">
+            className="px-2.5 py-1.5 border rounded-lg text-[12px] md:text-[12.5px] outline-none cursor-pointer"
+            style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)", color: "var(--text-secondary)" }}>
             <option value="all">Tous sports</option>
             <option value="football">Football</option>
             <option value="tennis">Tennis</option>
           </select>
           <select value={bankrollFilter} onChange={(e) => setBankrollFilter(e.target.value)}
-            className="px-2.5 py-1.5 border border-[#e3e6eb] rounded-lg bg-white text-[12px] md:text-[12.5px] text-[#3c4149] outline-none cursor-pointer max-sm:hidden">
+            className="px-2.5 py-1.5 border rounded-lg text-[12px] md:text-[12.5px] outline-none cursor-pointer max-sm:hidden"
+            style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)", color: "var(--text-secondary)" }}>
             <option value="all">Toutes bankrolls</option>
             <option value="campaign">Campagnes</option>
             <option value="global">Bankroll globale</option>
           </select>
-          <div className="flex gap-0.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg p-0.5 overflow-x-auto max-w-full">
+          <div className="flex gap-0.5 border rounded-lg p-0.5 overflow-x-auto max-w-full" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-color)" }}>
             {([
               { id: "all" as const, label: "Tous" },
               { id: "en_cours" as const, label: "En cours" },
@@ -625,9 +629,12 @@ export default function Portfolio() {
               <button key={pill.id} onClick={() => setStatusFilter(pill.id)}
                 className={`px-2 md:px-2.5 py-1 rounded-md text-[11px] md:text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
                   statusFilter === pill.id
-                    ? "bg-white text-[#111318] font-semibold shadow-sm"
-                    : "text-[#8a919e] hover:text-[#3c4149]"
-                }`}>
+                    ? "font-semibold shadow-sm"
+                    : "hover:text-[#3c4149]"
+                }`}
+                style={statusFilter === pill.id
+                  ? { backgroundColor: "var(--bg-card)", color: "var(--text-primary)" }
+                  : { color: "var(--text-muted)" }}>
                 {pill.label}
               </button>
             ))}
@@ -670,18 +677,22 @@ export default function Portfolio() {
 
           {/* Period + extra filters */}
           <div className="flex gap-2 items-center flex-wrap overflow-x-hidden">
-            <div data-tour="period-filters" className="flex gap-0.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg p-0.5">
+            <div data-tour="period-filters" className="flex gap-0.5 border rounded-lg p-0.5" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-color)" }}>
               {(["7d", "30d", "90d", "custom"] as PeriodFilter[]).map((p) => (
                 <button key={p} onClick={() => { setPeriodFilter(p); setPage(1); }}
                   className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-                    periodFilter === p ? "bg-white text-[#111318] font-semibold shadow-sm" : "text-[#8a919e] hover:text-[#3c4149]"
-                  }`}>
+                    periodFilter === p ? "font-semibold shadow-sm" : "hover:text-[#3c4149]"
+                  }`}
+                  style={periodFilter === p
+                    ? { backgroundColor: "var(--bg-card)", color: "var(--text-primary)" }
+                    : { color: "var(--text-muted)" }}>
                   {p === "7d" ? "7 jours" : p === "30d" ? "30 jours" : p === "90d" ? "90 jours" : "Custom"}
                 </button>
               ))}
             </div>
             <select data-tour="result-filters" value={resultFilter} onChange={(e) => { setResultFilter(e.target.value); setPage(1); }}
-              className="px-2.5 py-1.5 border border-[#e3e6eb] rounded-lg bg-white text-[12.5px] text-[#3c4149] outline-none cursor-pointer">
+              className="px-2.5 py-1.5 border rounded-lg text-[12.5px] outline-none cursor-pointer"
+              style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)", color: "var(--text-secondary)" }}>
               <option value="all">Tous résultats</option>
               <option value="won">Gagné</option>
               <option value="lost">Perdu</option>
@@ -691,7 +702,8 @@ export default function Portfolio() {
               <option value="expired">Expiré</option>
             </select>
             <select data-tour="tag-filters" value={tagFilter} onChange={(e) => { setTagFilter(e.target.value); setPage(1); }}
-              className="px-2.5 py-1.5 border border-[#e3e6eb] rounded-lg bg-white text-[12.5px] text-[#3c4149] outline-none cursor-pointer">
+              className="px-2.5 py-1.5 border rounded-lg text-[12.5px] outline-none cursor-pointer"
+              style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)", color: "var(--text-secondary)" }}>
               <option value="all">Tous tags</option>
               <option value="ALGO">ALGO</option>
               <option value="MANUEL">MANUEL</option>
@@ -699,55 +711,58 @@ export default function Portfolio() {
               <option value="COMBI">COMBI</option>
             </select>
             <select value={clvFilter} onChange={(e) => { setClvFilter(e.target.value); setPage(1); }}
-              className="px-2.5 py-1.5 border border-[#e3e6eb] rounded-lg bg-white text-[12.5px] text-[#3c4149] outline-none cursor-pointer">
+              className="px-2.5 py-1.5 border rounded-lg text-[12.5px] outline-none cursor-pointer"
+              style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)", color: "var(--text-secondary)" }}>
               <option value="all">CLV : tous</option>
               <option value="positive">CLV positif</option>
               <option value="negative">CLV négatif</option>
             </select>
             <select value={bookmakerFilter} onChange={(e) => { setBookmakerFilter(e.target.value); setPage(1); }}
-              className="px-2.5 py-1.5 border border-[#e3e6eb] rounded-lg bg-white text-[12.5px] text-[#3c4149] outline-none cursor-pointer">
+              className="px-2.5 py-1.5 border rounded-lg text-[12.5px] outline-none cursor-pointer"
+              style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)", color: "var(--text-secondary)" }}>
               <option value="all">Tous bookmakers</option>
               {[...new Set(bets.map((b) => b.bookmaker).filter(Boolean))].map((bk) => (
                 <option key={bk} value={bk!}>{bk}</option>
               ))}
             </select>
-            <span className="text-[11.5px] text-[#8a919e] font-[var(--font-mono)] ml-auto">{sortedBets.length} tickets</span>
+            <span className="text-[11.5px] font-[var(--font-mono)] ml-auto" style={{ color: "var(--text-muted)" }}>{sortedBets.length} tickets</span>
             <button onClick={() => exportCsv(sortedBets, "tickets-export.csv")}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-white text-[#8a919e] text-xs font-medium hover:border-[rgba(18,183,106,.2)] hover:text-[#12b76a] transition-colors cursor-pointer">
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium hover:border-[rgba(18,183,106,.2)] hover:text-[#12b76a] transition-colors cursor-pointer"
+              style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)", color: "var(--text-muted)" }}>
               <Download size={12} /> Export CSV
             </button>
           </div>
 
           {/* Table */}
-          <div data-tour="bets-table" className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl overflow-hidden flex flex-col flex-1" style={{ boxShadow: SH_SM }}>
+          <div data-tour="bets-table" className="border-[1.5px] rounded-xl overflow-hidden flex flex-col flex-1" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: SH_SM }}>
             <div className="overflow-x-auto flex-1 overflow-y-auto">
               <table className="w-full text-[12.5px] border-collapse">
-                <thead className="bg-[#f4f5f7] border-b-[1.5px] border-[#e3e6eb]">
+                <thead className="border-b-[1.5px]" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-color)" }}>
                   <tr>
                     <SortTh col="match_date" label="Date" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
-                    <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Match</th>
-                    <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Sport</th>
-                    <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Issue</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Match</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Sport</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Issue</th>
                     <SortTh col="odds_at_bet" label="Cote" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
                     <SortTh col="stake" label="Mise" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
-                    <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Résultat</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Résultat</th>
                     <SortTh col="profit_loss" label="Gain/Perte" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
                     <SortTh col="edge_at_bet" label="Edge" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} />
                     <SortTh col="clv" label="CLV" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} dataTour="clv-column" />
-                    <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Bookmaker</th>
-                    <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Campagne</th>
-                    <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">BK</th>
-                    <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Tag</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Bookmaker</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Campagne</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>BK</th>
+                    <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Tag</th>
                     <th className="px-3 py-2.5 w-16"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {pagedBets.map((b) => (
-                    <tr key={b.id} onClick={() => openDrawer(b)} className="border-b border-[#e3e6eb] last:border-b-0 hover:bg-[#f4f5f7] transition-colors cursor-pointer">
-                      <td className="px-3 py-2.5 font-[var(--font-mono)] text-[11px] text-[#8a919e]">{b.match_date.split("T")[0].slice(5).replace("-", "/")}</td>
-                      <td className="px-3 py-2.5 font-semibold text-[#111318]">{b.home_team} vs {b.away_team}</td>
+                    <tr key={b.id} onClick={() => openDrawer(b)} className="border-b last:border-b-0 transition-colors cursor-pointer hover:bg-[var(--bg-surface)]" style={{ borderColor: "var(--border-color)" }}>
+                      <td className="px-3 py-2.5 font-[var(--font-mono)] text-[11px]" style={{ color: "var(--text-muted)" }}>{b.match_date.split("T")[0].slice(5).replace("-", "/")}</td>
+                      <td className="px-3 py-2.5 font-semibold" style={{ color: "var(--text-primary)" }}>{b.home_team} vs {b.away_team}</td>
                       <td className="px-3 py-2.5 text-[11px]">{b.sport === "tennis" ? "🎾" : "⚽"}</td>
-                      <td className="px-3 py-2.5 text-[#3c4149]">{outcomeLabel(b.outcome_bet)}</td>
+                      <td className="px-3 py-2.5" style={{ color: "var(--text-secondary)" }}>{outcomeLabel(b.outcome_bet)}</td>
                       <td className="px-3 py-2.5 font-[var(--font-mono)] font-semibold">{b.odds_at_bet.toFixed(2)}</td>
                       <td className="px-3 py-2.5 font-[var(--font-mono)] font-semibold">{b.stake.toFixed(0)}€</td>
                       <td className="px-3 py-2.5"><StatusBadge result={b.result} /></td>
@@ -764,14 +779,14 @@ export default function Portfolio() {
                         ) : <span className="text-[#b0b7c3] font-[var(--font-mono)] text-[10px]">—</span>}
                       </td>
                       <td className="px-3 py-2.5"><ClvBadge clv={b.clv} /></td>
-                      <td className="px-3 py-2.5 text-[11px] text-[#3c4149]">{b.bookmaker || "—"}</td>
+                      <td className="px-3 py-2.5 text-[11px]" style={{ color: "var(--text-secondary)" }}>{b.bookmaker || "—"}</td>
                       <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-1.5 text-xs text-[#3c4149]">
+                        <div className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-secondary)" }}>
                           <span className="w-[7px] h-[7px] rounded-full flex-shrink-0" style={{ background: getCampaignColor(b.campaign_id) }} />
                           <span className="truncate max-w-[100px]">{b.campaign_id ? getCampaignName(b.campaign_id) : "Hors camp."}</span>
                         </div>
                       </td>
-                      <td className="px-3 py-2.5 font-[var(--font-mono)] text-[10.5px] text-[#8a919e]">{b.campaign_id ? "Camp." : "Globale"}</td>
+                      <td className="px-3 py-2.5 font-[var(--font-mono)] text-[10.5px]" style={{ color: "var(--text-muted)" }}>{b.campaign_id ? "Camp." : "Globale"}</td>
                       <td className="px-3 py-2.5"><TagBadge tag={getTag(b)} /></td>
                       <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-1">
@@ -800,14 +815,14 @@ export default function Portfolio() {
               </table>
             </div>
             {/* Pagination */}
-            <div className="flex items-center justify-between px-4 py-3 border-t border-[#e3e6eb] text-[12.5px] text-[#8a919e]">
+            <div className="flex items-center justify-between px-4 py-3 border-t text-[12.5px]" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
               <span>{sortedBets.length} tickets · page {page} / {totalPages}</span>
               <div className="flex gap-1">
                 <PBtn onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1}>‹</PBtn>
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1).map((p) => (
                   <PBtn key={p} active={page === p} onClick={() => setPage(p)}>{p}</PBtn>
                 ))}
-                {totalPages > 5 && <span className="px-1 text-[#b0b7c3]">…</span>}
+                {totalPages > 5 && <span className="px-1" style={{ color: "var(--text-muted2)" }}>…</span>}
                 {totalPages > 5 && <PBtn onClick={() => setPage(totalPages)}>{totalPages}</PBtn>}
                 <PBtn onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page >= totalPages}>›</PBtn>
               </div>
@@ -820,8 +835,8 @@ export default function Portfolio() {
       {viewMode === "camp" && (
         <div className="flex flex-col md:grid gap-3" style={{ gridTemplateColumns: "260px 1fr", animation: "fu .3s ease both" }}>
           {/* Campaign sidebar */}
-          <div className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl overflow-hidden h-fit max-md:max-h-[200px] max-h-[calc(100vh-280px)] overflow-y-auto" style={{ boxShadow: SH_SM }}>
-            <div className="px-4 py-3 border-b border-[#e3e6eb] text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">
+          <div className="border-[1.5px] rounded-xl overflow-hidden h-fit max-md:max-h-[200px] max-h-[calc(100vh-280px)] overflow-y-auto" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: SH_SM }}>
+            <div className="px-4 py-3 border-b text-[11px] font-bold uppercase tracking-wider" style={{ borderColor: "var(--border-color)", color: "var(--text-muted2)" }}>
               Campagnes
             </div>
             {campaigns.map((c) => {
@@ -832,11 +847,17 @@ export default function Portfolio() {
               const count = bets.filter((b) => b.campaign_id === c.id).length;
               return (
                 <div key={c.id} onClick={() => setSelectedCampId(c.id)}
-                  className={`px-3.5 py-3 border-b border-[#e3e6eb] cursor-pointer transition-colors flex flex-col gap-1 ${
+                  className={`px-3.5 py-3 border-b cursor-pointer transition-colors flex flex-col gap-1 ${
                     selectedCampId === c.id
-                      ? "bg-[rgba(59,91,219,.07)] border-r-2 border-r-[#3b5bdb]"
-                      : "hover:bg-[#f4f5f7]"
-                  } ${c.status === "archived" ? "opacity-50" : ""}`}>
+                      ? "border-r-2 border-r-[#3b5bdb]"
+                      : ""
+                  } ${c.status === "archived" ? "opacity-50" : ""}`}
+                  style={{
+                    borderColor: "var(--border-color)",
+                    backgroundColor: selectedCampId === c.id ? "var(--accent-bg)" : undefined,
+                  }}
+                  onMouseEnter={(e) => { if (selectedCampId !== c.id) (e.currentTarget as HTMLElement).style.backgroundColor = "var(--bg-surface)"; }}
+                  onMouseLeave={(e) => { if (selectedCampId !== c.id) (e.currentTarget as HTMLElement).style.backgroundColor = ""; }}>
                   <div className="text-[13px] font-semibold flex items-center gap-1.5">
                     <span>⚽</span> {c.name}
                   </div>
@@ -856,10 +877,11 @@ export default function Portfolio() {
             })}
             {/* Hors campagne */}
             <div onClick={() => setSelectedCampId(0)}
-              className={`px-3.5 py-3 border-t border-[#e3e6eb] cursor-pointer transition-colors ${
-                selectedCampId === 0 ? "bg-[rgba(59,91,219,.07)]" : "hover:bg-[#f4f5f7]"
-              }`}>
-              <div className="text-xs text-[#b0b7c3] flex items-center gap-1.5">
+              className="px-3.5 py-3 border-t cursor-pointer transition-colors"
+              style={{ borderColor: "var(--border-color)", backgroundColor: selectedCampId === 0 ? "var(--accent-bg)" : undefined }}
+              onMouseEnter={(e) => { if (selectedCampId !== 0) (e.currentTarget as HTMLElement).style.backgroundColor = "var(--bg-surface)"; }}
+              onMouseLeave={(e) => { if (selectedCampId !== 0) (e.currentTarget as HTMLElement).style.backgroundColor = ""; }}>
+              <div className="text-xs flex items-center gap-1.5" style={{ color: "var(--text-muted2)" }}>
                 <AlertCircle size={12} /> Hors campagne
               </div>
               <div className="flex gap-2.5 text-[11px] font-[var(--font-mono)] mt-1">
@@ -884,9 +906,9 @@ export default function Portfolio() {
               <CampMiniDash detail={campDetail} history={campHistory} campBets={campBets} />
             )}
             {selectedCampId === 0 && (
-              <div className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl p-4" style={{ boxShadow: SH_SM }}>
+              <div className="border-[1.5px] rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: SH_SM }}>
                 <div className="text-[13px] font-bold mb-3 flex items-center gap-2">
-                  <AlertCircle size={14} className="text-[#8a919e]" /> Tickets hors campagne
+                  <AlertCircle size={14} style={{ color: "var(--text-muted)" }} /> Tickets hors campagne
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                   {(() => {
@@ -925,7 +947,7 @@ export default function Portfolio() {
               />
             )}
             {selectedCampId == null && (
-              <div className="flex items-center justify-center h-48 text-sm text-[#8a919e]">
+              <div className="flex items-center justify-center h-48 text-sm" style={{ color: "var(--text-muted)" }}>
                 Sélectionnez une campagne pour voir ses tickets
               </div>
             )}
@@ -935,12 +957,12 @@ export default function Portfolio() {
 
       {/* ══════ ADD TICKET MODAL ══════ */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowAddModal(false)}>
-          <div className="bg-white rounded-xl p-4 md:p-5 w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-3 md:mx-0 shadow-[0_12px_40px_rgba(16,24,40,.14)] space-y-4"
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "var(--overlay)" }} onClick={() => setShowAddModal(false)}>
+          <div className="rounded-xl p-4 md:p-5 w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-3 md:mx-0 shadow-[0_12px_40px_rgba(16,24,40,.14)] space-y-4" style={{ backgroundColor: "var(--bg-card)" }}
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-[#111318]">Nouveau ticket</h2>
-              <button onClick={() => setShowAddModal(false)} className="text-[#8a919e] hover:text-[#111318] cursor-pointer"><X size={18} /></button>
+              <h2 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Nouveau ticket</h2>
+              <button onClick={() => setShowAddModal(false)} className="hover:text-[#111318] cursor-pointer" style={{ color: "var(--text-muted)" }}><X size={18} /></button>
             </div>
 
             {/* Mode toggle */}
@@ -1160,28 +1182,28 @@ export default function Portfolio() {
 
 function KpiCard({ label, value, color, sub }: { label: string; value: string; color?: string; sub?: string }) {
   return (
-    <div className="bg-white border-[1.5px] border-[#e3e6eb] rounded-[10px] px-2.5 md:px-3.5 py-2 md:py-2.5 text-center min-w-0" style={{ boxShadow: SH_SM }}>
-      <div className="text-[10px] md:text-[10.5px] text-[#8a919e] leading-tight">{label}</div>
-      <div className="text-[15px] md:text-[17px] font-extrabold tracking-tight font-[var(--font-mono)]" style={{ color: color || "#111318" }}>{value}</div>
-      {sub && <div className="text-[9px] md:text-[10px] text-[#b0b7c3] mt-0.5 truncate">{sub}</div>}
+    <div className="border-[1.5px] rounded-[10px] px-2.5 md:px-3.5 py-2 md:py-2.5 text-center min-w-0" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: SH_SM }}>
+      <div className="text-[10px] md:text-[10.5px] leading-tight" style={{ color: "var(--text-muted)" }}>{label}</div>
+      <div className="text-[15px] md:text-[17px] font-extrabold tracking-tight font-[var(--font-mono)]" style={{ color: color || "var(--text-primary)" }}>{value}</div>
+      {sub && <div className="text-[9px] md:text-[10px] mt-0.5 truncate" style={{ color: "var(--text-muted2)" }}>{sub}</div>}
     </div>
   );
 }
 
 function LKpi({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="bg-white border-[1.5px] border-[#e3e6eb] rounded-[10px] px-2.5 md:px-3.5 py-2 md:py-2.5 text-center min-w-0" style={{ boxShadow: SH_SM }}>
-      <div className="text-[10px] md:text-[10.5px] text-[#8a919e] mb-0.5 leading-tight">{label}</div>
-      <div className="text-[14px] md:text-[16px] font-extrabold font-[var(--font-mono)] tracking-tight" style={{ color: color || "#111318" }}>{value}</div>
+    <div className="border-[1.5px] rounded-[10px] px-2.5 md:px-3.5 py-2 md:py-2.5 text-center min-w-0" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: SH_SM }}>
+      <div className="text-[10px] md:text-[10.5px] mb-0.5 leading-tight" style={{ color: "var(--text-muted)" }}>{label}</div>
+      <div className="text-[14px] md:text-[16px] font-extrabold font-[var(--font-mono)] tracking-tight" style={{ color: color || "var(--text-primary)" }}>{value}</div>
     </div>
   );
 }
 
 function CmdStat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="text-center p-2 bg-[#f4f5f7] rounded-lg min-w-0">
-      <div className="text-[13px] md:text-[15px] font-extrabold font-[var(--font-mono)] tracking-tight" style={{ color: color || "#111318" }}>{value}</div>
-      <div className="text-[9px] md:text-[10px] text-[#8a919e] mt-0.5 leading-tight">{label}</div>
+    <div className="text-center p-2 rounded-lg min-w-0" style={{ backgroundColor: "var(--bg-surface)" }}>
+      <div className="text-[13px] md:text-[15px] font-extrabold font-[var(--font-mono)] tracking-tight" style={{ color: color || "var(--text-primary)" }}>{value}</div>
+      <div className="text-[9px] md:text-[10px] mt-0.5 leading-tight" style={{ color: "var(--text-muted)" }}>{label}</div>
     </div>
   );
 }
@@ -1192,7 +1214,7 @@ function SortTh({ col, label, sortCol, sortDir, onSort, dataTour }: {
   const active = sortCol === col;
   return (
     <th onClick={() => onSort(col)} data-tour={dataTour}
-      className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider cursor-pointer hover:text-[#3c4149] select-none whitespace-nowrap transition-colors">
+      className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider cursor-pointer hover:text-[#3c4149] select-none whitespace-nowrap transition-colors" style={{ color: "var(--text-muted2)" }}>
       {label}
       {active && <span className="text-[#3b5bdb] ml-0.5">{sortDir === "asc" ? " ▲" : " ▼"}</span>}
     </th>
@@ -1206,8 +1228,9 @@ function PBtn({ children, onClick, active, disabled }: {
     <button onClick={onClick} disabled={disabled}
       className={`w-7 h-7 rounded-md border text-xs flex items-center justify-center transition-all cursor-pointer ${
         active ? "bg-[#3b5bdb] text-white border-[#3b5bdb]"
-          : "border-[#e3e6eb] text-[#3c4149] hover:bg-[#3b5bdb] hover:text-white hover:border-[#3b5bdb]"
-      } ${disabled ? "opacity-30 pointer-events-none" : ""}`}>
+          : "hover:bg-[#3b5bdb] hover:text-white hover:border-[#3b5bdb]"
+      } ${disabled ? "opacity-30 pointer-events-none" : ""}`}
+      style={!active ? { borderColor: "var(--border-color)", color: "var(--text-secondary)" } : {}}>
       {children}
     </button>
   );
@@ -1347,29 +1370,29 @@ function TicketsKanban({
             const key = `${card.campId}-${r.home_team}-${r.outcome}`;
             const isAccepting = acceptingReco === key;
             return (
-              <div className="bg-white border-[1.5px] border-[rgba(247,144,9,.2)] rounded-[9px] p-3 transition-all hover:shadow-sm hover:-translate-y-px">
+              <div className="border-[1.5px] border-[rgba(247,144,9,.2)] rounded-[9px] p-3 transition-all hover:shadow-sm hover:-translate-y-px" style={{ backgroundColor: "var(--bg-card)" }}>
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex gap-1"><TagBadge tag="ALGO" /></div>
                 </div>
-                <div className="text-[13px] font-bold mb-0.5">{r.home_team} vs {r.away_team}</div>
-                <div className="text-[10.5px] text-[#8a919e] mb-2">
+                <div className="text-[13px] font-bold mb-0.5" style={{ color: "var(--text-primary)" }}>{r.home_team} vs {r.away_team}</div>
+                <div className="text-[10.5px] mb-2" style={{ color: "var(--text-muted)" }}>
                   {LEAGUE_INFO[r.league]?.flag} {LEAGUE_INFO[r.league]?.name || r.league} · {r.date.split("T")[0]}
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-[rgba(59,91,219,.07)] text-[#3b5bdb]">{outcomeLabel(r.outcome)}</span>
-                  <span className="text-sm font-extrabold font-[var(--font-mono)]">{r.best_odds.toFixed(2)}</span>
-                  <span className="text-[10.5px] font-bold font-[var(--font-mono)] text-[#12b76a]">+{(r.edge * 100).toFixed(1)}%</span>
-                  <span className="text-[10px] text-[#8a919e] font-[var(--font-mono)] ml-auto">{r.bookmaker}</span>
+                  <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--accent-bg)", color: "var(--accent)" }}>{outcomeLabel(r.outcome)}</span>
+                  <span className="text-sm font-extrabold font-[var(--font-mono)]" style={{ color: "var(--text-primary)" }}>{r.best_odds.toFixed(2)}</span>
+                  <span className="text-[10.5px] font-bold font-[var(--font-mono)]" style={{ color: "var(--green)" }}>+{(r.edge * 100).toFixed(1)}%</span>
+                  <span className="text-[10px] font-[var(--font-mono)] ml-auto" style={{ color: "var(--text-muted)" }}>{r.bookmaker}</span>
                 </div>
                 <div className="flex items-center mt-1">
-                  <span className="text-[11px] font-[var(--font-mono)] font-semibold text-[#3c4149]">Mise : {r.suggested_stake.toFixed(0)}€</span>
+                  <span className="text-[11px] font-[var(--font-mono)] font-semibold" style={{ color: "var(--text-secondary)" }}>Mise : {r.suggested_stake.toFixed(0)}€</span>
                 </div>
-                <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-[#e3e6eb]">
-                  <div className="flex items-center gap-1 text-[10px] text-[#b0b7c3]">
+                <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t" style={{ borderColor: "var(--border-color)" }}>
+                  <div className="flex items-center gap-1 text-[10px]" style={{ color: "var(--text-muted2)" }}>
                     <span className="w-1.5 h-1.5 rounded-full" style={{ background: getCampaignColor(card.campId ?? null) }} />
                     <span className="truncate max-w-[100px]">{getCampaignName(card.campId ?? null)}</span>
                   </div>
-                  <span className="text-[10px] font-[var(--font-mono)] text-[#b0b7c3]">BK Campagne</span>
+                  <span className="text-[10px] font-[var(--font-mono)]" style={{ color: "var(--text-muted2)" }}>BK Campagne</span>
                 </div>
                 {/* Actions */}
                 <div className="flex gap-1 mt-2">
@@ -1377,7 +1400,7 @@ function TicketsKanban({
                     className="flex-[2] py-1.5 rounded-md bg-[#12b76a] text-white text-[11.5px] font-semibold cursor-pointer hover:bg-[#0ea05e] disabled:opacity-50 transition-colors">
                     {isAccepting ? "…" : "✓ Valider"}
                   </button>
-                  <button className="flex-1 py-1.5 rounded-md border border-[#cdd1d9] text-[#3c4149] text-[11.5px] cursor-pointer hover:bg-[#f4f5f7] transition-colors">✏️</button>
+                  <button className="flex-1 py-1.5 rounded-md border text-[11.5px] cursor-pointer transition-colors" style={{ borderColor: "var(--border-strong)", color: "var(--text-secondary)" }} onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "var(--bg-surface)"; }} onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = ""; }}>✏️</button>
                   <button onClick={() => onIgnoreReco(card.campId!, r)}
                     className="flex-1 py-1.5 rounded-md border border-[rgba(240,68,56,.2)] bg-[rgba(240,68,56,.07)] text-[#f04438] text-[11.5px] cursor-pointer hover:bg-[rgba(240,68,56,.12)] transition-colors">✕ Ignorer</button>
                 </div>
@@ -1392,23 +1415,23 @@ function TicketsKanban({
           const isPending = b.result === "pending";
           const isIgnored = b.result === "ignored" || b.result === "expired";
           return (
-            <div onClick={() => onOpenDetail(b)} className={`bg-white border-[1.5px] rounded-[9px] p-3 transition-all hover:shadow-sm hover:-translate-y-px cursor-pointer ${
-              isWon ? "border-[rgba(18,183,106,.2)] bg-[rgba(18,183,106,.015)]"
-              : isLost ? "border-[rgba(240,68,56,.2)] bg-[rgba(240,68,56,.015)]"
-              : "border-[#e3e6eb]"
-            }`}>
+            <div onClick={() => onOpenDetail(b)} className="border-[1.5px] rounded-[9px] p-3 transition-all hover:shadow-sm hover:-translate-y-px cursor-pointer"
+              style={{
+                backgroundColor: isWon ? "rgba(18,183,106,.015)" : isLost ? "rgba(240,68,56,.015)" : "var(--bg-card)",
+                borderColor: isWon ? "rgba(18,183,106,.2)" : isLost ? "rgba(240,68,56,.2)" : "var(--border-color)",
+              }}>
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex gap-1"><TagBadge tag={getTag(b)} /></div>
                 {isPending && <span className="text-[10px] text-[#12b76a] font-[var(--font-mono)]">Placé ✓</span>}
                 {!isPending && <StatusBadge result={b.result} />}
               </div>
-              <div className="text-[13px] font-bold mb-0.5">{b.home_team} vs {b.away_team}</div>
-              <div className="text-[10.5px] text-[#8a919e] mb-2">
+              <div className="text-[13px] font-bold mb-0.5" style={{ color: "var(--text-primary)" }}>{b.home_team} vs {b.away_team}</div>
+              <div className="text-[10.5px] mb-2" style={{ color: "var(--text-muted)" }}>
                 {b.league && LEAGUE_INFO[b.league]?.flag} {b.league && (LEAGUE_INFO[b.league]?.name || b.league)} · {b.match_date.split("T")[0]}
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-[rgba(59,91,219,.07)] text-[#3b5bdb]">{outcomeLabel(b.outcome_bet)}</span>
-                <span className="text-sm font-extrabold font-[var(--font-mono)]">{b.odds_at_bet.toFixed(2)}</span>
+                <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--accent-bg)", color: "var(--accent)" }}>{outcomeLabel(b.outcome_bet)}</span>
+                <span className="text-sm font-extrabold font-[var(--font-mono)]" style={{ color: "var(--text-primary)" }}>{b.odds_at_bet.toFixed(2)}</span>
                 {b.odds_at_close != null && (
                   <span className={`text-[10px] font-[var(--font-mono)] font-semibold ${
                     b.odds_at_close < b.odds_at_bet ? "text-[#12b76a]" : b.odds_at_close > b.odds_at_bet ? "text-[#f04438]" : "text-[#8a919e]"
@@ -1421,13 +1444,13 @@ function TicketsKanban({
                 )}
               </div>
               {b.bookmaker && (
-                <div className="text-[10px] text-[#8a919e] mt-0.5">{b.bookmaker}</div>
+                <div className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>{b.bookmaker}</div>
               )}
-              <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-[#e3e6eb]">
+              <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t" style={{ borderColor: "var(--border-color)" }}>
                 {isPending ? (
                   <>
-                    <span className="text-[11px] font-[var(--font-mono)] font-semibold text-[#3c4149]">Mise : {b.stake.toFixed(0)}€</span>
-                    <span className="text-[11px] font-[var(--font-mono)] text-[#3c4149]">
+                    <span className="text-[11px] font-[var(--font-mono)] font-semibold" style={{ color: "var(--text-secondary)" }}>Mise : {b.stake.toFixed(0)}€</span>
+                    <span className="text-[11px] font-[var(--font-mono)]" style={{ color: "var(--text-secondary)" }}>
                       +{(b.stake * (b.odds_at_bet - 1)).toFixed(0)}€ potentiel
                     </span>
                   </>
@@ -1628,24 +1651,24 @@ function CampBetsTable({ bets, campaigns: _campaigns, onUpdateResult, onDeleteBe
           <table className="w-full text-[12.5px] border-collapse">
             <thead className="bg-[#f4f5f7] border-b-[1.5px] border-[#e3e6eb]">
               <tr>
-                <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Date</th>
-                <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Match</th>
-                <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Issue</th>
-                <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Cote</th>
-                <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Mise</th>
-                <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Résultat</th>
-                <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Gain/Perte</th>
-                <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">CLV</th>
-                <th className="px-3 py-2.5 text-left text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Tag</th>
+                <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Date</th>
+                <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Match</th>
+                <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Issue</th>
+                <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Cote</th>
+                <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Mise</th>
+                <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Résultat</th>
+                <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Gain/Perte</th>
+                <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>CLV</th>
+                <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Tag</th>
                 <th className="px-3 py-2.5 w-16"></th>
               </tr>
             </thead>
             <tbody>
               {paged.map((b) => (
-                <tr key={b.id} onClick={() => onOpenDetail(b)} className="border-b border-[#e3e6eb] last:border-b-0 hover:bg-[#f4f5f7] transition-colors cursor-pointer">
-                  <td className="px-3 py-2.5 font-[var(--font-mono)] text-[11px] text-[#8a919e]">{b.match_date.split("T")[0].slice(5).replace("-", "/")}</td>
-                  <td className="px-3 py-2.5 font-semibold text-[#111318]">{b.home_team} vs {b.away_team}</td>
-                  <td className="px-3 py-2.5 text-[#3c4149]">{outcomeLabel(b.outcome_bet)}</td>
+                <tr key={b.id} onClick={() => onOpenDetail(b)} className="border-b last:border-b-0 transition-colors cursor-pointer hover:bg-[var(--bg-surface)]" style={{ borderColor: "var(--border-color)" }}>
+                  <td className="px-3 py-2.5 font-[var(--font-mono)] text-[11px]" style={{ color: "var(--text-muted)" }}>{b.match_date.split("T")[0].slice(5).replace("-", "/")}</td>
+                  <td className="px-3 py-2.5 font-semibold" style={{ color: "var(--text-primary)" }}>{b.home_team} vs {b.away_team}</td>
+                  <td className="px-3 py-2.5" style={{ color: "var(--text-secondary)" }}>{outcomeLabel(b.outcome_bet)}</td>
                   <td className="px-3 py-2.5 font-[var(--font-mono)] font-semibold">{b.odds_at_bet.toFixed(2)}</td>
                   <td className="px-3 py-2.5 font-[var(--font-mono)] font-semibold">{b.stake.toFixed(0)}€</td>
                   <td className="px-3 py-2.5"><StatusBadge result={b.result} /></td>
@@ -1684,7 +1707,7 @@ function CampBetsTable({ bets, campaigns: _campaigns, onUpdateResult, onDeleteBe
             {Array.from({ length: Math.min(5, tp) }, (_, i) => i + 1).map((p) => (
               <PBtn key={p} active={pg === p} onClick={() => setPg(p)}>{p}</PBtn>
             ))}
-            {tp > 5 && <span className="px-1 text-[#b0b7c3]">…</span>}
+            {tp > 5 && <span className="px-1" style={{ color: "var(--text-muted2)" }}>…</span>}
             {tp > 5 && <PBtn onClick={() => setPg(tp)}>{tp}</PBtn>}
             <PBtn onClick={() => setPg(Math.min(tp, pg + 1))} disabled={pg >= tp}>›</PBtn>
           </div>

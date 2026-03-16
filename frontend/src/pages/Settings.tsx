@@ -39,24 +39,24 @@ import { settingsTour } from "@/tours/index";
 
 /* ── Design tokens ── */
 const C = {
-  bg: "#f4f5f7",
-  white: "#ffffff",
-  surface: "#f4f5f7",
-  border: "#e3e6eb",
-  border2: "#cdd1d9",
-  text: "#111318",
-  text2: "#3c4149",
-  muted: "#8a919e",
-  muted2: "#b0b7c3",
-  accent: "#3b5bdb",
-  accentBg: "rgba(59,91,219,0.07)",
-  accentBd: "rgba(59,91,219,0.18)",
-  green: "#12b76a",
-  greenBg: "rgba(18,183,106,0.08)",
-  red: "#f04438",
-  redBg: "rgba(240,68,56,0.07)",
-  amber: "#f79009",
-  amberBg: "rgba(247,144,9,0.08)",
+  bg: "var(--bg-primary)",
+  white: "var(--bg-card)",
+  surface: "var(--bg-surface)",
+  border: "var(--border-color)",
+  border2: "var(--border-strong)",
+  text: "var(--text-primary)",
+  text2: "var(--text-secondary)",
+  muted: "var(--text-muted)",
+  muted2: "var(--text-muted2)",
+  accent: "var(--accent)",
+  accentBg: "var(--accent-bg)",
+  accentBd: "var(--accent-border)",
+  green: "var(--green)",
+  greenBg: "var(--green-bg)",
+  red: "var(--red)",
+  redBg: "var(--red-bg)",
+  amber: "var(--amber)",
+  amberBg: "var(--amber-bg)",
   radius: "12px",
 };
 
@@ -381,22 +381,22 @@ export default function Settings() {
 
   const togglePwd = (field: string) => setShowPwd((p) => ({ ...p, [field]: !p[field] }));
 
-  const inputCls = "w-full py-2.5 px-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg text-[13.5px] text-[#111318] outline-none transition-all focus:border-[#3b5bdb] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,91,219,0.07)] placeholder:text-[#b0b7c3]";
+  const inputCls = "w-full py-2.5 px-3 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-lg text-[13.5px] text-[var(--text-primary)] outline-none transition-all focus:border-[var(--accent)] focus:bg-[var(--bg-card)] focus:shadow-[0_0_0_3px_var(--accent-bg)] placeholder:text-[var(--text-muted2)]";
   const inputWithIconCls = inputCls + " pl-[34px]";
-  const labelCls = "text-[11.5px] font-semibold text-[#3c4149] tracking-wide";
-  const sectionTitleCls = "text-[12.5px] font-bold text-[#3c4149] mb-3 pb-2.5 border-b border-[#e3e6eb] flex items-center gap-2";
+  const labelCls = "text-[11.5px] font-semibold text-[var(--text-secondary)] tracking-wide";
+  const sectionTitleCls = "text-[12.5px] font-bold text-[var(--text-secondary)] mb-3 pb-2.5 border-b border-[var(--border-color)] flex items-center gap-2";
 
   return (
     <div className="animate-fade-up">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-[22px] font-extrabold tracking-tight text-[#111318]">Mon profil</h1>
-        <p className="text-[13px] text-[#8a919e] mt-1">Gérez vos informations, sécurité et abonnement</p>
+        <h1 className="text-[22px] font-extrabold tracking-tight text-[var(--text-primary)]">Mon profil</h1>
+        <p className="text-[13px] text-[var(--text-muted)] mt-1">Gérez vos informations, sécurité et abonnement</p>
       </div>
 
       <div className="flex flex-col md:grid gap-4" style={{ gridTemplateColumns: "252px 1fr" }}>
         {/* ── LEFT: Avatar Card ── */}
-        <div data-tour="profile-card" className="bg-white border border-[#e3e6eb] rounded-xl shadow-sm overflow-hidden animate-fade-up">
+        <div data-tour="profile-card" className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm overflow-hidden animate-fade-up">
           <div className="p-5 flex flex-col items-center text-center">
             {/* Avatar */}
             <div className="relative w-20 h-20 mb-3.5">
@@ -408,7 +408,7 @@ export default function Settings() {
               </div>
             </div>
             <div className="text-[16px] font-extrabold tracking-tight">{user?.display_name}</div>
-            <div className="text-[11.5px] text-[#3b5bdb] mt-0.5">@{user?.display_name?.replace(/\s+/g, "")}</div>
+            <div className="text-[11.5px] text-[var(--accent)] mt-0.5">@{user?.display_name?.replace(/\s+/g, "")}</div>
             <div
               className="inline-flex items-center gap-1.5 mt-2.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider"
               style={{ background: C.accentBg, border: `1px solid ${C.accentBd}`, color: C.accent }}
@@ -418,23 +418,23 @@ export default function Settings() {
             </div>
 
             {/* Stats */}
-            <div className="w-full mt-4 pt-3.5 border-t border-[#e3e6eb] flex flex-col gap-2.5">
+            <div className="w-full mt-4 pt-3.5 border-t border-[var(--border-color)] flex flex-col gap-2.5">
               <div className="flex justify-between items-center text-[12px]">
-                <span className="text-[#8a919e]">Membre depuis</span>
-                <span className="font-semibold text-[#3c4149]">{stats?.member_since || "—"}</span>
+                <span className="text-[var(--text-muted)]">Membre depuis</span>
+                <span className="font-semibold text-[var(--text-secondary)]">{stats?.member_since || "—"}</span>
               </div>
               <div className="flex justify-between items-center text-[12px]">
-                <span className="text-[#8a919e]">Tickets validés</span>
-                <span className="font-semibold text-[#12b76a]">{stats?.total_bets ?? 0}</span>
+                <span className="text-[var(--text-muted)]">Tickets validés</span>
+                <span className="font-semibold text-[var(--green)]">{stats?.total_bets ?? 0}</span>
               </div>
               <div className="flex justify-between items-center text-[12px]">
-                <span className="text-[#8a919e]">ROI global</span>
-                <span className="font-semibold text-[#12b76a]">
+                <span className="text-[var(--text-muted)]">ROI global</span>
+                <span className="font-semibold text-[var(--green)]">
                   {stats ? `${stats.roi_pct >= 0 ? "+" : ""}${stats.roi_pct.toFixed(1)}%` : "—"}
                 </span>
               </div>
               <div className="flex justify-between items-center text-[12px]">
-                <span className="text-[#8a919e]">Statut</span>
+                <span className="text-[var(--text-muted)]">Statut</span>
                 <span
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold"
                   style={{ background: C.greenBg, color: C.green }}
@@ -447,9 +447,9 @@ export default function Settings() {
         </div>
 
         {/* ── RIGHT: Tabs Card ── */}
-        <div className="bg-white border border-[#e3e6eb] rounded-xl shadow-sm overflow-hidden animate-fade-up" style={{ animationDelay: "0.05s" }}>
+        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm overflow-hidden animate-fade-up" style={{ animationDelay: "0.05s" }}>
           {/* Tab bar */}
-          <div className="flex border-b border-[#e3e6eb] px-1.5 overflow-x-auto">
+          <div className="flex border-b border-[var(--border-color)] px-1.5 overflow-x-auto">
             {TABS.map((t) => {
               const tourMap: Record<string, string> = {
                 compte: "tab-account",
@@ -464,8 +464,8 @@ export default function Settings() {
                   onClick={() => setTab(t.id)}
                   className={`px-4 py-3.5 text-[13px] font-medium cursor-pointer border-b-2 -mb-px transition-all whitespace-nowrap bg-transparent border-x-0 border-t-0 ${
                     tab === t.id
-                      ? "text-[#3b5bdb] border-b-[#3b5bdb] font-semibold"
-                      : "text-[#8a919e] border-b-transparent hover:text-[#3c4149]"
+                      ? "text-[var(--accent)] border-b-[var(--accent)] font-semibold"
+                      : "text-[var(--text-muted)] border-b-transparent hover:text-[var(--text-secondary)]"
                   }`}
                 >
                   {t.label}
@@ -491,7 +491,7 @@ export default function Settings() {
               <div className="flex flex-col gap-1.5">
                 <label className={labelCls}>Pseudo public</label>
                 <div className="relative">
-                  <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b0b7c3] pointer-events-none" />
+                  <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted2)] pointer-events-none" />
                   <input
                     type="text"
                     value={displayName}
@@ -505,7 +505,7 @@ export default function Settings() {
               <div className="flex flex-col gap-1.5">
                 <label className={labelCls}>Adresse e-mail</label>
                 <div className="relative">
-                  <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b0b7c3] pointer-events-none" />
+                  <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted2)] pointer-events-none" />
                   <input
                     type="email"
                     value={email}
@@ -513,37 +513,37 @@ export default function Settings() {
                     className={inputWithIconCls}
                   />
                 </div>
-                <p className="text-[11px] text-[#8a919e] mt-0.5">La modification de l'email nécessite une confirmation par lien.</p>
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">La modification de l'email nécessite une confirmation par lien.</p>
               </div>
 
               {/* Preferences */}
-              <div className="border-t border-[#e3e6eb] pt-3.5 mt-1">
+              <div className="border-t border-[var(--border-color)] pt-3.5 mt-1">
                 <div className={sectionTitleCls}>
                   <Bell size={13} /> Préférences & notifications
                 </div>
                 <div className="flex flex-col">
                   {/* TODO: public_profile n'existe pas encore dans UserPreferences backend — a connecter via updatePreferences() quand le champ sera ajoute */}
-                  <div className="flex items-center gap-3 py-3 border-b border-[#e3e6eb]">
+                  <div className="flex items-center gap-3 py-3 border-b border-[var(--border-color)]">
                     <div className="flex-1">
-                      <div className="text-[13.5px] font-medium text-[#111318]">Profil public</div>
-                      <div className="text-[12px] text-[#8a919e] mt-0.5">Pseudo et ROI visibles par la communauté</div>
+                      <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Profil public</div>
+                      <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Pseudo et ROI visibles par la communauté</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <Toggle checked={publicProfile} onChange={() => {}} disabled />
-                      <span className="text-[11px] text-[#8a919e] whitespace-nowrap">Bientot disponible</span>
+                      <span className="text-[11px] text-[var(--text-muted)] whitespace-nowrap">Bientot disponible</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 py-3 border-b border-[#e3e6eb]">
+                  <div className="flex items-center gap-3 py-3 border-b border-[var(--border-color)]">
                     <div className="flex-1">
-                      <div className="text-[13.5px] font-medium text-[#111318]">Résumé hebdomadaire</div>
-                      <div className="text-[12px] text-[#8a919e] mt-0.5">Synthèse de vos performances chaque lundi</div>
+                      <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Résumé hebdomadaire</div>
+                      <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Synthèse de vos performances chaque lundi</div>
                     </div>
                     <Toggle checked={weeklyDigest} onChange={setWeeklyDigest} />
                   </div>
                   <div className="flex items-center gap-3 py-3">
                     <div className="flex-1">
-                      <div className="text-[13.5px] font-medium text-[#111318]">Alertes matchs scannés</div>
-                      <div className="text-[12px] text-[#8a919e] mt-0.5">Notification au coup d'envoi d'un match scanné</div>
+                      <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Alertes matchs scannés</div>
+                      <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Notification au coup d'envoi d'un match scanné</div>
                     </div>
                     <Toggle checked={matchAlerts} onChange={setMatchAlerts} />
                   </div>
@@ -551,10 +551,10 @@ export default function Settings() {
               </div>
 
               {/* Actions */}
-              <div className="flex justify-end gap-2 pt-3.5 border-t border-[#e3e6eb] mt-1">
+              <div className="flex justify-end gap-2 pt-3.5 border-t border-[var(--border-color)] mt-1">
                 <button
                   type="button"
-                  className="px-4 py-2.5 rounded-lg border border-[#e3e6eb] bg-transparent text-[#8a919e] text-[13px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] hover:bg-[#f4f5f7] transition-all"
+                  className="px-4 py-2.5 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-muted)] text-[13px] font-medium cursor-pointer hover:border-[var(--border-strong)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] transition-all"
                 >
                   Annuler
                 </button>
@@ -588,7 +588,7 @@ export default function Settings() {
               <div className="flex flex-col gap-1.5">
                 <label className={labelCls}>Mot de passe actuel</label>
                 <div className="relative">
-                  <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b0b7c3] pointer-events-none" />
+                  <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted2)] pointer-events-none" />
                   <input
                     type={showPwd.current ? "text" : "password"}
                     value={currentPwd}
@@ -596,7 +596,7 @@ export default function Settings() {
                     className={inputWithIconCls + " pr-9"}
                     required
                   />
-                  <button type="button" onClick={() => togglePwd("current")} className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[#b0b7c3] hover:text-[#111318] transition-colors p-0">
+                  <button type="button" onClick={() => togglePwd("current")} className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[var(--text-muted2)] hover:text-[var(--text-primary)] transition-colors p-0">
                     {showPwd.current ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
@@ -606,7 +606,7 @@ export default function Settings() {
                 <div className="flex flex-col gap-1.5">
                   <label className={labelCls}>Nouveau mot de passe</label>
                   <div className="relative">
-                    <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b0b7c3] pointer-events-none" />
+                    <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted2)] pointer-events-none" />
                     <input
                       type={showPwd.new ? "text" : "password"}
                       value={newPwd}
@@ -614,7 +614,7 @@ export default function Settings() {
                       className={inputWithIconCls + " pr-9"}
                       placeholder="Min. 8 car."
                     />
-                    <button type="button" onClick={() => togglePwd("new")} className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[#b0b7c3] hover:text-[#111318] transition-colors p-0">
+                    <button type="button" onClick={() => togglePwd("new")} className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[var(--text-muted2)] hover:text-[var(--text-primary)] transition-colors p-0">
                       {showPwd.new ? <EyeOff size={14} /> : <Eye size={14} />}
                     </button>
                   </div>
@@ -637,7 +637,7 @@ export default function Settings() {
                 <div className="flex flex-col gap-1.5">
                   <label className={labelCls}>Confirmer</label>
                   <div className="relative">
-                    <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b0b7c3] pointer-events-none" />
+                    <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted2)] pointer-events-none" />
                     <input
                       type={showPwd.confirm ? "text" : "password"}
                       value={confirmPwd}
@@ -645,7 +645,7 @@ export default function Settings() {
                       className={inputWithIconCls + " pr-9"}
                       placeholder="Répéter"
                     />
-                    <button type="button" onClick={() => togglePwd("confirm")} className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[#b0b7c3] hover:text-[#111318] transition-colors p-0">
+                    <button type="button" onClick={() => togglePwd("confirm")} className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[var(--text-muted2)] hover:text-[var(--text-primary)] transition-colors p-0">
                       {showPwd.confirm ? <EyeOff size={14} /> : <Eye size={14} />}
                     </button>
                   </div>
@@ -653,26 +653,26 @@ export default function Settings() {
               </div>
 
               {/* Security settings */}
-              <div className="border-t border-[#e3e6eb] pt-3.5 mt-1">
+              <div className="border-t border-[var(--border-color)] pt-3.5 mt-1">
                 <div className={sectionTitleCls}>
                   <Shield size={13} /> Sécurité du compte
                 </div>
                 <div className="flex flex-col">
-                  <div className="flex items-center gap-3 py-3 border-b border-[#e3e6eb]">
+                  <div className="flex items-center gap-3 py-3 border-b border-[var(--border-color)]">
                     <div className="flex-1">
-                      <div className="text-[13.5px] font-medium text-[#111318]">Alertes de connexion suspecte</div>
-                      <div className="text-[12px] text-[#8a919e] mt-0.5">Email si connexion depuis un nouvel appareil</div>
+                      <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Alertes de connexion suspecte</div>
+                      <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Email si connexion depuis un nouvel appareil</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <Toggle checked={false} onChange={() => {}} disabled />
-                      <span className="text-[11px] text-[#8a919e] whitespace-nowrap">Bientot disponible</span>
+                      <span className="text-[11px] text-[var(--text-muted)] whitespace-nowrap">Bientot disponible</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 py-3">
                     <div className="flex-1">
-                      <div className="text-[13.5px] font-medium text-[#111318]">Sessions actives</div>
-                      <div className="text-[12px] text-[#8a919e] mt-0.5">
-                        1 appareil.<button type="button" onClick={handleRevokeAll} className="bg-transparent border-none cursor-pointer text-[#3b5bdb] font-medium p-0 text-[12px]">Tout révoquer</button>
+                      <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Sessions actives</div>
+                      <div className="text-[12px] text-[var(--text-muted)] mt-0.5">
+                        1 appareil.<button type="button" onClick={handleRevokeAll} className="bg-transparent border-none cursor-pointer text-[var(--accent)] font-medium p-0 text-[12px]">Tout révoquer</button>
                       </div>
                     </div>
                     <span
@@ -685,10 +685,10 @@ export default function Settings() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3.5 border-t border-[#e3e6eb] mt-1">
+              <div className="flex justify-end gap-2 pt-3.5 border-t border-[var(--border-color)] mt-1">
                 <button
                   type="button"
-                  className="px-4 py-2.5 rounded-lg border border-[#e3e6eb] bg-transparent text-[#8a919e] text-[13px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] hover:bg-[#f4f5f7] transition-all"
+                  className="px-4 py-2.5 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-muted)] text-[13px] font-medium cursor-pointer hover:border-[var(--border-strong)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] transition-all"
                 >
                   Annuler
                 </button>
@@ -706,19 +706,19 @@ export default function Settings() {
 
           {/* ── Tab: Sécurité — 2FA section ── */}
           {tab === "securite" && (
-            <div className="p-5 border-t border-[#e3e6eb]">
+            <div className="p-5 border-t border-[var(--border-color)]">
               <div className={sectionTitleCls}>
                 <ShieldCheck size={13} /> Double authentification (2FA)
               </div>
-              <p className="text-[12px] text-[#8a919e] mt-0.5 mb-4">Protegez votre compte avec une application d'authentification (Google Authenticator, Authy, etc.).</p>
+              <p className="text-[12px] text-[var(--text-muted)] mt-0.5 mb-4">Protegez votre compte avec une application d'authentification (Google Authenticator, Authy, etc.).</p>
 
               {twoFaSuccess && (
-                <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-lg text-[13px] font-medium text-[#12b76a] mb-4" style={{ background: "rgba(18,183,106,0.06)", border: "1px solid rgba(18,183,106,0.2)" }}>
+                <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-lg text-[13px] font-medium text-[var(--green)] mb-4" style={{ background: "var(--green-bg)", border: "1px solid rgba(18,183,106,0.2)" }}>
                   <Check size={15} className="shrink-0" /> {twoFaSuccess}
                 </div>
               )}
               {twoFaError && twoFaStep === "idle" && (
-                <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-lg text-[13px] font-medium text-[#f04438] mb-4" style={{ background: "rgba(240,68,56,0.06)", border: "1px solid rgba(240,68,56,0.2)" }}>
+                <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-lg text-[13px] font-medium text-[var(--red)] mb-4" style={{ background: "var(--red-bg)", border: "1px solid rgba(240,68,56,0.2)" }}>
                   <X size={15} className="shrink-0" /> {twoFaError}
                 </div>
               )}
@@ -727,12 +727,12 @@ export default function Settings() {
               {twoFaStep === "idle" && (
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: user?.totp_enabled ? "rgba(18,183,106,0.1)" : "rgba(240,68,56,0.07)" }}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: user?.totp_enabled ? "var(--green-bg)" : "var(--red-bg)" }}>
                       <KeyRound size={18} style={{ color: user?.totp_enabled ? C.green : C.red }} />
                     </div>
                     <div>
-                      <div className="text-[13.5px] font-semibold text-[#111318]">{user?.totp_enabled ? "2FA activee" : "2FA desactivee"}</div>
-                      <div className="text-[12px] text-[#8a919e] mt-0.5">{user?.totp_enabled ? "Votre compte est protege par une app d'authentification." : "Activez le 2FA pour securiser votre compte."}</div>
+                      <div className="text-[13.5px] font-semibold text-[var(--text-primary)]">{user?.totp_enabled ? "2FA activee" : "2FA desactivee"}</div>
+                      <div className="text-[12px] text-[var(--text-muted)] mt-0.5">{user?.totp_enabled ? "Votre compte est protege par une app d'authentification." : "Activez le 2FA pour securiser votre compte."}</div>
                     </div>
                   </div>
                   {user?.totp_enabled ? (
@@ -753,11 +753,11 @@ export default function Settings() {
               {/* Setup state — QR code */}
               {twoFaStep === "setup" && (
                 <form onSubmit={handleVerify2FA} className="space-y-4">
-                  <div className="flex flex-col items-center gap-3 p-4 rounded-xl" style={{ background: "#f7f8fa", border: "1px solid #e3e6eb" }}>
+                  <div className="flex flex-col items-center gap-3 p-4 rounded-xl" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-color)" }}>
                     {twoFaQr && <img src={`data:image/png;base64,${twoFaQr}`} alt="QR Code 2FA" className="w-[180px] h-[180px]" />}
                     <div className="text-center">
-                      <div className="text-[12px] text-[#8a919e] mb-1">Ou entrez cette cle manuellement :</div>
-                      <code className="text-[13px] font-mono font-bold text-[#3b5bdb] bg-white px-3 py-1.5 rounded border border-[#e3e6eb] select-all">{twoFaSecret}</code>
+                      <div className="text-[12px] text-[var(--text-muted)] mb-1">Ou entrez cette cle manuellement :</div>
+                      <code className="text-[13px] font-mono font-bold text-[var(--accent)] bg-[var(--bg-card)] px-3 py-1.5 rounded border border-[var(--border-color)] select-all">{twoFaSecret}</code>
                     </div>
                   </div>
                   {twoFaError && (
@@ -770,7 +770,7 @@ export default function Settings() {
                   </div>
                   <div className="flex gap-2 justify-end">
                     <button type="button" onClick={() => { setTwoFaStep("idle"); setTwoFaError(""); }}
-                      className="px-4 py-2.5 rounded-lg border border-[#e3e6eb] bg-transparent text-[#8a919e] text-[13px] font-medium cursor-pointer">Annuler</button>
+                      className="px-4 py-2.5 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-muted)] text-[13px] font-medium cursor-pointer">Annuler</button>
                     <button type="submit" disabled={twoFaCode.length !== 6 || twoFaLoading}
                       className="px-4 py-2.5 rounded-lg border-none text-white text-[13px] font-semibold cursor-pointer disabled:opacity-70" style={{ background: C.accent }}>Verifier</button>
                   </div>
@@ -794,9 +794,9 @@ export default function Settings() {
                   </div>
                   <div className="flex gap-2 justify-end">
                     <button type="button" onClick={() => { setTwoFaStep("idle"); setTwoFaError(""); }}
-                      className="px-4 py-2.5 rounded-lg border border-[#e3e6eb] bg-transparent text-[#8a919e] text-[13px] font-medium cursor-pointer">Annuler</button>
+                      className="px-4 py-2.5 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-muted)] text-[13px] font-medium cursor-pointer">Annuler</button>
                     <button type="submit" disabled={twoFaCode.length !== 6 || !twoFaDisablePwd || twoFaLoading}
-                      className="px-4 py-2.5 rounded-lg border-none text-white text-[13px] font-semibold cursor-pointer disabled:opacity-70" style={{ background: "#f04438" }}>Desactiver</button>
+                      className="px-4 py-2.5 rounded-lg border-none text-white text-[13px] font-semibold cursor-pointer disabled:opacity-70" style={{ background: "var(--red)" }}>Desactiver</button>
                   </div>
                 </form>
               )}
@@ -890,10 +890,10 @@ export default function Settings() {
                           Elite
                         </div>
                       )}
-                      <div className="text-[14px] font-bold text-[#111318]">{plan.name}</div>
+                      <div className="text-[14px] font-bold text-[var(--text-primary)]">{plan.name}</div>
                       <div className="flex items-baseline gap-0.5 mt-1.5">
-                        <span className="text-[24px] font-extrabold tracking-tight text-[#111318]">{displayPrice}</span>
-                        <span className="text-[12px] text-[#8a919e]">{isFree ? plan.period : plan.period}</span>
+                        <span className="text-[24px] font-extrabold tracking-tight text-[var(--text-primary)]">{displayPrice}</span>
+                        <span className="text-[12px] text-[var(--text-muted)]">{isFree ? plan.period : plan.period}</span>
                       </div>
                       {billing === "annual" && !isFree && plan.annualTotal && (
                         <div className="text-[10.5px] mt-0.5" style={{ color: C.green }}>
@@ -901,11 +901,11 @@ export default function Settings() {
                         </div>
                       )}
                       {plan.desc && (
-                        <p className="text-[11px] text-[#8a919e] mt-1 mb-2 leading-snug">{plan.desc}</p>
+                        <p className="text-[11px] text-[var(--text-muted)] mt-1 mb-2 leading-snug">{plan.desc}</p>
                       )}
                       <ul className="list-none flex flex-col gap-1.5 p-0 m-0 mt-2.5 flex-1">
                         {plan.features.map((f) => (
-                          <li key={f.text} className="text-[12px] text-[#8a919e] flex items-center gap-1.5">
+                          <li key={f.text} className="text-[12px] text-[var(--text-muted)] flex items-center gap-1.5">
                             <span
                               className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-extrabold shrink-0"
                               style={{
@@ -915,7 +915,7 @@ export default function Settings() {
                             >
                               {f.ok ? "\u2713" : "\u2715"}
                             </span>
-                            <span className={f.bold ? "font-semibold text-[#111318]" : ""}>
+                            <span className={f.bold ? "font-semibold text-[var(--text-primary)]" : ""}>
                               {f.text}
                               {f.soon && <span className="ml-1 px-1 py-px rounded text-[8px] font-bold bg-[rgba(124,58,237,0.08)] text-[#7c3aed]">Bientot</span>}
                             </span>
@@ -955,21 +955,21 @@ export default function Settings() {
 
               {/* Erreur billing */}
               {billingError && (
-                <div className="mt-3 px-3.5 py-2.5 rounded-lg bg-[rgba(240,68,56,0.07)] border border-[rgba(240,68,56,0.15)] text-[12px] text-[#f04438]">
+                <div className="mt-3 px-3.5 py-2.5 rounded-lg text-[12px] text-[var(--red)]" style={{ background: "var(--red-bg)", border: "1px solid rgba(240,68,56,0.15)" }}>
                   {billingError}
                 </div>
               )}
 
               {/* Gestion abonnement Stripe */}
-              <div className="flex items-center gap-2.5 px-3.5 py-3 mt-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg text-[12px] text-[#8a919e]">
-                <CreditCard size={14} className="text-[#8a919e] shrink-0" />
+              <div className="flex items-center gap-2.5 px-3.5 py-3 mt-3 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-lg text-[12px] text-[var(--text-muted)]">
+                <CreditCard size={14} className="text-[var(--text-muted)] shrink-0" />
                 {user?.tier !== "free" ? (
                   <>
                     Abonnement actif ·
                     <button
                       onClick={handleManageBilling}
                       disabled={billingLoading !== null}
-                      className="bg-transparent border-none cursor-pointer text-[#3b5bdb] font-medium p-0 text-[12px] ml-1"
+                      className="bg-transparent border-none cursor-pointer text-[var(--accent)] font-medium p-0 text-[12px] ml-1"
                       style={{ opacity: billingLoading === "portal" ? 0.7 : 1 }}
                     >
                       {billingLoading === "portal" ? "Redirection..." : "Gérer via Stripe →"}
@@ -989,29 +989,29 @@ export default function Settings() {
                 <AlertTriangle size={13} /> Zone de danger
               </div>
 
-              <div className="flex items-center justify-between py-3.5 border-b border-[#e3e6eb] gap-4">
+              <div className="flex items-center justify-between py-3.5 border-b border-[var(--border-color)] gap-4">
                 <div>
-                  <div className="text-[13.5px] font-semibold text-[#111318]">Exporter mes données</div>
-                  <div className="text-[12px] text-[#8a919e] mt-0.5">Téléchargez tickets, historique et campagnes au format JSON.</div>
+                  <div className="text-[13.5px] font-semibold text-[var(--text-primary)]">Exporter mes données</div>
+                  <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Téléchargez tickets, historique et campagnes au format JSON.</div>
                 </div>
                 <button
                   type="button"
                   onClick={handleExport}
-                  className="px-4 py-2 rounded-lg border border-[#e3e6eb] bg-transparent text-[#8a919e] text-[12px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] hover:bg-[#f4f5f7] transition-all whitespace-nowrap flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-muted)] text-[12px] font-medium cursor-pointer hover:border-[var(--border-strong)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] transition-all whitespace-nowrap flex items-center gap-1.5"
                 >
                   <Download size={12} /> Exporter .json
                 </button>
               </div>
 
-              <div className="flex items-center justify-between py-3.5 border-b border-[#e3e6eb] gap-4">
+              <div className="flex items-center justify-between py-3.5 border-b border-[var(--border-color)] gap-4">
                 <div>
-                  <div className="text-[13.5px] font-semibold text-[#111318]">Réinitialiser les statistiques</div>
-                  <div className="text-[12px] text-[#8a919e] mt-0.5">Remet le ROI et l'historique à zéro. Irréversible.</div>
+                  <div className="text-[13.5px] font-semibold text-[var(--text-primary)]">Réinitialiser les statistiques</div>
+                  <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Remet le ROI et l'historique à zéro. Irréversible.</div>
                 </div>
                 <button
                   type="button"
                   onClick={handleResetStats}
-                  className="px-4 py-2 rounded-lg border bg-transparent text-[12px] font-semibold cursor-pointer transition-all whitespace-nowrap hover:bg-[#f04438] hover:text-white hover:border-[#f04438]"
+                  className="px-4 py-2 rounded-lg border bg-transparent text-[12px] font-semibold cursor-pointer transition-all whitespace-nowrap hover:bg-[var(--red)] hover:text-white hover:border-[var(--red)]"
                   style={{ borderColor: "rgba(240,68,56,0.25)", color: C.red }}
                 >
                   Réinitialiser
@@ -1021,12 +1021,12 @@ export default function Settings() {
               <div className="flex items-center justify-between py-3.5 gap-4">
                 <div>
                   <div className="text-[13.5px] font-semibold" style={{ color: C.red }}>Supprimer le compte</div>
-                  <div className="text-[12px] text-[#8a919e] mt-0.5">Suppression immédiate. Irréversible, aucun remboursement.</div>
+                  <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Suppression immédiate. Irréversible, aucun remboursement.</div>
                 </div>
                 {!showDeleteConfirm ? (
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="px-4 py-2 rounded-lg border bg-transparent text-[12px] font-semibold cursor-pointer transition-all whitespace-nowrap hover:bg-[#f04438] hover:text-white hover:border-[#f04438] flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-lg border bg-transparent text-[12px] font-semibold cursor-pointer transition-all whitespace-nowrap hover:bg-[var(--red)] hover:text-white hover:border-[var(--red)] flex items-center gap-1.5"
                     style={{ borderColor: "rgba(240,68,56,0.25)", color: C.red }}
                   >
                     <Trash2 size={12} /> Supprimer le compte
@@ -1043,7 +1043,7 @@ export default function Settings() {
                     </button>
                     <button
                       onClick={() => setShowDeleteConfirm(false)}
-                      className="text-[12px] text-[#8a919e] hover:text-[#3c4149] cursor-pointer bg-transparent border-none"
+                      className="text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] cursor-pointer bg-transparent border-none"
                     >
                       Annuler
                     </button>

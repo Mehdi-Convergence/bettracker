@@ -28,12 +28,12 @@ import { sendFeedback } from "@/services/api";
 
 /* ── Sidebar colors ── */
 const SB = {
-  bg: "#1e2535",
-  border: "rgba(255,255,255,0.07)",
-  text: "rgba(255,255,255,0.48)",
-  textHover: "rgba(255,255,255,0.82)",
-  hover: "rgba(255,255,255,0.05)",
-  active: "rgba(255,255,255,0.09)",
+  bg: "var(--sidebar-bg)",
+  border: "var(--sidebar-border)",
+  text: "var(--sidebar-text)",
+  textHover: "var(--sidebar-text-hover)",
+  hover: "var(--sidebar-hover)",
+  active: "var(--sidebar-active)",
 };
 
 /* ── Navigation structure ── */
@@ -97,22 +97,24 @@ function Breadcrumb() {
   const campaignDetailMatch = location.pathname.match(/^\/campaign\/(\d+)$/);
   if (campaignDetailMatch) {
     return (
-      <div className="flex items-center gap-1.5 text-[13px] text-[#8a919e]">
+      <div className="flex items-center gap-1.5 text-[13px]" style={{ color: "var(--text-muted)" }}>
         <span>BetTracker</span>
-        <span className="text-[11px] text-[#b0b7c3]">&rsaquo;</span>
-        <Link to="/campaign" className="hover:text-[#111318] transition-colors no-underline text-[#8a919e]">Campagnes</Link>
-        <span className="text-[11px] text-[#b0b7c3]">&rsaquo;</span>
-        <span className="text-[#111318] font-semibold">{label || "..."}</span>
+        <span className="text-[11px]" style={{ color: "var(--text-muted2)" }}>&rsaquo;</span>
+        <Link to="/campaign" className="transition-colors no-underline" style={{ color: "var(--text-muted)" }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-primary)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--text-muted)"; }}>Campagnes</Link>
+        <span className="text-[11px]" style={{ color: "var(--text-muted2)" }}>&rsaquo;</span>
+        <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{label || "..."}</span>
       </div>
     );
   }
 
   const currentPage = PAGE_NAMES[location.pathname] || "BetTracker";
   return (
-    <div className="flex items-center gap-1.5 text-[13px] text-[#8a919e]">
+    <div className="flex items-center gap-1.5 text-[13px]" style={{ color: "var(--text-muted)" }}>
       <span>BetTracker</span>
-      <span className="text-[11px] text-[#b0b7c3]">&rsaquo;</span>
-      <span className="text-[#111318] font-semibold">{currentPage}</span>
+      <span className="text-[11px]" style={{ color: "var(--text-muted2)" }}>&rsaquo;</span>
+      <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{currentPage}</span>
     </div>
   );
 }
@@ -145,11 +147,8 @@ function HelpAndFeedback() {
       <div className="relative">
         <button
           onClick={() => setMenuOpen((v) => !v)}
-          className={`w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-all text-[13px] font-bold border-none ${
-            menuOpen
-              ? "bg-[#e8eaed] text-[#111318]"
-              : "bg-[#f4f5f7] text-[#5a6272] hover:bg-[#e8eaed] hover:text-[#111318]"
-          }`}
+          className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-all text-[13px] font-bold border-none"
+          style={{ background: menuOpen ? "var(--bg-elevated)" : "var(--bg-surface)", color: menuOpen ? "var(--text-primary)" : "var(--text-muted)" }}
         >
           ?
         </button>
@@ -157,16 +156,22 @@ function HelpAndFeedback() {
         {menuOpen && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-            <div className="absolute right-0 top-10 z-50 bg-white border border-[#e3e6eb] rounded-xl shadow-lg py-1 w-48 overflow-hidden">
+            <div className="absolute right-0 top-10 z-50 rounded-xl shadow-lg py-1 w-48 overflow-hidden" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
               {requestTour && (
                 <button onClick={startTour}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-[#3c4149] hover:bg-[#f4f5f7] transition-colors text-left bg-transparent border-none cursor-pointer">
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] transition-colors text-left bg-transparent border-none cursor-pointer"
+                  style={{ color: "var(--text-secondary)" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-surface)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
                   <HelpCircle size={14} className="text-[#3b5bdb]" />
                   Visite guidée
                 </button>
               )}
               <button onClick={openFeedback}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-[#3c4149] hover:bg-[#f4f5f7] transition-colors text-left bg-transparent border-none cursor-pointer">
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] transition-colors text-left bg-transparent border-none cursor-pointer"
+                style={{ color: "var(--text-secondary)" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-surface)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
                 <MessageCircle size={14} className="text-[#7c3aed]" />
                 Envoyer un message
               </button>
@@ -177,11 +182,11 @@ function HelpAndFeedback() {
 
       {/* Feedback modal */}
       {feedbackOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.35)" }} onClick={() => setFeedbackOpen(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[440px] mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "var(--overlay)" }} onClick={() => setFeedbackOpen(false)}>
+          <div className="rounded-2xl shadow-2xl w-full max-w-[440px] mx-4 p-6" style={{ background: "var(--bg-card)" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[16px] font-extrabold text-[#111318]">Envoyer un message</h3>
-              <button onClick={() => setFeedbackOpen(false)} className="text-[#b0b7c3] hover:text-[#111318] bg-transparent border-none cursor-pointer p-1 transition-colors">
+              <h3 className="text-[16px] font-extrabold" style={{ color: "var(--text-primary)" }}>Envoyer un message</h3>
+              <button onClick={() => setFeedbackOpen(false)} className="bg-transparent border-none cursor-pointer p-1 transition-colors" style={{ color: "var(--text-muted2)" }}>
                 <X size={18} />
               </button>
             </div>
@@ -198,7 +203,8 @@ function HelpAndFeedback() {
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="Retour, bug, suggestion..."
                   rows={5}
-                  className="w-full border border-[#e3e6eb] rounded-xl px-3.5 py-3 text-[13px] text-[#111318] outline-none resize-none focus:border-[#7c3aed] focus:shadow-[0_0_0_3px_rgba(124,58,237,0.07)] transition-all placeholder:text-[#b0b7c3]"
+                  className="w-full rounded-xl px-3.5 py-3 text-[13px] outline-none resize-none focus:shadow-[0_0_0_3px_rgba(124,58,237,0.07)] transition-all"
+                  style={{ border: "1px solid var(--border-color)", color: "var(--text-primary)", background: "var(--bg-surface)" }}
                 />
                 {status === "error" && (
                   <p className="text-[12px] text-[#f04438] mt-1.5">Erreur d'envoi, réessaie.</p>
@@ -256,7 +262,7 @@ export default function Layout() {
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 md:hidden"
-          style={{ background: "rgba(0,0,0,0.45)" }}
+          style={{ background: "var(--overlay)" }}
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -501,10 +507,11 @@ export default function Layout() {
       <TourProvider>
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Topbar */}
-          <div className="h-14 min-h-14 border-b border-[#e3e6eb] bg-white flex items-center px-7 gap-3 max-md:px-4">
+          <div className="h-14 min-h-14 flex items-center px-7 gap-3 max-md:px-4" style={{ background: "var(--bg-card)", borderBottom: "1px solid var(--border-color)" }}>
             {/* Hamburger mobile */}
             <button
-              className="hidden max-md:flex items-center justify-center w-8 h-8 rounded-lg bg-transparent border-none cursor-pointer text-[#5a6272] hover:bg-[#f4f5f7] shrink-0"
+              className="hidden max-md:flex items-center justify-center w-8 h-8 rounded-lg bg-transparent border-none cursor-pointer shrink-0"
+              style={{ color: "var(--text-muted)" }}
               onClick={() => setMobileOpen(true)}
             >
               <Menu size={20} />

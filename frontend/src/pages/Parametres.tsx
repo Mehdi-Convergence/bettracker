@@ -21,22 +21,22 @@ import type { UserPreferences, Bet } from "@/types";
 
 /* ── Design tokens ── */
 const C = {
-  bg: "#f4f5f7",
-  white: "#ffffff",
-  border: "#e3e6eb",
-  border2: "#cdd1d9",
-  text: "#111318",
-  text2: "#3c4149",
-  muted: "#8a919e",
-  muted2: "#b0b7c3",
-  accent: "#3b5bdb",
-  accentBg: "rgba(59,91,219,0.07)",
-  accentBd: "rgba(59,91,219,0.18)",
-  green: "#12b76a",
-  greenBg: "rgba(18,183,106,0.08)",
-  red: "#f04438",
-  amber: "#f79009",
-  amberBg: "rgba(247,144,9,0.08)",
+  bg: "var(--bg-primary)",
+  white: "var(--bg-card)",
+  border: "var(--border-color)",
+  border2: "var(--border-strong)",
+  text: "var(--text-primary)",
+  text2: "var(--text-secondary)",
+  muted: "var(--text-muted)",
+  muted2: "var(--text-muted2)",
+  accent: "var(--accent)",
+  accentBg: "var(--accent-bg)",
+  accentBd: "var(--accent-border)",
+  green: "var(--green)",
+  greenBg: "var(--green-bg)",
+  red: "var(--red)",
+  amber: "var(--amber)",
+  amberBg: "var(--amber-bg)",
 };
 
 type SectionId = "bankroll" | "notifications" | "share" | "display";
@@ -61,12 +61,12 @@ const NOTIF_EVENTS: {
   { key: "low_bankroll", label: "Alerte bankroll basse", desc: "Bankroll sous le seuil configuré", prefKey: "notif_low_bankroll" },
 ];
 
-const sectionTitleCls = "text-[14px] font-bold text-[#111318] flex items-center gap-2 mb-0.5";
-const sectionDescCls = "text-[12px] text-[#8a919e] leading-relaxed";
-const labelCls = "text-[12px] font-semibold text-[#3c4149] block mb-1.5";
-const inputCls = "w-full py-2 px-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg text-[13px] text-[#111318] outline-none transition-all focus:border-[#3b5bdb] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,91,219,0.07)] placeholder:text-[#b0b7c3]";
+const sectionTitleCls = "text-[14px] font-bold text-[var(--text-primary)] flex items-center gap-2 mb-0.5";
+const sectionDescCls = "text-[12px] text-[var(--text-muted)] leading-relaxed";
+const labelCls = "text-[12px] font-semibold text-[var(--text-secondary)] block mb-1.5";
+const inputCls = "w-full py-2 px-3 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-lg text-[13px] text-[var(--text-primary)] outline-none transition-all focus:border-[var(--accent)] focus:bg-[var(--bg-card)] focus:shadow-[0_0_0_3px_var(--accent-bg)] placeholder:text-[var(--text-muted2)]";
 const selectCls = inputCls + " cursor-pointer";
-const rowCls = "flex items-center justify-between px-5 py-3.5 border-b border-[#e3e6eb] last:border-b-0";
+const rowCls = "flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-color)] last:border-b-0";
 
 export default function Parametres() {
   const { user } = useAuth();
@@ -160,18 +160,18 @@ export default function Parametres() {
   if (!prefs) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3b5bdb]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent)]" />
       </div>
     );
   }
 
   const SaveBtn = ({ section }: { section: SectionId }) => (
-    <div className="flex items-center justify-end gap-2 pt-3.5 border-t border-[#e3e6eb] mt-4">
+    <div className="flex items-center justify-end gap-2 pt-3.5 border-t border-[var(--border-color)] mt-4">
       {hasDirty && (
         <button
           type="button"
           onClick={() => setDirty({})}
-          className="px-4 py-2 rounded-lg border border-[#e3e6eb] bg-transparent text-[#8a919e] text-[12.5px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] transition-all"
+          className="px-4 py-2 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-muted)] text-[12.5px] font-medium cursor-pointer hover:border-[var(--border-strong)] hover:text-[var(--text-secondary)] transition-all"
         >
           Annuler
         </button>
@@ -242,14 +242,14 @@ export default function Parametres() {
     <div className="animate-fade-up overflow-x-hidden">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-[22px] font-extrabold tracking-tight text-[#111318]">Paramètres</h1>
-        <p className="text-[13px] text-[#8a919e] mt-1">Configuration fonctionnelle : bankroll, notifications, partage, affichage</p>
+        <h1 className="text-[22px] font-extrabold tracking-tight text-[var(--text-primary)]">Paramètres</h1>
+        <p className="text-[13px] text-[var(--text-muted)] mt-1">Configuration fonctionnelle : bankroll, notifications, partage, affichage</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-5">
         {/* ── LEFT: Sidebar navigation ── */}
         <div className="md:w-[210px] md:min-w-[210px] md:sticky top-4 self-start">
-          <div className="bg-white border border-[#e3e6eb] rounded-xl shadow-sm overflow-hidden">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm overflow-hidden">
             <div className="p-2.5 flex flex-row gap-1 overflow-x-auto md:flex-col md:gap-0.5">
               {SECTIONS.map((s, i) => {
                 const Icon = s.icon;
@@ -259,7 +259,7 @@ export default function Parametres() {
                 return (
                   <div key={s.id}>
                     {showGroup && (
-                      <div className="hidden md:block text-[10px] font-bold text-[#b0b7c3] uppercase tracking-[0.1em] px-3 pt-2.5 pb-1 first:pt-0">
+                      <div className="hidden md:block text-[10px] font-bold text-[var(--text-muted2)] uppercase tracking-[0.1em] px-3 pt-2.5 pb-1 first:pt-0">
                         {s.group}
                       </div>
                     )}
@@ -267,8 +267,8 @@ export default function Parametres() {
                       onClick={() => scrollTo(s.id)}
                       className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium cursor-pointer transition-all border-none text-left w-full ${
                         isActive
-                          ? "text-[#3b5bdb] font-semibold"
-                          : "text-[#3c4149] hover:bg-[#f4f5f7]"
+                          ? "text-[var(--accent)] font-semibold"
+                          : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]"
                       }`}
                       style={{ background: isActive ? C.accentBg : "transparent" }}
                     >
@@ -278,10 +278,10 @@ export default function Parametres() {
                   </div>
                 );
               })}
-              <div className="hidden md:block h-px bg-[#e3e6eb] my-2.5 mx-2" />
+              <div className="hidden md:block h-px bg-[var(--border-color)] my-2.5 mx-2" />
               <a
                 href="/settings"
-                className="hidden md:flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-[#8a919e] hover:bg-[#f4f5f7] transition-all no-underline"
+                className="hidden md:flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-[var(--text-muted)] hover:bg-[var(--bg-surface)] transition-all no-underline"
               >
                 <User size={15} style={{ color: C.muted2 }} />
                 Mon profil & Plan →
@@ -294,8 +294,8 @@ export default function Parametres() {
         <div className="flex-1 min-w-0 flex flex-col gap-5">
 
           {/* ═══ Section 1: Bankroll globale ═══ */}
-          <div ref={sectionRefs.bankroll} id="bankroll" className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl shadow-sm overflow-hidden animate-fade-up">
-            <div className="px-5 py-4 border-b border-[#e3e6eb]">
+          <div ref={sectionRefs.bankroll} id="bankroll" className="bg-[var(--bg-card)] border-[1.5px] border-[var(--border-color)] rounded-xl shadow-sm overflow-hidden animate-fade-up">
+            <div className="px-5 py-4 border-b border-[var(--border-color)]">
               <div className={sectionTitleCls}>
                 <DollarSign size={16} style={{ color: C.accent }} /> Bankroll globale
               </div>
@@ -331,7 +331,7 @@ export default function Parametres() {
                     min={0}
                     step={50}
                   />
-                  <div className="text-[11.5px] text-[#8a919e] mt-1">Budget de référence pour les paris hors campagne</div>
+                  <div className="text-[11.5px] text-[var(--text-muted)] mt-1">Budget de référence pour les paris hors campagne</div>
                 </div>
                 <div>
                   <label className={labelCls}>Mise par défaut ({currSymbol}) *</label>
@@ -343,23 +343,23 @@ export default function Parametres() {
                     min={0}
                     step={5}
                   />
-                  <div className="text-[11.5px] text-[#8a919e] mt-1">Pré-remplie à la création d'un ticket Scanner</div>
+                  <div className="text-[11.5px] text-[var(--text-muted)] mt-1">Pré-remplie à la création d'un ticket Scanner</div>
                 </div>
               </div>
 
               {/* Toggle rows */}
-              <div className="border border-[#e3e6eb] rounded-[10px] overflow-hidden">
+              <div className="border border-[var(--border-color)] rounded-[10px] overflow-hidden">
                 <div className={rowCls}>
                   <div className="flex-1 pr-5">
-                    <div className="text-[13.5px] font-medium text-[#111318]">Mise en % de bankroll</div>
-                    <div className="text-[12px] text-[#8a919e] mt-0.5">La mise par défaut = X% de la bankroll courante plutôt qu'un montant fixe</div>
+                    <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Mise en % de bankroll</div>
+                    <div className="text-[12px] text-[var(--text-muted)] mt-0.5">La mise par défaut = X% de la bankroll courante plutôt qu'un montant fixe</div>
                   </div>
                   <Toggle checked={getVal("stake_as_percentage") ?? false} onChange={(v) => setVal("stake_as_percentage", v)} />
                 </div>
                 {getVal("stake_as_percentage") && (
                   <div className={rowCls}>
                     <div className="flex-1 pr-5">
-                      <div className="text-[13.5px] font-medium text-[#111318]">% mise par défaut</div>
+                      <div className="text-[13.5px] font-medium text-[var(--text-primary)]">% mise par défaut</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <input
@@ -371,14 +371,14 @@ export default function Parametres() {
                         max={100}
                         step={0.5}
                       />
-                      <span className="text-[13px] text-[#8a919e]">%</span>
+                      <span className="text-[13px] text-[var(--text-muted)]">%</span>
                     </div>
                   </div>
                 )}
                 <div className={rowCls}>
                   <div className="flex-1 pr-5">
-                    <div className="text-[13.5px] font-medium text-[#111318]">Stop-loss journalier hors campagne</div>
-                    <div className="text-[12px] text-[#8a919e] mt-0.5">Bloque la création de tickets hors campagne si cette perte est atteinte dans la journée</div>
+                    <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Stop-loss journalier hors campagne</div>
+                    <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Bloque la création de tickets hors campagne si cette perte est atteinte dans la journée</div>
                   </div>
                   <div className="flex items-center gap-2">
                     <input
@@ -400,8 +400,8 @@ export default function Parametres() {
                 </div>
                 <div className={rowCls}>
                   <div className="flex-1 pr-5">
-                    <div className="text-[13.5px] font-medium text-[#111318]">Alerte seuil bas bankroll</div>
-                    <div className="text-[12px] text-[#8a919e] mt-0.5">Notification quand la bankroll disponible descend sous ce montant</div>
+                    <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Alerte seuil bas bankroll</div>
+                    <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Notification quand la bankroll disponible descend sous ce montant</div>
                   </div>
                   <div className="flex items-center gap-2">
                     <input
@@ -411,7 +411,7 @@ export default function Parametres() {
                       className={inputCls + " !w-[90px]"}
                       min={0}
                     />
-                    <span className="text-[13px] text-[#8a919e]">{currSymbol}</span>
+                    <span className="text-[13px] text-[var(--text-muted)]">{currSymbol}</span>
                   </div>
                 </div>
               </div>
@@ -420,8 +420,8 @@ export default function Parametres() {
           </div>
 
           {/* ═══ Section 2: Push & Email ═══ */}
-          <div ref={sectionRefs.notifications} id="notifications" className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl shadow-sm overflow-hidden animate-fade-up" style={{ animationDelay: "0.05s" }}>
-            <div className="px-5 py-4 border-b border-[#e3e6eb]">
+          <div ref={sectionRefs.notifications} id="notifications" className="bg-[var(--bg-card)] border-[1.5px] border-[var(--border-color)] rounded-xl shadow-sm overflow-hidden animate-fade-up" style={{ animationDelay: "0.05s" }}>
+            <div className="px-5 py-4 border-b border-[var(--border-color)]">
               <div className={sectionTitleCls}>
                 <Bell size={16} style={{ color: C.accent }} /> Notifications in-app
               </div>
@@ -429,9 +429,9 @@ export default function Parametres() {
             </div>
 
             {/* Column headers */}
-            <div className="grid px-5 py-2.5 border-b border-[#e3e6eb] bg-[#f4f5f7]" style={{ gridTemplateColumns: "1fr 80px" }}>
-              <div className="text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider">Événement</div>
-              <div className="text-[10.5px] font-bold text-[#b0b7c3] uppercase tracking-wider text-center flex flex-col items-center gap-0.5">
+            <div className="grid px-5 py-2.5 border-b border-[var(--border-color)] bg-[var(--bg-surface)]" style={{ gridTemplateColumns: "1fr 80px" }}>
+              <div className="text-[11px] font-bold text-[var(--text-muted2)] uppercase tracking-wider">Événement</div>
+              <div className="text-[10.5px] font-bold text-[var(--text-muted2)] uppercase tracking-wider text-center flex flex-col items-center gap-0.5">
                 <Bell size={12} />
                 Actif
               </div>
@@ -448,8 +448,8 @@ export default function Parametres() {
                 }}
               >
                 <div>
-                  <div className="text-[13px] font-medium text-[#111318]">{evt.label}</div>
-                  <div className="text-[11.5px] text-[#8a919e] mt-0.5">{evt.desc}</div>
+                  <div className="text-[13px] font-medium text-[var(--text-primary)]">{evt.label}</div>
+                  <div className="text-[11.5px] text-[var(--text-muted)] mt-0.5">{evt.desc}</div>
                 </div>
                 <div className="flex justify-center">
                   <Toggle
@@ -460,14 +460,14 @@ export default function Parametres() {
               </div>
             ))}
 
-            <div className="px-5 py-4 border-t border-[#e3e6eb]">
+            <div className="px-5 py-4 border-t border-[var(--border-color)]">
               <SaveBtn section="notifications" />
             </div>
           </div>
 
           {/* ═══ Section 3: Partage de tickets ═══ */}
-          <div ref={sectionRefs.share} id="share" className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl shadow-sm overflow-hidden animate-fade-up" style={{ animationDelay: "0.1s" }}>
-            <div className="px-5 py-4 border-b border-[#e3e6eb]">
+          <div ref={sectionRefs.share} id="share" className="bg-[var(--bg-card)] border-[1.5px] border-[var(--border-color)] rounded-xl shadow-sm overflow-hidden animate-fade-up" style={{ animationDelay: "0.1s" }}>
+            <div className="px-5 py-4 border-b border-[var(--border-color)]">
               <div className={sectionTitleCls}>
                 <Share2 size={16} style={{ color: C.accent }} /> Partage de tickets
               </div>

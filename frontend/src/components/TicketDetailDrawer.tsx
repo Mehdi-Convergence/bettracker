@@ -17,10 +17,17 @@ import ShareTicketModal from "./ShareTicketModal";
 // DESIGN TOKENS (match Portfolio.tsx)
 // ══════════════════════════════════════════════
 const C = {
-  accent: "#3b5bdb", green: "#12b76a", red: "#f04438",
-  amber: "#f79009", purple: "#7c3aed",
-  text: "#111318", text2: "#3c4149", muted: "#8a919e", muted2: "#b0b7c3",
-  bg: "#f4f5f7", border: "#e3e6eb",
+  accent: "var(--accent)",
+  green: "var(--green)",
+  red: "var(--red)",
+  amber: "var(--amber)",
+  purple: "#7c3aed",  // reste fixe
+  text: "var(--text-primary)",
+  text2: "var(--text-secondary)",
+  muted: "var(--text-muted)",
+  muted2: "var(--text-muted2)",
+  bg: "var(--bg-surface)",
+  border: "var(--border-color)",
 };
 
 function getTag(bet: Bet): string {
@@ -169,34 +176,37 @@ export default function TicketDetailDrawer({
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 right-0 w-[440px] h-full bg-white border-l-[1.5px] border-[#e3e6eb] flex flex-col z-50 transition-transform duration-[260ms] ease-[cubic-bezier(.32,.72,0,1)] ${
+        className={`fixed top-0 right-0 w-[440px] h-full flex flex-col z-50 transition-transform duration-[260ms] ease-[cubic-bezier(.32,.72,0,1)] ${
           open ? "translate-x-0 shadow-[0_16px_48px_rgba(16,24,40,.2)]" : "translate-x-full"
         }`}
+        style={{ background: "var(--bg-card)", borderLeft: "1.5px solid var(--border-color)" }}
       >
         {/* ── Navigator ── */}
-        <div className="h-[38px] bg-[#f4f5f7] border-b border-[#e3e6eb] flex items-center justify-between px-3.5 shrink-0">
-          <span className="text-[11px] text-[#8a919e] font-[var(--font-mono)]">
+        <div className="h-[38px] flex items-center justify-between px-3.5 shrink-0" style={{ background: "var(--bg-surface)", borderBottom: "1px solid var(--border-color)" }}>
+          <span className="text-[11px] font-[var(--font-mono)]" style={{ color: "var(--text-muted)" }}>
             Ticket {currentIndex + 1} / {allBets.length}
           </span>
           <div className="flex gap-1">
             <button onClick={() => currentIndex > 0 && onNavigate(currentIndex - 1)}
               disabled={currentIndex <= 0}
-              className="w-6 h-6 rounded-[5px] border border-[#e3e6eb] bg-white flex items-center justify-center text-[#8a919e] hover:border-[rgba(59,91,219,.18)] hover:text-[#3b5bdb] transition-all disabled:opacity-30 cursor-pointer">
+              className="w-6 h-6 rounded-[5px] flex items-center justify-center hover:border-[rgba(59,91,219,.18)] hover:text-[#3b5bdb] transition-all disabled:opacity-30 cursor-pointer"
+              style={{ border: "1px solid var(--border-color)", background: "var(--bg-card)", color: "var(--text-muted)" }}>
               <ChevronLeft size={11} />
             </button>
             <button onClick={() => currentIndex < allBets.length - 1 && onNavigate(currentIndex + 1)}
               disabled={currentIndex >= allBets.length - 1}
-              className="w-6 h-6 rounded-[5px] border border-[#e3e6eb] bg-white flex items-center justify-center text-[#8a919e] hover:border-[rgba(59,91,219,.18)] hover:text-[#3b5bdb] transition-all disabled:opacity-30 cursor-pointer">
+              className="w-6 h-6 rounded-[5px] flex items-center justify-center hover:border-[rgba(59,91,219,.18)] hover:text-[#3b5bdb] transition-all disabled:opacity-30 cursor-pointer"
+              style={{ border: "1px solid var(--border-color)", background: "var(--bg-card)", color: "var(--text-muted)" }}>
               <ChevronRight size={11} />
             </button>
           </div>
         </div>
 
         {/* ── Header ── */}
-        <div className="px-4 py-3.5 border-b border-[#e3e6eb] shrink-0">
+        <div className="px-4 py-3.5 shrink-0" style={{ borderBottom: "1px solid var(--border-color)" }}>
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <div className="text-[11px] text-[#8a919e] mb-1">
+              <div className="text-[11px] mb-1" style={{ color: "var(--text-muted)" }}>
                 {sportIcon} {leagueName}
               </div>
               <div className="text-[16px] font-extrabold tracking-tight leading-tight mb-1.5">
@@ -205,13 +215,16 @@ export default function TicketDetailDrawer({
               <div className="flex gap-1.5 flex-wrap items-center">
                 <StatusBadge result={bet.result} />
                 <TagBadge tag={tag} />
-                <span className="text-[11px] text-[#8a919e] font-[var(--font-mono)]">
+                <span className="text-[11px] font-[var(--font-mono)]" style={{ color: "var(--text-muted)" }}>
                   {bet.match_date.split("T")[0].slice(5).replace("-", "/")}
                 </span>
               </div>
             </div>
             <button onClick={onClose}
-              className="w-[26px] h-[26px] rounded-md flex items-center justify-center text-[#8a919e] hover:bg-[#f4f5f7] hover:text-[#111318] transition-all cursor-pointer shrink-0">
+              className="w-[26px] h-[26px] rounded-md flex items-center justify-center transition-all cursor-pointer shrink-0"
+              style={{ color: "var(--text-muted)" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-surface)"; e.currentTarget.style.color = "var(--text-primary)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text-muted)"; }}>
               <X size={14} />
             </button>
           </div>
@@ -221,7 +234,7 @@ export default function TicketDetailDrawer({
         <div className="flex-1 overflow-y-auto">
 
           {/* BLOC 1 — Données du pari */}
-          <div className="px-4 py-3.5 border-b border-[#e3e6eb]">
+          <div className="px-4 py-3.5" style={{ borderBottom: "1px solid var(--border-color)" }}>
             <BlocTitle icon={<CheckCircle2 size={12} />} label="Données du pari" />
             <div className="grid grid-cols-2 gap-[7px] mb-2.5">
               <StatBox value={bet.odds_at_bet.toFixed(2)} label={isProposed ? "Cote générée" : "Cote au placement"} />
@@ -238,7 +251,7 @@ export default function TicketDetailDrawer({
           </div>
 
           {/* BLOC 2 — Mouvement de cote */}
-          <div className="px-4 py-3.5 border-b border-[#e3e6eb]">
+          <div className="px-4 py-3.5" style={{ borderBottom: "1px solid var(--border-color)" }}>
             <BlocTitle icon={<Activity size={12} />} label="Mouvement de cote" />
             {bet.odds_at_close != null ? (
               <>
@@ -260,11 +273,11 @@ export default function TicketDetailDrawer({
                 ) : null}
               </>
             ) : isPending ? (
-              <div className="text-[12px] text-[#8a919e] italic py-2">
+              <div className="text-[12px] italic py-2" style={{ color: "var(--text-muted)" }}>
                 Cote de fermeture disponible après le match.
               </div>
             ) : (
-              <div className="text-[12px] text-[#8a919e] italic py-2">
+              <div className="text-[12px] italic py-2" style={{ color: "var(--text-muted)" }}>
                 Données de cote indisponibles.
               </div>
             )}
@@ -272,7 +285,7 @@ export default function TicketDetailDrawer({
 
           {/* BLOC 3 — Résultat & CLV (only if resolved) */}
           {isResolved && (
-            <div className="px-4 py-3.5 border-b border-[#e3e6eb]">
+            <div className="px-4 py-3.5" style={{ borderBottom: "1px solid var(--border-color)" }}>
               <BlocTitle icon={<BarChart3 size={12} />} label="Résultat & CLV" />
               {/* Result box */}
               <div className={`rounded-[9px] p-3 mb-2.5 flex items-center justify-between ${rbCls}`}>
@@ -303,9 +316,9 @@ export default function TicketDetailDrawer({
 
           {/* Ignored hypothetical result */}
           {isIgnored && bet.profit_loss != null && (
-            <div className="px-4 py-3.5 border-b border-[#e3e6eb]">
+            <div className="px-4 py-3.5" style={{ borderBottom: "1px solid var(--border-color)" }}>
               <BlocTitle icon={<BarChart3 size={12} />} label="Résultat hypothétique" />
-              <div className="px-3 py-2.5 rounded-[9px] bg-[rgba(138,145,158,.06)] border border-[rgba(138,145,158,.12)] text-[13px] text-[#8a919e] italic">
+              <div className="px-3 py-2.5 rounded-[9px] bg-[rgba(138,145,158,.06)] border border-[rgba(138,145,158,.12)] text-[13px] italic" style={{ color: "var(--text-muted)" }}>
                 Aurait rapporté {bet.profit_loss >= 0 ? `+${bet.profit_loss.toFixed(2)}€` : `${bet.profit_loss.toFixed(2)}€`}
               </div>
             </div>
@@ -313,7 +326,7 @@ export default function TicketDetailDrawer({
 
           {/* BLOC 4 — Evolution de la cote (snapshots horaires) */}
           {oddsHistory.length >= 2 && (
-            <div className="px-4 py-3.5 border-b border-[#e3e6eb]">
+            <div className="px-4 py-3.5" style={{ borderBottom: "1px solid var(--border-color)" }}>
               <BlocTitle icon={<TrendingUp size={12} />} label="Evolution de la cote" />
               <OddsHistoryChart history={oddsHistory} />
             </div>
@@ -335,7 +348,7 @@ export default function TicketDetailDrawer({
 
             {/* Note personnelle */}
             <div className="mt-3">
-              <div className="text-[11.5px] font-semibold text-[#3c4149] mb-1.5">Note personnelle</div>
+              <div className="text-[11.5px] font-semibold mb-1.5" style={{ color: "var(--text-secondary)" }}>Note personnelle</div>
               <textarea
                 value={noteValue}
                 onChange={(e) => {
@@ -343,9 +356,10 @@ export default function TicketDetailDrawer({
                   autoSaveNote(e.target.value);
                 }}
                 placeholder={isProposed ? "Ajouter une note avant de valider…" : "Ajouter une note…"}
-                className="w-full px-2.5 py-2 border border-[#e3e6eb] rounded-lg text-[13px] text-[#111318] bg-[#f4f5f7] resize-none min-h-[60px] outline-none leading-relaxed transition-all focus:border-[#3b5bdb] focus:bg-white focus:shadow-[0_0_0_3px_rgba(59,91,219,.07)] placeholder:text-[#b0b7c3]"
+                className="w-full px-2.5 py-2 rounded-lg text-[13px] resize-none min-h-[60px] outline-none leading-relaxed transition-all focus:shadow-[0_0_0_3px_rgba(59,91,219,.07)]"
+                style={{ border: "1px solid var(--border-color)", color: "var(--text-primary)", background: "var(--bg-surface)" }}
               />
-              <div className="text-[10px] text-[#b0b7c3] mt-1">
+              <div className="text-[10px] mt-1" style={{ color: "var(--text-muted2)" }}>
                 {noteSaving ? "Sauvegarde…" : "Sauvegardé automatiquement"}
               </div>
             </div>
@@ -353,7 +367,7 @@ export default function TicketDetailDrawer({
         </div>
 
         {/* ── Actions ── */}
-        <div className="px-4 py-3 border-t border-[#e3e6eb] shrink-0 flex flex-col gap-[7px] bg-white">
+        <div className="px-4 py-3 shrink-0 flex flex-col gap-[7px]" style={{ borderTop: "1px solid var(--border-color)", background: "var(--bg-card)" }}>
           {isProposed && (
             <>
               <div className="flex gap-[7px]">
@@ -363,7 +377,7 @@ export default function TicketDetailDrawer({
                 </button>
               </div>
               <div className="flex gap-[7px]">
-                <button className="flex-1 py-2 rounded-lg border border-[#e3e6eb] text-[#3c4149] text-[12.5px] font-medium flex items-center justify-center gap-1.5 hover:bg-[#f4f5f7] transition-colors cursor-pointer">
+                <button className="flex-1 py-2 rounded-lg text-[12.5px] font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer" style={{ border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>
                   ✏️ Modifier la mise
                 </button>
                 <button onClick={() => onUpdateResult(bet.id, "ignored")}
@@ -389,7 +403,7 @@ export default function TicketDetailDrawer({
             />
           )}
           {bet.campaign_id && (
-            <button className="py-2 rounded-lg border border-[#e3e6eb] text-[#8a919e] text-[12px] font-medium flex items-center justify-center gap-1.5 hover:border-[rgba(59,91,219,.18)] hover:text-[#3b5bdb] hover:bg-[rgba(59,91,219,.07)] transition-colors cursor-pointer w-full">
+            <button className="py-2 rounded-lg text-[12px] font-medium flex items-center justify-center gap-1.5 hover:border-[rgba(59,91,219,.18)] hover:text-[#3b5bdb] hover:bg-[rgba(59,91,219,.07)] transition-colors cursor-pointer w-full" style={{ border: "1px solid var(--border-color)", color: "var(--text-muted)" }}>
               → Voir la campagne {getCampaignName(bet.campaign_id)}
             </button>
           )}
@@ -406,8 +420,8 @@ export default function TicketDetailDrawer({
 
 function BlocTitle({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div className="text-[10.5px] font-bold text-[#b0b7c3] uppercase tracking-[.09em] mb-2.5 flex items-center gap-[5px]">
-      <span className="text-[#3b5bdb]">{icon}</span>
+    <div className="text-[10.5px] font-bold uppercase tracking-[.09em] mb-2.5 flex items-center gap-[5px]" style={{ color: "var(--text-muted2)" }}>
+      <span style={{ color: "var(--accent)" }}>{icon}</span>
       {label}
     </div>
   );
@@ -415,21 +429,21 @@ function BlocTitle({ icon, label }: { icon: React.ReactNode; label: string }) {
 
 function StatBox({ value, label, valueColor }: { value: string; label: string; valueColor?: string }) {
   return (
-    <div className="bg-[#f4f5f7] rounded-lg px-2.5 py-2">
-      <div className="text-[15px] font-extrabold font-[var(--font-mono)] tracking-tight" style={{ color: valueColor || "#111318" }}>
+    <div className="rounded-lg px-2.5 py-2" style={{ background: "var(--bg-surface)" }}>
+      <div className="text-[15px] font-extrabold font-[var(--font-mono)] tracking-tight" style={{ color: valueColor || "var(--text-primary)" }}>
         {value}
       </div>
-      <div className="text-[10px] text-[#8a919e] mt-0.5">{label}</div>
+      <div className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>{label}</div>
     </div>
   );
 }
 
 function DataRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
   return (
-    <div className="flex justify-between items-center py-1.5 border-b border-[#e3e6eb] last:border-b-0">
-      <span className="text-[12.5px] text-[#8a919e]">{label}</span>
+    <div className="flex justify-between items-center py-1.5 last:border-b-0" style={{ borderBottom: "1px solid var(--border-color)" }}>
+      <span className="text-[12.5px]" style={{ color: "var(--text-muted)" }}>{label}</span>
       <span className="text-[12.5px] font-semibold font-[var(--font-mono)] text-right max-w-[220px]"
-        style={{ color: valueColor || "#3c4149" }}>
+        style={{ color: valueColor || "var(--text-secondary)" }}>
         {value}
       </span>
     </div>
@@ -484,14 +498,14 @@ function OddsHistoryChart({ history }: { history: OddsPoint[] }) {
         <LineChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 9, fill: "#8a919e", fontFamily: "var(--font-mono)" }}
+            tick={{ fontSize: 9, fill: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
             tickLine={false}
             axisLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
             domain={domain}
-            tick={{ fontSize: 9, fill: "#8a919e", fontFamily: "var(--font-mono)" }}
+            tick={{ fontSize: 9, fill: "var(--text-muted)", fontFamily: "var(--font-mono)" }}
             tickLine={false}
             axisLine={false}
             tickCount={4}
@@ -499,8 +513,8 @@ function OddsHistoryChart({ history }: { history: OddsPoint[] }) {
           />
           <ReTooltip
             contentStyle={{
-              background: "#fff",
-              border: "1px solid #e3e6eb",
+              background: "var(--bg-card)",
+              border: "1px solid var(--border-color)",
               borderRadius: 6,
               fontSize: 11,
               fontFamily: "var(--font-mono)",
@@ -510,7 +524,7 @@ function OddsHistoryChart({ history }: { history: OddsPoint[] }) {
               if (value == null) return ["", "Cote"];
               return [value.toFixed(3), "Cote"];
             }}
-            labelStyle={{ color: "#8a919e", fontSize: 10 }}
+            labelStyle={{ color: "var(--text-muted)", fontSize: 10 }}
           />
           <Line
             type="monotone"
@@ -544,13 +558,13 @@ function OddsHistoryChart({ history }: { history: OddsPoint[] }) {
       </ResponsiveContainer>
       <div className="flex gap-3 mt-1">
         {betPoint && (
-          <div className="flex items-center gap-[5px] text-[10px] text-[#8a919e]">
+          <div className="flex items-center gap-[5px] text-[10px]" style={{ color: "var(--text-muted)" }}>
             <span className="w-[7px] h-[7px] rounded-full bg-[#12b76a]" />
             Placement · {betPoint.odds.toFixed(2)}
           </div>
         )}
         {closePoint && (
-          <div className="flex items-center gap-[5px] text-[10px] text-[#8a919e]">
+          <div className="flex items-center gap-[5px] text-[10px]" style={{ color: "var(--text-muted)" }}>
             <span className="w-[7px] h-[7px] rounded-full bg-[#7c3aed]" />
             Fermeture · {closePoint.odds.toFixed(2)}
           </div>
@@ -601,7 +615,7 @@ function CoteChart({ generation, placement, closing, isResolved }: {
           )}
         </svg>
       </div>
-      <div className="flex justify-between text-[10px] text-[#8a919e] font-[var(--font-mono)]">
+      <div className="flex justify-between text-[10px] font-[var(--font-mono)]" style={{ color: "var(--text-muted)" }}>
         <span style={{ color: "#12b76a" }}>Placement · {placement.toFixed(2)}</span>
         {isResolved && (
           <span style={{ color: "#7c3aed" }}>Fermeture · {closing.toFixed(2)}</span>
@@ -615,7 +629,7 @@ function CoteChart({ generation, placement, closing, isResolved }: {
           <span className="w-[7px] h-[7px] rounded-full bg-[#12b76a]" /> Placement
         </div>
         {isResolved && (
-          <div className="flex items-center gap-[5px] text-[10px] text-[#8a919e]">
+          <div className="flex items-center gap-[5px] text-[10px]" style={{ color: "var(--text-muted)" }}>
             <span className="w-[7px] h-[7px] rounded-full bg-[#7c3aed]" /> Fermeture
           </div>
         )}
