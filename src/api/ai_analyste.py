@@ -235,22 +235,36 @@ def get_rate_limit(
 def get_ai_context(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    period: int = 30,
+    vb_limit: int = 7,
+    min_edge: float = 0,
+    sports: str = "",
 ):
-    """Get context panel data: user performance, today's scans, active campaigns."""
-    now = datetime.now(timezone.utc)
-    cutoff_30d = now - timedelta(days=30)
+    """Get context panel data: user performance, today's scans, active campaigns.
 
-    # --- Performance 30j ---
-    settled_bets = (
-        db.query(Bet)
-        .filter(
-            Bet.user_id == user.id,
-            Bet.is_backtest == False,  # noqa: E712
-            Bet.result.in_(["won", "lost"]),
-            Bet.match_date >= cutoff_30d,
-        )
-        .all()
+    Query params:
+        period: performance lookback in days (7, 30, 90, 365). Default 30.
+        vb_limit: max value bets to return (1-20). Default 7.
+        min_edge: minimum edge % to include in value bets. Default 0.
+        sports: comma-separated sport filter (e.g. "football,tennis"). Empty = all.
+    """
+    period = max(1, min(period, 365))
+    vb_limit = max(1, min(vb_limit, 20))
+    sport_filter = [s.strip() for s in sports.split(",") if s.strip()] if sports else []
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=period)
+
+    # --- Performance ---
+    q = db.query(Bet).filter(
+        Bet.user_id == user.id,
+        Bet.is_backtest == False,  # noqa: E712
+        Bet.result.in_(["won", "lost"]),
+        Bet.match_date >= cutoff,
     )
+    if sport_filter:
+        q = q.filter(Bet.sport.in_(sport_filter))
+    settled_bets = q.all()
     total_bets = len(settled_bets)
     wins = sum(1 for b in settled_bets if b.result == "won")
     total_stake = sum(float(b.stake or 0) for b in settled_bets)
@@ -289,27 +303,30 @@ def get_ai_context(
         cumulative += day_pl[day_key]
         pl_timeline.append({"date": day_key, "pl": round(cumulative, 2)})
 
-    # --- Today's scans (top value bets across all sports) ---
+    # --- Today's scans (top value bets across selected sports) ---
+    all_sports = ["football", "tennis", "nba", "mlb", "rugby"]
+    scan_sports = [s for s in all_sports if s in sport_filter] if sport_filter else all_sports
     value_bets: list[dict] = []
-    for sport in ["football", "tennis", "nba", "mlb", "rugby"]:
+    for sport in scan_sports:
         cache_key = f"scanner:{sport}:latest"
         data = cache_get(cache_key)
         if data and isinstance(data, dict) and "matches" in data:
-            for m in data["matches"][:5]:
+            for m in data["matches"][:10]:
                 edge = m.get("best_edge", 0)
-                if edge and edge > 0:
+                edge_pct = round(edge * 100, 1) if edge and edge < 1 else round(edge, 1) if edge else 0
+                if edge_pct > min_edge:
                     value_bets.append({
                         "sport": sport,
                         "match": f"{m.get('home_team', '?')} vs {m.get('away_team', '?')}",
                         "league": m.get("league", ""),
                         "date": m.get("match_date", ""),
-                        "edge": round(edge * 100, 1) if edge < 1 else round(edge, 1),
+                        "edge": edge_pct,
                         "outcome": m.get("best_outcome", ""),
                         "odds": m.get("best_odds", 0),
                         "prob": round(m.get("model_home_prob", 0) * 100, 1) if m.get("model_home_prob", 0) < 1 else round(m.get("model_home_prob", 0), 1),
                     })
     value_bets.sort(key=lambda x: x["edge"], reverse=True)
-    value_bets = value_bets[:7]
+    value_bets = value_bets[:vb_limit]
 
     # --- Active campaigns ---
     campaigns = (

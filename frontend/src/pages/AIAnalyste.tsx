@@ -19,13 +19,11 @@ import type {
 import {
   MessageCircle,
   Send,
-  RotateCcw,
   TrendingUp,
   Zap,
   BarChart3,
   CreditCard,
   CheckSquare,
-  Clock,
   Trash2,
   ChevronLeft,
   Loader2,
@@ -34,6 +32,8 @@ import {
   Trophy,
   Target,
   Settings,
+  History,
+  Plus,
 } from "lucide-react";
 
 /* ================================================================
@@ -76,6 +76,66 @@ const SPORT_LABELS: Record<string, string> = {
   rugby: "Rugby",
   pmu: "PMU",
 };
+
+const PERIOD_OPTIONS = [
+  { value: 7, label: "7j" },
+  { value: 30, label: "30j" },
+  { value: 90, label: "90j" },
+  { value: 365, label: "1an" },
+];
+
+const VB_LIMIT_OPTIONS = [
+  { value: 5, label: "5" },
+  { value: 7, label: "7" },
+  { value: 10, label: "10" },
+  { value: 15, label: "15" },
+];
+
+const MIN_EDGE_OPTIONS = [
+  { value: 0, label: "Tous" },
+  { value: 2, label: ">2%" },
+  { value: 5, label: ">5%" },
+  { value: 10, label: ">10%" },
+];
+
+const ALL_SPORTS = ["football", "tennis", "nba", "mlb", "rugby"];
+
+interface CtxSettings {
+  period: number;
+  vb_limit: number;
+  min_edge: number;
+  sports: string[];
+}
+
+const DEFAULT_CTX_SETTINGS: CtxSettings = { period: 30, vb_limit: 7, min_edge: 0, sports: [] };
+
+function loadCtxSettings(): CtxSettings {
+  try {
+    const raw = localStorage.getItem("ai_ctx_settings");
+    if (raw) return { ...DEFAULT_CTX_SETTINGS, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return { ...DEFAULT_CTX_SETTINGS };
+}
+
+function saveCtxSettings(s: CtxSettings) {
+  localStorage.setItem("ai_ctx_settings", JSON.stringify(s));
+}
+
+/* compact inline select */
+function MiniSelect({ value, options, onChange }: { value: number; options: { value: number; label: string }[]; onChange: (v: number) => void }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="text-[9.5px] font-semibold bg-[rgba(124,58,237,.06)] text-[#7c3aed] border-none rounded px-1.5 py-0.5 cursor-pointer outline-none appearance-none font-[inherit]"
+      style={{ backgroundImage: "none" }}
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
+  );
+}
 
 const SPORT_COLORS: Record<string, string> = {
   football: "#12b76a",
@@ -132,18 +192,14 @@ function Sparkline({ data, color = "#12b76a", w = 120, h = 32 }: { data: number[
 
 function ContextPanel({
   context,
-  conversations,
-  onSelectConversation,
-  onDeleteConversation,
-  onNewConversation,
   onSendMessage,
+  ctxSettings,
+  onCtxSettingsChange,
 }: {
   context: AIContext | null;
-  conversations: AIConversation[];
-  onSelectConversation: (id: number) => void;
-  onDeleteConversation: (id: number) => void;
-  onNewConversation: () => void;
   onSendMessage: (text: string) => void;
+  ctxSettings: CtxSettings;
+  onCtxSettingsChange: (s: CtxSettings) => void;
 }) {
   const rl = context?.rate_limit;
   const perf = context?.performance;
@@ -189,13 +245,43 @@ function ContextPanel({
           </div>
         )}
 
-        {/* ── PERFORMANCES 30J ── */}
-        {perf && perf.total_bets > 0 && (
+        {/* ── PERFORMANCES ── */}
+        {perf && (
           <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2.5">
-              <Trophy size={10} className="text-[#f79009]" />
-              Mes performances - 30j
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider">
+                <Trophy size={10} className="text-[#f79009]" />
+                Performances
+              </div>
+              <MiniSelect value={ctxSettings.period} options={PERIOD_OPTIONS} onChange={(v) => onCtxSettingsChange({ ...ctxSettings, period: v })} />
             </div>
+
+            {/* Sport filter pills */}
+            <div className="flex gap-1 flex-wrap mb-2">
+              {ALL_SPORTS.map((s) => {
+                const active = ctxSettings.sports.length === 0 || ctxSettings.sports.includes(s);
+                return (
+                  <button
+                    key={s}
+                    onClick={() => {
+                      const current = ctxSettings.sports.length === 0 ? [...ALL_SPORTS] : [...ctxSettings.sports];
+                      const next = current.includes(s) ? current.filter((x) => x !== s) : [...current, s];
+                      onCtxSettingsChange({ ...ctxSettings, sports: next.length === ALL_SPORTS.length ? [] : next });
+                    }}
+                    className={`px-1.5 py-[1px] rounded text-[9px] font-semibold border cursor-pointer transition-all font-[inherit] ${
+                      active
+                        ? "border-transparent text-white"
+                        : "border-[#e3e6eb] bg-[#f7f8fa] text-[#b0b7c3]"
+                    }`}
+                    style={active ? { backgroundColor: SPORT_COLORS[s] || "#8a919e" } : undefined}
+                  >
+                    {SPORT_LABELS[s] || s}
+                  </button>
+                );
+              })}
+            </div>
+
+            {perf.total_bets > 0 ? (<>
 
             {/* ROI big number */}
             <div className="text-center mb-2">
@@ -245,63 +331,32 @@ function ContextPanel({
                 ))}
               </div>
             )}
+            </>) : (
+              <div className="text-[11px] text-[#b0b7c3] text-center py-2">Aucun pari sur cette periode</div>
+            )}
           </div>
         )}
 
         {/* ── VALUE BETS DU JOUR ── */}
-        {vbs.length > 0 && (
-          <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
+        <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider">
               <Target size={10} className="text-[#3b5bdb]" />
-              Value bets du jour - {vbs.length}
+              Value bets - {vbs.length}
             </div>
+            <div className="flex items-center gap-1">
+              <MiniSelect value={ctxSettings.vb_limit} options={VB_LIMIT_OPTIONS} onChange={(v) => onCtxSettingsChange({ ...ctxSettings, vb_limit: v })} />
+              <MiniSelect value={ctxSettings.min_edge} options={MIN_EDGE_OPTIONS} onChange={(v) => onCtxSettingsChange({ ...ctxSettings, min_edge: v })} />
+            </div>
+          </div>
+          {vbs.length > 0 ? (
             <div className="flex flex-col gap-1.5">
               {vbs.map((vb, i) => (
                 <ValueBetRow key={i} vb={vb} onSend={onSendMessage} />
               ))}
             </div>
-          </div>
-        )}
-
-        {/* ── CONVERSATIONS ── */}
-        <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider">
-              <Clock size={10} className="text-[#3b5bdb]" />
-              Conversations
-            </div>
-            <button
-              onClick={onNewConversation}
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-[9.5px] font-semibold text-[#7c3aed] bg-[rgba(124,58,237,.06)] hover:bg-[rgba(124,58,237,.12)] transition-colors cursor-pointer border-none font-[inherit]"
-            >
-              <RotateCcw size={9} />
-              Nouveau
-            </button>
-          </div>
-          {conversations.length === 0 ? (
-            <div className="text-[11px] text-[#b0b7c3] text-center py-2">Aucune conversation</div>
           ) : (
-            <div className="flex flex-col gap-1 max-h-[150px] overflow-y-auto">
-              {conversations.slice(0, 10).map((c) => (
-                <div
-                  key={c.id}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all hover:bg-[#f7f8fa] group"
-                  onClick={() => onSelectConversation(c.id)}
-                >
-                  <MessageCircle size={11} className="text-[#b0b7c3] shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[11px] font-medium text-[#111318] truncate">{c.title || "Sans titre"}</div>
-                    <div className="text-[9px] text-[#b0b7c3]">{c.message_count} msg</div>
-                  </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onDeleteConversation(c.id); }}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-[#b0b7c3] hover:text-[#f04438] transition-all cursor-pointer border-none bg-transparent"
-                  >
-                    <Trash2 size={10} />
-                  </button>
-                </div>
-              ))}
-            </div>
+            <div className="text-[11px] text-[#b0b7c3] text-center py-2">Aucun value bet disponible</div>
           )}
         </div>
 
@@ -424,6 +479,9 @@ export default function AIAnalyste() {
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [context, setContext] = useState<AIContext | null>(null);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [ctxSettings, setCtxSettings] = useState<CtxSettings>(loadCtxSettings);
+  const historyRef = useRef<HTMLDivElement>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -441,6 +499,17 @@ export default function AIAnalyste() {
     }
   }, [input]);
 
+  // Close history dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (historyRef.current && !historyRef.current.contains(e.target as Node)) {
+        setShowHistory(false);
+      }
+    }
+    if (showHistory) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showHistory]);
+
   // Load context + conversations on mount
   useEffect(() => {
     loadConversations();
@@ -456,13 +525,25 @@ export default function AIAnalyste() {
     }
   }
 
-  async function loadContext() {
+  async function loadContext(settings?: CtxSettings) {
     try {
-      const data = await getAIContext();
+      const s = settings || ctxSettings;
+      const data = await getAIContext({
+        period: s.period,
+        vb_limit: s.vb_limit,
+        min_edge: s.min_edge,
+        sports: s.sports.length > 0 ? s.sports.join(",") : undefined,
+      });
       setContext(data);
     } catch {
       // silent
     }
+  }
+
+  function handleCtxSettingsChange(newSettings: CtxSettings) {
+    setCtxSettings(newSettings);
+    saveCtxSettings(newSettings);
+    loadContext(newSettings);
   }
 
   async function loadConversation(id: number) {
@@ -607,9 +688,64 @@ export default function AIAnalyste() {
             onClick={() => { handleNewConversation(); }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-white text-[#8a919e] text-[12px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] transition-colors font-[inherit]"
           >
-            <RotateCcw size={13} />
-            <span className="max-sm:hidden">Nouveau contexte</span>
+            <Plus size={13} />
+            <span className="max-sm:hidden">Nouvelle conversation</span>
           </button>
+          {/* History dropdown */}
+          <div className="relative" ref={historyRef}>
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12px] font-medium cursor-pointer transition-colors font-[inherit] ${
+                showHistory
+                  ? "border-[#7c3aed] bg-[rgba(124,58,237,.05)] text-[#7c3aed]"
+                  : "border-[#e3e6eb] bg-white text-[#8a919e] hover:border-[#cdd1d9] hover:text-[#3c4149]"
+              }`}
+            >
+              <History size={13} />
+              <span className="max-sm:hidden">Historique</span>
+            </button>
+            {showHistory && (
+              <div className="absolute right-0 top-full mt-1.5 w-[320px] max-sm:w-[280px] bg-white rounded-xl border border-[#e3e6eb] shadow-[0_8px_24px_rgba(16,24,40,.12)] z-50 overflow-hidden">
+                <div className="px-3 py-2.5 border-b border-[#e3e6eb] flex items-center justify-between">
+                  <span className="text-[12px] font-bold text-[#111318]">Conversations</span>
+                  <span className="text-[10px] text-[#b0b7c3]">{conversations.length} conv.</span>
+                </div>
+                {conversations.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-[12px] text-[#b0b7c3]">Aucune conversation</div>
+                ) : (
+                  <div className="max-h-[350px] overflow-y-auto py-1">
+                    {conversations.map((c) => (
+                      <div
+                        key={c.id}
+                        className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-all group ${
+                          conversationId === c.id
+                            ? "bg-[rgba(124,58,237,.06)]"
+                            : "hover:bg-[#f7f8fa]"
+                        }`}
+                        onClick={() => { loadConversation(c.id); setShowHistory(false); }}
+                      >
+                        <MessageCircle size={12} className={`shrink-0 ${conversationId === c.id ? "text-[#7c3aed]" : "text-[#b0b7c3]"}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-[12px] font-medium truncate ${conversationId === c.id ? "text-[#7c3aed]" : "text-[#111318]"}`}>
+                            {c.title || "Sans titre"}
+                          </div>
+                          <div className="text-[10px] text-[#b0b7c3]">
+                            {c.message_count} messages
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteConversation(c.id); }}
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded text-[#b0b7c3] hover:text-[#f04438] hover:bg-[rgba(240,68,56,.06)] transition-all cursor-pointer border-none bg-transparent"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setShowMobileSidebar(!showMobileSidebar)}
             className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-white text-[#8a919e] text-[12px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] transition-colors font-[inherit]"
@@ -745,11 +881,9 @@ export default function AIAnalyste() {
         {/* ── CONTEXT PANEL (desktop) ── */}
         <ContextPanel
           context={context}
-          conversations={conversations}
-          onSelectConversation={loadConversation}
-          onDeleteConversation={handleDeleteConversation}
-          onNewConversation={handleNewConversation}
           onSendMessage={handleSend}
+          ctxSettings={ctxSettings}
+          onCtxSettingsChange={handleCtxSettingsChange}
         />
 
         {/* ── MOBILE CONTEXT DRAWER ── */}
@@ -794,94 +928,96 @@ export default function AIAnalyste() {
                   </div>
                 )}
 
-                {/* Performance 30j */}
-                {context?.performance && context.performance.total_bets > 0 && (
+                {/* Performance */}
+                {context?.performance && (
                   <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2.5">
-                      <Trophy size={10} className="text-[#f79009]" />
-                      Performances - 30j
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider">
+                        <Trophy size={10} className="text-[#f79009]" />
+                        Performances
+                      </div>
+                      <MiniSelect value={ctxSettings.period} options={PERIOD_OPTIONS} onChange={(v) => handleCtxSettingsChange({ ...ctxSettings, period: v })} />
                     </div>
-                    <div className="text-center mb-2">
-                      <span className={`text-[28px] font-extrabold font-mono leading-none ${context.performance.roi >= 0 ? "text-[#12b76a]" : "text-[#f04438]"}`}>
-                        {context.performance.roi >= 0 ? "+" : ""}{context.performance.roi}%
-                      </span>
-                      <span className="text-[11px] text-[#8a919e] ml-1.5">ROI</span>
+                    {/* Sport filter pills */}
+                    <div className="flex gap-1 flex-wrap mb-2">
+                      {ALL_SPORTS.map((s) => {
+                        const active = ctxSettings.sports.length === 0 || ctxSettings.sports.includes(s);
+                        return (
+                          <button
+                            key={s}
+                            onClick={() => {
+                              const current = ctxSettings.sports.length === 0 ? [...ALL_SPORTS] : [...ctxSettings.sports];
+                              const next = current.includes(s) ? current.filter((x) => x !== s) : [...current, s];
+                              handleCtxSettingsChange({ ...ctxSettings, sports: next.length === ALL_SPORTS.length ? [] : next });
+                            }}
+                            className={`px-1.5 py-[1px] rounded text-[9px] font-semibold border cursor-pointer transition-all font-[inherit] ${
+                              active ? "border-transparent text-white" : "border-[#e3e6eb] bg-[#f7f8fa] text-[#b0b7c3]"
+                            }`}
+                            style={active ? { backgroundColor: SPORT_COLORS[s] || "#8a919e" } : undefined}
+                          >
+                            {SPORT_LABELS[s] || s}
+                          </button>
+                        );
+                      })}
                     </div>
-                    <div className="grid grid-cols-2 gap-2 mb-2">
-                      <div className="text-center">
-                        <div className="text-[15px] font-bold font-mono text-[#111318]">{context.performance.total_bets}</div>
-                        <div className="text-[9.5px] text-[#b0b7c3]">Tickets</div>
-                      </div>
-                      <div className="text-center">
-                        <div className={`text-[15px] font-bold font-mono ${context.performance.win_rate >= 50 ? "text-[#12b76a]" : "text-[#f79009]"}`}>{context.performance.win_rate}%</div>
-                        <div className="text-[9.5px] text-[#b0b7c3]">Reussite</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-[15px] font-bold font-mono text-[#111318]">{context.performance.total_stake.toLocaleString("fr-FR")}</div>
-                        <div className="text-[9.5px] text-[#b0b7c3]">Mise totale</div>
-                      </div>
-                      <div className="text-center">
-                        <div className={`text-[15px] font-bold font-mono ${context.performance.total_pl >= 0 ? "text-[#12b76a]" : "text-[#f04438]"}`}>
-                          {context.performance.total_pl >= 0 ? "+" : ""}{context.performance.total_pl.toLocaleString("fr-FR")}
+                    {context.performance.total_bets > 0 ? (
+                      <>
+                        <div className="text-center mb-2">
+                          <span className={`text-[28px] font-extrabold font-mono leading-none ${context.performance.roi >= 0 ? "text-[#12b76a]" : "text-[#f04438]"}`}>
+                            {context.performance.roi >= 0 ? "+" : ""}{context.performance.roi}%
+                          </span>
+                          <span className="text-[11px] text-[#8a919e] ml-1.5">ROI</span>
                         </div>
-                        <div className="text-[9.5px] text-[#b0b7c3]">Gain net</div>
-                      </div>
-                    </div>
-                    {context.performance.timeline.length > 1 && (
-                      <Sparkline data={context.performance.timeline.map((t) => t.pl)} w={260} h={36} />
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                          <div className="text-center">
+                            <div className="text-[15px] font-bold font-mono text-[#111318]">{context.performance.total_bets}</div>
+                            <div className="text-[9.5px] text-[#b0b7c3]">Tickets</div>
+                          </div>
+                          <div className="text-center">
+                            <div className={`text-[15px] font-bold font-mono ${context.performance.win_rate >= 50 ? "text-[#12b76a]" : "text-[#f79009]"}`}>{context.performance.win_rate}%</div>
+                            <div className="text-[9.5px] text-[#b0b7c3]">Reussite</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-[15px] font-bold font-mono text-[#111318]">{context.performance.total_stake.toLocaleString("fr-FR")}</div>
+                            <div className="text-[9.5px] text-[#b0b7c3]">Mise totale</div>
+                          </div>
+                          <div className="text-center">
+                            <div className={`text-[15px] font-bold font-mono ${context.performance.total_pl >= 0 ? "text-[#12b76a]" : "text-[#f04438]"}`}>
+                              {context.performance.total_pl >= 0 ? "+" : ""}{context.performance.total_pl.toLocaleString("fr-FR")}
+                            </div>
+                            <div className="text-[9.5px] text-[#b0b7c3]">Gain net</div>
+                          </div>
+                        </div>
+                        {context.performance.timeline.length > 1 && (
+                          <Sparkline data={context.performance.timeline.map((t) => t.pl)} w={260} h={36} />
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-[11px] text-[#b0b7c3] text-center py-2">Aucun pari sur cette periode</div>
                     )}
                   </div>
                 )}
 
                 {/* Value bets */}
-                {context?.value_bets && context.value_bets.length > 0 && (
-                  <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
+                <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider">
                       <Target size={10} className="text-[#3b5bdb]" />
-                      Value bets du jour - {context.value_bets.length}
+                      Value bets - {context?.value_bets?.length || 0}
                     </div>
+                    <div className="flex items-center gap-1">
+                      <MiniSelect value={ctxSettings.vb_limit} options={VB_LIMIT_OPTIONS} onChange={(v) => handleCtxSettingsChange({ ...ctxSettings, vb_limit: v })} />
+                      <MiniSelect value={ctxSettings.min_edge} options={MIN_EDGE_OPTIONS} onChange={(v) => handleCtxSettingsChange({ ...ctxSettings, min_edge: v })} />
+                    </div>
+                  </div>
+                  {context?.value_bets && context.value_bets.length > 0 ? (
                     <div className="flex flex-col gap-1.5">
                       {context.value_bets.map((vb, i) => (
                         <ValueBetRow key={i} vb={vb} onSend={(t) => { setShowMobileSidebar(false); handleSend(t); }} />
                       ))}
                     </div>
-                  </div>
-                )}
-
-                {/* Conversations */}
-                <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider">
-                      <Clock size={10} className="text-[#3b5bdb]" />
-                      Conversations
-                    </div>
-                    <button onClick={() => { setShowMobileSidebar(false); handleNewConversation(); }}
-                      className="flex items-center gap-1 px-2 py-0.5 rounded text-[9.5px] font-semibold text-[#7c3aed] bg-[rgba(124,58,237,.06)] hover:bg-[rgba(124,58,237,.12)] transition-colors cursor-pointer border-none font-[inherit]">
-                      <RotateCcw size={9} /> Nouveau
-                    </button>
-                  </div>
-                  {conversations.length === 0 ? (
-                    <div className="text-[11px] text-[#b0b7c3] text-center py-2">Aucune conversation</div>
                   ) : (
-                    <div className="flex flex-col gap-1">
-                      {conversations.slice(0, 10).map((c) => (
-                        <div key={c.id}
-                          className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all ${
-                            conversationId === c.id ? "bg-[rgba(124,58,237,.06)]" : "hover:bg-[#f7f8fa]"
-                          } group`}
-                          onClick={() => { loadConversation(c.id); setShowMobileSidebar(false); }}>
-                          <MessageCircle size={11} className="text-[#b0b7c3] shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-[11px] font-medium text-[#111318] truncate">{c.title || "Sans titre"}</div>
-                            <div className="text-[9px] text-[#b0b7c3]">{c.message_count} msg</div>
-                          </div>
-                          <button onClick={(e) => { e.stopPropagation(); handleDeleteConversation(c.id); }}
-                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-[#b0b7c3] hover:text-[#f04438] transition-all cursor-pointer border-none bg-transparent">
-                            <Trash2 size={10} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                    <div className="text-[11px] text-[#b0b7c3] text-center py-2">Aucun value bet disponible</div>
                   )}
                 </div>
 

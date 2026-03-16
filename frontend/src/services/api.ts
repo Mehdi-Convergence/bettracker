@@ -491,8 +491,14 @@ export function getAIRateLimit() {
   return request<import("../types").AIRateLimit>("/ai/rate-limit");
 }
 
-export function getAIContext() {
-  return request<import("../types").AIContext>("/ai/context");
+export function getAIContext(params?: { period?: number; vb_limit?: number; min_edge?: number; sports?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.period != null) qs.set("period", String(params.period));
+  if (params?.vb_limit != null) qs.set("vb_limit", String(params.vb_limit));
+  if (params?.min_edge != null) qs.set("min_edge", String(params.min_edge));
+  if (params?.sports) qs.set("sports", params.sports);
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return request<import("../types").AIContext>(`/ai/context${suffix}`);
 }
 
 // Admin
