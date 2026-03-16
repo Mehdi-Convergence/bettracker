@@ -100,8 +100,8 @@ export function DashboardGrid({
         gridConfig={{
           cols,
           rowHeight: isMobile ? 50 : 60,
-          margin: (isMobile ? [8, 8] : [16, 16]) as const,
-          containerPadding: [0, 0] as const,
+          margin: isMobile ? [8, 8] as [number, number] : [16, 16] as [number, number],
+          containerPadding: [0, 0] as [number, number],
           maxRows: Infinity,
         }}
         width={containerWidth}
