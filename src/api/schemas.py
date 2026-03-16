@@ -66,6 +66,15 @@ class TwoFactorLoginRequest(BaseModel):
     code: str = Field(min_length=6, max_length=6)
 
 
+class EmailCodeRequest(BaseModel):
+    email: str
+
+
+class EmailCodeVerifyRequest(BaseModel):
+    email: str
+    code: str
+
+
 class OnboardingRequest(BaseModel):
     bankroll: float = Field(gt=0)
     default_stake_pct: float = Field(gt=0, le=100)

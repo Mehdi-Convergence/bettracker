@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LogIn, Mail, Lock, Eye, EyeOff, UserPlus, Check, ScanSearch, BarChart2, Bot, MessageCircle, ShieldCheck } from "lucide-react";
+import { LogIn, Mail, Lock, Eye, EyeOff, UserPlus, Check, ScanSearch, BarChart2, Bot, MessageCircle, ShieldCheck, KeyRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { requestEmailCode, verifyEmailCode, setAccessToken } from "@/services/api";
 
 type Mode = "login" | "signup";
+type LoginMethod = "password" | "email-code";
 
 export default function Login() {
   const { login, login2FAVerify, register } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("login");
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>("password");
 
   // Login
   const [email, setEmail] = useState("");
@@ -23,6 +26,13 @@ export default function Login() {
   const [loginToken, setLoginToken] = useState("");
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+
+  // Email code step
+  const [emailCodeStep, setEmailCodeStep] = useState<"email" | "code">("email");
+  const [emailCodeEmail, setEmailCodeEmail] = useState("");
+  const [emailCode, setEmailCode] = useState("");
+  const [emailCodeLoading, setEmailCodeLoading] = useState(false);
+  const [emailCodeSuccess, setEmailCodeSuccess] = useState("");
 
   // Signup
   const [signupName, setSignupName] = useState("");
@@ -62,6 +72,44 @@ export default function Login() {
       setTwoFactorCode("");
     } finally {
       setTwoFactorLoading(false);
+    }
+  };
+
+  const handleRequestEmailCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setEmailCodeSuccess("");
+    setEmailCodeLoading(true);
+    try {
+      await requestEmailCode(emailCodeEmail);
+      setEmailCodeStep("code");
+      setEmailCodeSuccess("Code envoye. Verifiez votre boite mail.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'envoi du code");
+    } finally {
+      setEmailCodeLoading(false);
+    }
+  };
+
+  const handleVerifyEmailCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setEmailCodeLoading(true);
+    try {
+      const result = await verifyEmailCode(emailCodeEmail, emailCode) as Record<string, unknown>;
+      if (result.requires_2fa) {
+        setLoginToken(result.login_token as string);
+        setTwoFactorRequired(true);
+        setLoginMethod("password");
+      } else {
+        setAccessToken(result.access_token as string);
+        navigate("/dashboard");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Code invalide");
+      setEmailCode("");
+    } finally {
+      setEmailCodeLoading(false);
     }
   };
 
@@ -280,89 +328,236 @@ export default function Login() {
 
           {/* ── LOGIN FORM ── */}
           {mode === "login" && !twoFactorRequired && (
-            <form onSubmit={handleLogin}>
-              <div className="flex flex-col gap-3.5">
-                {error && (
-                  <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "rgba(240,68,56,0.06)", border: "1px solid rgba(240,68,56,0.2)" }}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
-                    {error}
-                  </div>
-                )}
+            <div>
+              {/* Methode de connexion */}
+              <div className="flex gap-1 mb-5">
+                <button
+                  type="button"
+                  onClick={() => { setLoginMethod("password"); setError(""); }}
+                  className={`flex items-center gap-1.5 px-3 py-[7px] rounded-lg text-[12.5px] font-medium cursor-pointer border transition-all ${
+                    loginMethod === "password"
+                      ? "bg-[#eef1fb] text-[#3b5bdb] border-[#c5cef7]"
+                      : "bg-transparent text-[#8a919e] border-transparent hover:text-[#3c4149]"
+                  }`}
+                >
+                  <Lock size={13} />
+                  Mot de passe
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setLoginMethod("email-code"); setError(""); setEmailCodeStep("email"); setEmailCode(""); setEmailCodeSuccess(""); }}
+                  className={`flex items-center gap-1.5 px-3 py-[7px] rounded-lg text-[12.5px] font-medium cursor-pointer border transition-all ${
+                    loginMethod === "email-code"
+                      ? "bg-[#eef1fb] text-[#3b5bdb] border-[#c5cef7]"
+                      : "bg-transparent text-[#8a919e] border-transparent hover:text-[#3c4149]"
+                  }`}
+                >
+                  <KeyRound size={13} />
+                  Code par email
+                </button>
+              </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className={labelCls}>Adresse e-mail</label>
-                  <div className="relative">
-                    <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b0b7c3] pointer-events-none" />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="votre@email.com"
-                      className={inputCls}
-                      required
-                      autoFocus
-                    />
-                  </div>
-                </div>
+              {/* Formulaire mot de passe */}
+              {loginMethod === "password" && (
+                <form onSubmit={handleLogin}>
+                  <div className="flex flex-col gap-3.5">
+                    {error && (
+                      <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "rgba(240,68,56,0.06)", border: "1px solid rgba(240,68,56,0.2)" }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
+                        {error}
+                      </div>
+                    )}
 
-                <div className="flex flex-col gap-1.5">
-                  <label className={labelCls}>Mot de passe</label>
-                  <div className="relative">
-                    <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b0b7c3] pointer-events-none" />
-                    <input
-                      type={showPwd ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Votre mot de passe"
-                      className={inputCls + " pr-[42px]"}
-                      required
-                    />
+                    <div className="flex flex-col gap-1.5">
+                      <label className={labelCls}>Adresse e-mail</label>
+                      <div className="relative">
+                        <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b0b7c3] pointer-events-none" />
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="votre@email.com"
+                          className={inputCls}
+                          required
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className={labelCls}>Mot de passe</label>
+                      <div className="relative">
+                        <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b0b7c3] pointer-events-none" />
+                        <input
+                          type={showPwd ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Votre mot de passe"
+                          className={inputCls + " pr-[42px]"}
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPwd(!showPwd)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[#b0b7c3] hover:text-[#111318] transition-colors p-0"
+                        >
+                          {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between -mt-1">
+                      <label className="flex items-center gap-2 text-[12.5px] text-[#8a919e] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={remember}
+                          onChange={(e) => setRemember(e.target.checked)}
+                          className="w-[15px] h-[15px] accent-[#3b5bdb] cursor-pointer"
+                        />
+                        Se souvenir de moi
+                      </label>
+                      <Link to="/forgot-password" className="text-[12.5px] text-[#3b5bdb] font-medium no-underline hover:underline">
+                        Mot de passe oublie ?
+                      </Link>
+                    </div>
+
                     <button
-                      type="button"
-                      onClick={() => setShowPwd(!showPwd)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[#b0b7c3] hover:text-[#111318] transition-colors p-0"
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-[13px] rounded-[10px] border-none bg-[#3b5bdb] text-white text-[14px] font-bold cursor-pointer flex items-center justify-center gap-2 transition-all shadow-[0_2px_8px_rgba(59,91,219,0.3)] hover:bg-[#2f4ac7] hover:-translate-y-px hover:shadow-[0_6px_20px_rgba(59,91,219,0.35)] disabled:opacity-70 mt-1"
                     >
-                      {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
+                      {loading ? (
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                      ) : (
+                        <LogIn size={16} />
+                      )}
+                      Se connecter
                     </button>
                   </div>
-                </div>
 
-                <div className="flex items-center justify-between -mt-1">
-                  <label className="flex items-center gap-2 text-[12.5px] text-[#8a919e] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={remember}
-                      onChange={(e) => setRemember(e.target.checked)}
-                      className="w-[15px] h-[15px] accent-[#3b5bdb] cursor-pointer"
-                    />
-                    Se souvenir de moi
-                  </label>
-                  <Link to="/forgot-password" className="text-[12.5px] text-[#3b5bdb] font-medium no-underline hover:underline">
-                    Mot de passe oublié ?
-                  </Link>
-                </div>
+                  <div className="text-center text-[13px] text-[#8a919e] mt-5 pt-5 border-t border-[#e3e6eb]">
+                    Pas encore de compte ?{" "}
+                    <button type="button" onClick={() => setMode("signup")} className="text-[#3b5bdb] font-semibold bg-transparent border-none cursor-pointer hover:underline p-0">
+                      Essai gratuit 7 jours →
+                    </button>
+                  </div>
+                </form>
+              )}
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-[13px] rounded-[10px] border-none bg-[#3b5bdb] text-white text-[14px] font-bold cursor-pointer flex items-center justify-center gap-2 transition-all shadow-[0_2px_8px_rgba(59,91,219,0.3)] hover:bg-[#2f4ac7] hover:-translate-y-px hover:shadow-[0_6px_20px_rgba(59,91,219,0.35)] disabled:opacity-70 mt-1"
-                >
-                  {loading ? (
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+              {/* Formulaire code par email */}
+              {loginMethod === "email-code" && (
+                <div>
+                  {emailCodeStep === "email" ? (
+                    <form onSubmit={handleRequestEmailCode}>
+                      <div className="flex flex-col gap-3.5">
+                        <div className="flex items-start gap-3 px-3.5 py-3 rounded-[10px] text-[12.5px] text-[#3c4149]" style={{ background: "rgba(59,91,219,0.05)", border: "1px solid rgba(59,91,219,0.15)" }}>
+                          <KeyRound size={15} className="text-[#3b5bdb] shrink-0 mt-0.5" />
+                          <span>Entrez votre email pour recevoir un code de connexion a 6 chiffres valable 10 minutes.</span>
+                        </div>
+
+                        {error && (
+                          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "rgba(240,68,56,0.06)", border: "1px solid rgba(240,68,56,0.2)" }}>
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
+                            {error}
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className={labelCls}>Adresse e-mail</label>
+                          <div className="relative">
+                            <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#b0b7c3] pointer-events-none" />
+                            <input
+                              type="email"
+                              value={emailCodeEmail}
+                              onChange={(e) => setEmailCodeEmail(e.target.value)}
+                              placeholder="votre@email.com"
+                              className={inputCls}
+                              required
+                              autoFocus
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={emailCodeLoading}
+                          className="w-full py-[13px] rounded-[10px] border-none bg-[#3b5bdb] text-white text-[14px] font-bold cursor-pointer flex items-center justify-center gap-2 transition-all shadow-[0_2px_8px_rgba(59,91,219,0.3)] hover:bg-[#2f4ac7] hover:-translate-y-px hover:shadow-[0_6px_20px_rgba(59,91,219,0.35)] disabled:opacity-70"
+                        >
+                          {emailCodeLoading ? (
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                          ) : (
+                            <Mail size={16} />
+                          )}
+                          Envoyer le code
+                        </button>
+                      </div>
+
+                      <div className="text-center text-[13px] text-[#8a919e] mt-5 pt-5 border-t border-[#e3e6eb]">
+                        Pas encore de compte ?{" "}
+                        <button type="button" onClick={() => setMode("signup")} className="text-[#3b5bdb] font-semibold bg-transparent border-none cursor-pointer hover:underline p-0">
+                          Essai gratuit 7 jours →
+                        </button>
+                      </div>
+                    </form>
                   ) : (
-                    <LogIn size={16} />
-                  )}
-                  Se connecter
-                </button>
-              </div>
+                    <form onSubmit={handleVerifyEmailCode}>
+                      <div className="flex flex-col gap-3.5">
+                        {emailCodeSuccess && (
+                          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#12b76a]" style={{ background: "rgba(18,183,106,0.06)", border: "1px solid rgba(18,183,106,0.2)" }}>
+                            <Check size={15} className="shrink-0" />
+                            {emailCodeSuccess}
+                          </div>
+                        )}
 
-              <div className="text-center text-[13px] text-[#8a919e] mt-5 pt-5 border-t border-[#e3e6eb]">
-                Pas encore de compte ?{" "}
-                <button type="button" onClick={() => setMode("signup")} className="text-[#3b5bdb] font-semibold bg-transparent border-none cursor-pointer hover:underline p-0">
-                  Essai gratuit 7 jours →
-                </button>
-              </div>
-            </form>
+                        {error && (
+                          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "rgba(240,68,56,0.06)", border: "1px solid rgba(240,68,56,0.2)" }}>
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
+                            {error}
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className={labelCls}>Code de verification (6 chiffres)</label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]{6}"
+                            maxLength={6}
+                            value={emailCode}
+                            onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                            placeholder="000000"
+                            className={inputNoPadCls + " text-center text-[18px] font-[var(--font-mono)] tracking-[0.3em]"}
+                            required
+                            autoFocus
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={emailCodeLoading || emailCode.length !== 6}
+                          className="w-full py-[13px] rounded-[10px] border-none bg-[#3b5bdb] text-white text-[14px] font-bold cursor-pointer flex items-center justify-center gap-2 transition-all shadow-[0_2px_8px_rgba(59,91,219,0.3)] hover:bg-[#2f4ac7] hover:-translate-y-px hover:shadow-[0_6px_20px_rgba(59,91,219,0.35)] disabled:opacity-70"
+                        >
+                          {emailCodeLoading ? (
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                          ) : (
+                            <KeyRound size={16} />
+                          )}
+                          Valider le code
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => { setEmailCodeStep("email"); setEmailCode(""); setError(""); setEmailCodeSuccess(""); }}
+                          className="text-[12.5px] text-[#8a919e] bg-transparent border-none cursor-pointer hover:text-[#3c4149] transition-colors text-center"
+                        >
+                          Renvoyer le code
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* ── SIGNUP FORM ── */}

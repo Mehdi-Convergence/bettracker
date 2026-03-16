@@ -344,6 +344,20 @@ export function login2FA(login_token: string, code: string): Promise<{ access_to
   return request("/auth/2fa/login", { method: "POST", body: JSON.stringify({ login_token, code }) });
 }
 
+export function requestEmailCode(email: string) {
+  return request<{ detail: string }>("/auth/email-code", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function verifyEmailCode(email: string, code: string) {
+  return request<{ access_token: string; user: unknown } | { requires_2fa: boolean; login_token: string }>("/auth/email-code/verify", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+  });
+}
+
 // Onboarding & Tour
 export function completeOnboarding(bankroll: number, default_stake_pct: number) {
   return request<unknown>("/auth/onboarding", {
@@ -536,4 +550,20 @@ export function forceScan(sport: string) {
 
 export function getAdminAI() {
   return request<import("../types").AdminAIStats>("/admin/ai");
+}
+
+// ---- Dashboard V2 ----
+export function getWidgetData() {
+  return request<Record<string, unknown>>("/widgets/data");
+}
+
+export function getDashboardLayout() {
+  return request<Record<string, unknown>>("/settings/dashboard-layout");
+}
+
+export function saveDashboardLayout(layout: Record<string, unknown>) {
+  return request<{ ok: boolean }>("/settings/dashboard-layout", {
+    method: "PUT",
+    body: JSON.stringify(layout),
+  });
 }

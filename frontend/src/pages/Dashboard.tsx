@@ -221,9 +221,9 @@ export default function Dashboard() {
       {/* ── MAIN: 2 columns ── */}
       <div className="grid gap-3 items-stretch flex-1 min-h-0 max-md:flex max-md:flex-col" style={{ gridTemplateColumns: "1fr 340px" }}>
         {/* LEFT column */}
-        <div className="flex flex-col gap-3 min-h-0">
+        <div className="flex flex-col gap-3 min-h-0 overflow-y-auto">
           {/* ROW 1: ROI chart + P&L résumé side by side */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 min-h-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 shrink-0">
             {/* ROI Chart */}
             <div data-tour="roi-chart" className="bg-white border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden flex flex-col">
               <div className="flex items-center px-4 py-2.5 border-b border-[#e3e6eb]">
@@ -231,7 +231,7 @@ export default function Dashboard() {
                   <TrendingUp size={13} className="text-[#3b5bdb]" /> Évolution ROI
                 </div>
               </div>
-              <div className="px-3 py-2 flex-1 flex items-center max-md:min-h-[160px]">
+              <div className="px-3 py-2 flex-1 flex items-center min-h-[180px] max-md:min-h-[160px]">
                 <ROIChart data={history} />
               </div>
             </div>

@@ -102,6 +102,28 @@ def send_verification_email(to_email: str, display_name: str, verification_url: 
     return _send(to_email, "Vérifiez votre adresse email - BetTracker", html)
 
 
+def send_login_code_email(to_email: str, display_name: str, code: str) -> bool:
+    """Send a 6-digit login code by email."""
+    name = display_name or to_email.split("@")[0]
+    html = f"""
+    <div style="font-family: -apple-system, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
+      <h2 style="color: #111318; margin-bottom: 8px;">Votre code de connexion</h2>
+      <p style="color: #3c4149; line-height: 1.6;">
+        Bonjour {name}, voici votre code de connexion BetTracker :
+      </p>
+      <div style="background: #f4f5f7; border-radius: 12px; padding: 24px; text-align: center; margin: 20px 0;">
+        <span style="font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #3b5bdb; font-family: monospace;">
+          {code}
+        </span>
+      </div>
+      <p style="color: #8a919e; font-size: 13px;">
+        Ce code expire dans 10 minutes. Si vous n'avez pas demande cette connexion, ignorez cet email.
+      </p>
+    </div>
+    """
+    return _send(to_email, f"Code de connexion BetTracker : {code}", html)
+
+
 def send_reset_password_email(email: str, display_name: str, reset_url: str) -> bool:
     """Send password reset link."""
     name = display_name or email.split("@")[0]

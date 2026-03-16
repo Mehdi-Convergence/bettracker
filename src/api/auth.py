@@ -1,6 +1,7 @@
 """Authentication API endpoints."""
 
 import logging
+import random
 import secrets
 import threading
 from datetime import datetime, timedelta, timezone
@@ -18,6 +19,8 @@ from src.api.deps import (
 )
 from src.api.schemas import (
     ChangePasswordRequest,
+    EmailCodeRequest,
+    EmailCodeVerifyRequest,
     ForgotPasswordRequest,
     LoginRequest,
     MessageResponse,
@@ -138,6 +141,82 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
         login_token = _create_login_2fa_token(user.id)
         return JSONResponse(content={"requires_2fa": True, "login_token": login_token})
 
+    access_token = create_access_token(user.id, user.token_version)
+    refresh_token = create_refresh_token(user.id, user.token_version)
+
+    response = JSONResponse(content={
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": _user_response_dict(user),
+    })
+    _set_refresh_cookie(response, refresh_token)
+    return response
+
+
+@router.post("/auth/email-code")
+@limiter.limit("3/minute")
+def request_email_code(request: Request, body: EmailCodeRequest, db: Session = Depends(get_db)):
+    """Send a 6-digit login code by email."""
+    email_lower = body.email.lower()
+    user = db.query(User).filter(User.email == email_lower, User.is_active == True).first()
+
+    # Toujours retourner succes (anti-enumeration)
+    if not user:
+        return {"detail": "Si un compte existe avec cet email, un code a ete envoye."}
+
+    # Genere un code a 6 chiffres
+    code = f"{random.randint(100000, 999999)}"
+
+    # Stocke dans le cache avec TTL 10 minutes
+    cache_key = f"email_code:{email_lower}"
+    cache_set(cache_key, code, ttl=600)
+
+    # Reinitialise le compteur de tentatives
+    attempts_key = f"email_code_attempts:{email_lower}"
+    cache_set(attempts_key, "0", ttl=600)
+
+    # Envoie l'email en thread
+    from src.services.email import send_login_code_email
+    threading.Thread(target=send_login_code_email, args=(user.email, user.display_name, code), daemon=True).start()
+
+    return {"detail": "Si un compte existe avec cet email, un code a ete envoye."}
+
+
+@router.post("/auth/email-code/verify")
+@limiter.limit("10/minute")
+def verify_email_code(request: Request, body: EmailCodeVerifyRequest, db: Session = Depends(get_db)):
+    """Verify the 6-digit email code and return tokens."""
+    email_lower = body.email.lower()
+
+    # Verifie le nombre de tentatives
+    attempts_key = f"email_code_attempts:{email_lower}"
+    attempts = int(cache_get(attempts_key) or "0")
+    if attempts >= 5:
+        cache_delete(f"email_code:{email_lower}")
+        cache_delete(attempts_key)
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Trop de tentatives. Demandez un nouveau code.")
+
+    cache_key = f"email_code:{email_lower}"
+    stored_code = cache_get(cache_key)
+
+    if not stored_code or stored_code != body.code:
+        cache_set(attempts_key, str(attempts + 1), ttl=600)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Code invalide ou expire")
+
+    # Code valide — nettoyage
+    cache_delete(cache_key)
+    cache_delete(attempts_key)
+
+    user = db.query(User).filter(User.email == email_lower, User.is_active == True).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Code invalide ou expire")
+
+    # Si 2FA active, demander le code TOTP
+    if getattr(user, "totp_enabled", False):
+        login_token = _create_login_2fa_token(user.id)
+        return JSONResponse(content={"requires_2fa": True, "login_token": login_token})
+
+    # Generation des tokens
     access_token = create_access_token(user.id, user.token_version)
     refresh_token = create_refresh_token(user.id, user.token_version)
 
