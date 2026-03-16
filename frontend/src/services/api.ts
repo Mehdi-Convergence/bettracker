@@ -385,10 +385,10 @@ export function sendFeedback(message: string) {
 }
 
 // Stripe
-export function createCheckoutSession(tier: "pro" | "premium") {
+export function createCheckoutSession(tier: "pro" | "premium", billing: "monthly" | "annual" = "monthly") {
   return request<{ url: string }>("/stripe/checkout", {
     method: "POST",
-    body: JSON.stringify({ tier }),
+    body: JSON.stringify({ tier, billing }),
   });
 }
 

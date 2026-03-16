@@ -1,6 +1,6 @@
 """User preferences endpoints (bankroll, notifications, display)."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends
 from sqlalchemy.orm import Session
 
 from src.api.deps import get_current_user
@@ -78,3 +78,30 @@ def update_preferences(
     db.commit()
     db.refresh(prefs)
     return _prefs_to_response(prefs)
+
+
+@router.get("/settings/dashboard-layout")
+def get_dashboard_layout(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get user's dashboard v2 layout."""
+    import json
+    prefs = _get_or_create_prefs(user, db)
+    if prefs.dashboard_layout:
+        return json.loads(prefs.dashboard_layout)
+    return None
+
+
+@router.put("/settings/dashboard-layout")
+def update_dashboard_layout(
+    layout: dict = Body(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Save user's dashboard v2 layout."""
+    import json
+    prefs = _get_or_create_prefs(user, db)
+    prefs.dashboard_layout = json.dumps(layout)
+    db.commit()
+    return {"ok": True}

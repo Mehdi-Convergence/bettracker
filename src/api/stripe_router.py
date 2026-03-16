@@ -25,6 +25,7 @@ router = APIRouter(tags=["stripe"])
 
 class CheckoutBody(BaseModel):
     tier: str  # "pro" | "premium"
+    billing: str = "monthly"  # "monthly" | "annual"
 
 
 # ── POST /stripe/checkout ────────────────────────────────────────────────────
@@ -37,9 +38,9 @@ def checkout(
 ) -> dict:
     """Create a Stripe Checkout Session for upgrading to pro or premium."""
     if body.tier == "pro":
-        price_id = settings.STRIPE_PRO_PRICE_ID
+        price_id = settings.STRIPE_PRO_ANNUAL_PRICE_ID if body.billing == "annual" else settings.STRIPE_PRO_PRICE_ID
     elif body.tier == "premium":
-        price_id = settings.STRIPE_PREMIUM_PRICE_ID
+        price_id = settings.STRIPE_PREMIUM_ANNUAL_PRICE_ID if body.billing == "annual" else settings.STRIPE_PREMIUM_PRICE_ID
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tier invalide (pro ou premium)")
 

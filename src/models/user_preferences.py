@@ -1,6 +1,6 @@
 """User preferences for functional settings (bankroll, notifications, display)."""
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.base import Base, TimestampMixin
@@ -42,6 +42,9 @@ class UserPreferences(Base, TimestampMixin):
     odds_format: Mapped[str] = mapped_column(String(15), default="decimal")  # decimal / fractional / american
     default_tickets_view: Mapped[str] = mapped_column(String(15), default="kanban")  # kanban / list / campaign
     default_campaigns_view: Mapped[str] = mapped_column(String(15), default="grid")  # grid / kanban
+
+    # -- Dashboard v2 layout (JSON) --
+    dashboard_layout: Mapped[str | None] = mapped_column(Text, default=None)
 
     def __repr__(self) -> str:
         return f"<UserPreferences user_id={self.user_id}>"

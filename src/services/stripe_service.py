@@ -52,8 +52,8 @@ def construct_webhook_event(payload: bytes, sig_header: str):
 
 def get_tier_from_price(price_id: str) -> str:
     """Map a Stripe price ID to a user tier."""
-    if price_id == settings.STRIPE_PRO_PRICE_ID:
+    if price_id in (settings.STRIPE_PRO_PRICE_ID, settings.STRIPE_PRO_ANNUAL_PRICE_ID):
         return "pro"
-    if price_id == settings.STRIPE_PREMIUM_PRICE_ID:
+    if price_id in (settings.STRIPE_PREMIUM_PRICE_ID, settings.STRIPE_PREMIUM_ANNUAL_PRICE_ID):
         return "premium"
     return "free"

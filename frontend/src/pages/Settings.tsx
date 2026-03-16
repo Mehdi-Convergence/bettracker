@@ -5,6 +5,8 @@ import {
   Mail,
   Lock,
   Shield,
+  ShieldCheck,
+  KeyRound,
   Star,
   Eye,
   EyeOff,
@@ -14,6 +16,8 @@ import {
   Trash2,
   Bell,
   CreditCard,
+  X,
+  QrCode,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -23,6 +27,9 @@ import {
   logoutAll as apiLogoutAll,
   createCheckoutSession,
   createBillingPortalSession,
+  setup2FA,
+  verify2FA,
+  disable2FA,
 } from "@/services/api";
 import { Toggle } from "@/components/ui";
 import type { UserStats } from "@/types";
@@ -73,11 +80,14 @@ const STRENGTH_LABELS = ["", "Faible", "Moyen", "Fort", "Très fort"];
 const STRENGTH_COLORS = ["", C.red, C.amber, C.green, C.green];
 
 /* ── Plans — aligne avec la landing page ── */
-const PLANS: { id: string; name: string; price: string; period: string; desc?: string; badge?: string; features: { text: string; ok: boolean; bold?: boolean; soon?: boolean }[] }[] = [
+const PLANS: { id: string; name: string; priceMonthly: string; priceAnnual: string; annualTotal: string; annualSaving: string; period: string; desc?: string; badge?: string; features: { text: string; ok: boolean; bold?: boolean; soon?: boolean }[] }[] = [
   {
     id: "free",
     name: "Free",
-    price: "0€",
+    priceMonthly: "0€",
+    priceAnnual: "0€",
+    annualTotal: "",
+    annualSaving: "",
     period: "7 jours",
     desc: "Acces a toutes les fonctionnalites pendant 7 jours. Aucune carte bancaire requise.",
     features: [
@@ -93,7 +103,10 @@ const PLANS: { id: string; name: string; price: string; period: string; desc?: s
   {
     id: "pro",
     name: "Pro",
-    price: "29€",
+    priceMonthly: "29€",
+    priceAnnual: "23€",
+    annualTotal: "276€/an",
+    annualSaving: "economisez 72€",
     period: "/mois",
     badge: "Le plus populaire",
     desc: "L'algo analyse tous les matchs pour vous. Placez selon les recommandations, au bon moment.",
@@ -110,7 +123,10 @@ const PLANS: { id: string; name: string; price: string; period: string; desc?: s
   {
     id: "premium",
     name: "Elite",
-    price: "69€",
+    priceMonthly: "69€",
+    priceAnnual: "55€",
+    annualTotal: "660€/an",
+    annualSaving: "economisez 168€",
     period: "/mois",
     desc: "L'algo tourne en automatique via les Campagnes. L'IA analyse. Vous supervisez.",
     features: [
@@ -125,10 +141,29 @@ const PLANS: { id: string; name: string; price: string; period: string; desc?: s
 ];
 
 export default function Settings() {
-  const { user, updateProfile, logout } = useAuth();
+  const { user, updateProfile, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>("compte");
+  const [tab, setTab] = useState<Tab>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("tab");
+    if (t === "billing" || t === "plan") return "plan";
+    if (t === "securite") return "securite";
+    if (t === "danger") return "danger";
+    return "compte";
+  });
+  const [billingSuccess, setBillingSuccess] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("success") === "1";
+  });
   const { showTour, completeTour } = useTour("settings");
+
+  useEffect(() => {
+    if (billingSuccess) {
+      refreshUser();
+      const timer = setTimeout(() => setBillingSuccess(false), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [billingSuccess, refreshUser]);
 
   // Profile
   const [displayName, setDisplayName] = useState(user?.display_name || "");
@@ -163,8 +198,19 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
 
   // Billing
+  const [billing, setBilling] = useState<"monthly" | "annual">("monthly");
   const [billingLoading, setBillingLoading] = useState<string | null>(null);
   const [billingError, setBillingError] = useState("");
+
+  // 2FA states
+  const [twoFaStep, setTwoFaStep] = useState<"idle" | "setup" | "disable">("idle");
+  const [twoFaQr, setTwoFaQr] = useState("");
+  const [twoFaSecret, setTwoFaSecret] = useState("");
+  const [twoFaCode, setTwoFaCode] = useState("");
+  const [twoFaDisablePwd, setTwoFaDisablePwd] = useState("");
+  const [twoFaError, setTwoFaError] = useState("");
+  const [twoFaSuccess, setTwoFaSuccess] = useState("");
+  const [twoFaLoading, setTwoFaLoading] = useState(false);
 
   useEffect(() => {
     getUserStats().then(setStats).catch(() => {});
@@ -214,6 +260,47 @@ export default function Settings() {
     }
   };
 
+  const handleSetup2FA = async () => {
+    setTwoFaError(""); setTwoFaSuccess(""); setTwoFaLoading(true);
+    try {
+      const data = await setup2FA();
+      setTwoFaQr(data.qr_code);
+      setTwoFaSecret(data.secret);
+      setTwoFaStep("setup");
+      setTwoFaCode("");
+    } catch (err: unknown) {
+      setTwoFaError(err instanceof Error ? err.message : "Erreur");
+    } finally { setTwoFaLoading(false); }
+  };
+
+  const handleVerify2FA = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTwoFaError(""); setTwoFaLoading(true);
+    try {
+      await verify2FA(twoFaCode);
+      setTwoFaSuccess("Double authentification activee avec succes !");
+      setTwoFaStep("idle");
+      setTwoFaCode("");
+      refreshUser();
+    } catch (err: unknown) {
+      setTwoFaError(err instanceof Error ? err.message : "Code invalide");
+    } finally { setTwoFaLoading(false); }
+  };
+
+  const handleDisable2FA = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTwoFaError(""); setTwoFaLoading(true);
+    try {
+      await disable2FA(twoFaDisablePwd, twoFaCode);
+      setTwoFaSuccess("Double authentification desactivee.");
+      setTwoFaStep("idle");
+      setTwoFaCode(""); setTwoFaDisablePwd("");
+      refreshUser();
+    } catch (err: unknown) {
+      setTwoFaError(err instanceof Error ? err.message : "Erreur");
+    } finally { setTwoFaLoading(false); }
+  };
+
   const handleDelete = async () => {
     setDeleteLoading(true);
     try {
@@ -229,7 +316,7 @@ export default function Settings() {
     setBillingError("");
     setBillingLoading(tier);
     try {
-      const { url } = await createCheckoutSession(tier);
+      const { url } = await createCheckoutSession(tier, billing);
       window.location.href = url;
     } catch (err: unknown) {
       setBillingError(err instanceof Error ? err.message : "Erreur Stripe");
@@ -617,9 +704,113 @@ export default function Settings() {
             </form>
           )}
 
+          {/* ── Tab: Sécurité — 2FA section ── */}
+          {tab === "securite" && (
+            <div className="p-5 border-t border-[#e3e6eb]">
+              <div className={sectionTitleCls}>
+                <ShieldCheck size={13} /> Double authentification (2FA)
+              </div>
+              <p className="text-[12px] text-[#8a919e] mt-0.5 mb-4">Protegez votre compte avec une application d'authentification (Google Authenticator, Authy, etc.).</p>
+
+              {twoFaSuccess && (
+                <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-lg text-[13px] font-medium text-[#12b76a] mb-4" style={{ background: "rgba(18,183,106,0.06)", border: "1px solid rgba(18,183,106,0.2)" }}>
+                  <Check size={15} className="shrink-0" /> {twoFaSuccess}
+                </div>
+              )}
+              {twoFaError && twoFaStep === "idle" && (
+                <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-lg text-[13px] font-medium text-[#f04438] mb-4" style={{ background: "rgba(240,68,56,0.06)", border: "1px solid rgba(240,68,56,0.2)" }}>
+                  <X size={15} className="shrink-0" /> {twoFaError}
+                </div>
+              )}
+
+              {/* Idle state */}
+              {twoFaStep === "idle" && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: user?.totp_enabled ? "rgba(18,183,106,0.1)" : "rgba(240,68,56,0.07)" }}>
+                      <KeyRound size={18} style={{ color: user?.totp_enabled ? C.green : C.red }} />
+                    </div>
+                    <div>
+                      <div className="text-[13.5px] font-semibold text-[#111318]">{user?.totp_enabled ? "2FA activee" : "2FA desactivee"}</div>
+                      <div className="text-[12px] text-[#8a919e] mt-0.5">{user?.totp_enabled ? "Votre compte est protege par une app d'authentification." : "Activez le 2FA pour securiser votre compte."}</div>
+                    </div>
+                  </div>
+                  {user?.totp_enabled ? (
+                    <button onClick={() => { setTwoFaStep("disable"); setTwoFaError(""); setTwoFaSuccess(""); setTwoFaCode(""); setTwoFaDisablePwd(""); }}
+                      className="px-4 py-2 rounded-lg border border-[rgba(240,68,56,0.25)] bg-transparent text-[#f04438] text-[13px] font-semibold cursor-pointer transition-all hover:bg-[rgba(240,68,56,0.06)]">
+                      Desactiver
+                    </button>
+                  ) : (
+                    <button onClick={handleSetup2FA} disabled={twoFaLoading}
+                      className="px-4 py-2 rounded-lg border-none text-white text-[13px] font-semibold cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-70"
+                      style={{ background: C.accent }}>
+                      <QrCode size={14} /> Activer
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Setup state — QR code */}
+              {twoFaStep === "setup" && (
+                <form onSubmit={handleVerify2FA} className="space-y-4">
+                  <div className="flex flex-col items-center gap-3 p-4 rounded-xl" style={{ background: "#f7f8fa", border: "1px solid #e3e6eb" }}>
+                    {twoFaQr && <img src={`data:image/png;base64,${twoFaQr}`} alt="QR Code 2FA" className="w-[180px] h-[180px]" />}
+                    <div className="text-center">
+                      <div className="text-[12px] text-[#8a919e] mb-1">Ou entrez cette cle manuellement :</div>
+                      <code className="text-[13px] font-mono font-bold text-[#3b5bdb] bg-white px-3 py-1.5 rounded border border-[#e3e6eb] select-all">{twoFaSecret}</code>
+                    </div>
+                  </div>
+                  {twoFaError && (
+                    <div className="px-3 py-2 rounded-lg text-[12px] font-medium" style={{ background: C.redBg, color: C.red }}>{twoFaError}</div>
+                  )}
+                  <div className="flex flex-col gap-1.5">
+                    <label className={labelCls}>Code a 6 chiffres</label>
+                    <input type="text" inputMode="numeric" maxLength={6} value={twoFaCode} onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, ""))}
+                      className={inputCls} placeholder="000000" autoFocus style={{ letterSpacing: "6px", textAlign: "center", fontSize: "18px", fontFamily: "monospace" }} />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button type="button" onClick={() => { setTwoFaStep("idle"); setTwoFaError(""); }}
+                      className="px-4 py-2.5 rounded-lg border border-[#e3e6eb] bg-transparent text-[#8a919e] text-[13px] font-medium cursor-pointer">Annuler</button>
+                    <button type="submit" disabled={twoFaCode.length !== 6 || twoFaLoading}
+                      className="px-4 py-2.5 rounded-lg border-none text-white text-[13px] font-semibold cursor-pointer disabled:opacity-70" style={{ background: C.accent }}>Verifier</button>
+                  </div>
+                </form>
+              )}
+
+              {/* Disable state */}
+              {twoFaStep === "disable" && (
+                <form onSubmit={handleDisable2FA} className="space-y-3.5">
+                  {twoFaError && (
+                    <div className="px-3 py-2 rounded-lg text-[12px] font-medium" style={{ background: C.redBg, color: C.red }}>{twoFaError}</div>
+                  )}
+                  <div className="flex flex-col gap-1.5">
+                    <label className={labelCls}>Mot de passe actuel</label>
+                    <input type="password" value={twoFaDisablePwd} onChange={(e) => setTwoFaDisablePwd(e.target.value)} className={inputCls} required />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className={labelCls}>Code 2FA actuel</label>
+                    <input type="text" inputMode="numeric" maxLength={6} value={twoFaCode} onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, ""))}
+                      className={inputCls} placeholder="000000" style={{ letterSpacing: "6px", textAlign: "center", fontSize: "18px", fontFamily: "monospace" }} />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button type="button" onClick={() => { setTwoFaStep("idle"); setTwoFaError(""); }}
+                      className="px-4 py-2.5 rounded-lg border border-[#e3e6eb] bg-transparent text-[#8a919e] text-[13px] font-medium cursor-pointer">Annuler</button>
+                    <button type="submit" disabled={twoFaCode.length !== 6 || !twoFaDisablePwd || twoFaLoading}
+                      className="px-4 py-2.5 rounded-lg border-none text-white text-[13px] font-semibold cursor-pointer disabled:opacity-70" style={{ background: "#f04438" }}>Desactiver</button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
+
           {/* ── Tab: Plan & Facturation ── */}
           {tab === "plan" && (
             <div className="p-5">
+              {billingSuccess && (
+                <div className="mb-4 px-3.5 py-2.5 rounded-lg border text-[12.5px] font-medium flex items-center gap-2" style={{ background: C.greenBg, borderColor: "rgba(18,183,106,0.15)", color: C.green }}>
+                  <Check size={15} /> Paiement reussi ! Votre abonnement est actif.
+                </div>
+              )}
               <div className={sectionTitleCls}>
                 <Star size={13} /> Abonnement
                 <span
@@ -630,14 +821,55 @@ export default function Settings() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Toggle Mensuel / Annuel */}
+              <div className="flex items-center justify-center mb-4">
+                <div
+                  className="inline-flex items-center gap-0 rounded-full p-[3px]"
+                  style={{ background: C.surface, border: `1px solid ${C.border}` }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setBilling("monthly")}
+                    className="px-4 py-1.5 rounded-full text-[12px] font-semibold transition-all cursor-pointer border-none"
+                    style={{
+                      background: billing === "monthly" ? C.white : "transparent",
+                      color: billing === "monthly" ? C.text : C.muted,
+                      boxShadow: billing === "monthly" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                    }}
+                  >
+                    Mensuel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBilling("annual")}
+                    className="px-4 py-1.5 rounded-full text-[12px] font-semibold transition-all cursor-pointer border-none flex items-center gap-1.5"
+                    style={{
+                      background: billing === "annual" ? C.white : "transparent",
+                      color: billing === "annual" ? C.text : C.muted,
+                      boxShadow: billing === "annual" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                    }}
+                  >
+                    Annuel
+                    <span
+                      className="px-1.5 py-px rounded text-[9px] font-bold"
+                      style={{ background: C.greenBg, color: C.green }}
+                    >
+                      -20%
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-stretch">
                 {PLANS.map((plan) => {
                   const isCurrent = plan.id === user?.tier;
                   const isElite = plan.id === "premium";
+                  const isFree = plan.id === "free";
+                  const displayPrice = billing === "annual" && !isFree ? plan.priceAnnual : plan.priceMonthly;
                   return (
                     <div
                       key={plan.id}
-                      className="border rounded-[10px] p-[18px_16px] cursor-pointer transition-all relative hover:shadow-md hover:-translate-y-px"
+                      className="flex flex-col border rounded-[10px] p-[18px_16px] transition-all relative hover:shadow-md hover:-translate-y-px"
                       style={{
                         borderWidth: "1.5px",
                         borderColor: isCurrent ? C.accentBd : isElite ? "rgba(124,58,237,0.25)" : C.border,
@@ -660,13 +892,18 @@ export default function Settings() {
                       )}
                       <div className="text-[14px] font-bold text-[#111318]">{plan.name}</div>
                       <div className="flex items-baseline gap-0.5 mt-1.5">
-                        <span className="text-[24px] font-extrabold tracking-tight text-[#111318]">{plan.price}</span>
-                        <span className="text-[12px] text-[#8a919e]">{plan.period}</span>
+                        <span className="text-[24px] font-extrabold tracking-tight text-[#111318]">{displayPrice}</span>
+                        <span className="text-[12px] text-[#8a919e]">{isFree ? plan.period : plan.period}</span>
                       </div>
+                      {billing === "annual" && !isFree && plan.annualTotal && (
+                        <div className="text-[10.5px] mt-0.5" style={{ color: C.green }}>
+                          {plan.annualTotal} — {plan.annualSaving}
+                        </div>
+                      )}
                       {plan.desc && (
                         <p className="text-[11px] text-[#8a919e] mt-1 mb-2 leading-snug">{plan.desc}</p>
                       )}
-                      <ul className="list-none flex flex-col gap-1.5 p-0 m-0 mt-2.5">
+                      <ul className="list-none flex flex-col gap-1.5 p-0 m-0 mt-2.5 flex-1">
                         {plan.features.map((f) => (
                           <li key={f.text} className="text-[12px] text-[#8a919e] flex items-center gap-1.5">
                             <span
@@ -706,10 +943,10 @@ export default function Settings() {
                           : isCurrent
                             ? "Plan actuel"
                             : isElite
-                              ? "Passer à Elite →"
+                              ? "Passer a Elite →"
                               : plan.id === "pro"
-                                ? "Passer à Pro →"
-                                : "Rétrograder"}
+                                ? "Passer a Pro →"
+                                : "Retrograder"}
                       </button>
                     </div>
                   );

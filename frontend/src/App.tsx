@@ -21,6 +21,7 @@ const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Admin = lazy(() => import("./pages/Admin"));
+const DashboardV2 = lazy(() => import("./pages/DashboardV2"));
 const MentionsLegales = lazy(() => import("./pages/MentionsLegales"));
 const CGU = lazy(() => import("./pages/CGU"));
 const ConfidentialitePolicy = lazy(() => import("./pages/ConfidentialitePolicy"));
@@ -80,6 +81,7 @@ export default function App() {
               <Route path="parametres" element={<Parametres />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="admin" element={<Admin />} />
+              <Route path="dashboard-v2" element={<DashboardV2 />} />
             </Route>
           </Routes>
         </Suspense>

@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: str = ""
     STRIPE_PRO_PRICE_ID: str = ""
     STRIPE_PREMIUM_PRICE_ID: str = ""
+    STRIPE_PRO_ANNUAL_PRICE_ID: str = ""
+    STRIPE_PREMIUM_ANNUAL_PRICE_ID: str = ""
 
     # AI Analyste (Groq — free tier)
     GROQ_API_KEY: str = ""
