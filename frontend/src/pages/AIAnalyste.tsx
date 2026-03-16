@@ -34,6 +34,7 @@ import {
   Settings,
   History,
   Plus,
+  StickyNote,
 } from "lucide-react";
 
 /* ================================================================
@@ -77,27 +78,6 @@ const SPORT_LABELS: Record<string, string> = {
   pmu: "PMU",
 };
 
-const PERIOD_OPTIONS = [
-  { value: 7, label: "7j" },
-  { value: 30, label: "30j" },
-  { value: 90, label: "90j" },
-  { value: 365, label: "1an" },
-];
-
-const VB_LIMIT_OPTIONS = [
-  { value: 5, label: "5" },
-  { value: 7, label: "7" },
-  { value: 10, label: "10" },
-  { value: 15, label: "15" },
-];
-
-const MIN_EDGE_OPTIONS = [
-  { value: 0, label: "Tous" },
-  { value: 2, label: ">2%" },
-  { value: 5, label: ">5%" },
-  { value: 10, label: ">10%" },
-];
-
 const ALL_SPORTS = ["football", "tennis", "nba", "mlb", "rugby"];
 
 interface CtxSettings {
@@ -105,9 +85,10 @@ interface CtxSettings {
   vb_limit: number;
   min_edge: number;
   sports: string[];
+  notes: string;
 }
 
-const DEFAULT_CTX_SETTINGS: CtxSettings = { period: 30, vb_limit: 7, min_edge: 0, sports: [] };
+const DEFAULT_CTX_SETTINGS: CtxSettings = { period: 30, vb_limit: 7, min_edge: 0, sports: [], notes: "" };
 
 function loadCtxSettings(): CtxSettings {
   try {
@@ -121,19 +102,24 @@ function saveCtxSettings(s: CtxSettings) {
   localStorage.setItem("ai_ctx_settings", JSON.stringify(s));
 }
 
-/* compact inline select */
-function MiniSelect({ value, options, onChange }: { value: number; options: { value: number; label: string }[]; onChange: (v: number) => void }) {
+/* compact inline number input with suffix */
+function MiniInput({ value, onChange, suffix, min, max, w = 38 }: { value: number; onChange: (v: number) => void; suffix?: string; min?: number; max?: number; w?: number }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className="text-[9.5px] font-semibold bg-[rgba(124,58,237,.06)] text-[#7c3aed] border-none rounded px-1.5 py-0.5 cursor-pointer outline-none appearance-none font-[inherit]"
-      style={{ backgroundImage: "none" }}
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
+    <span className="inline-flex items-center gap-0.5 bg-[rgba(124,58,237,.06)] rounded px-1 py-0.5">
+      <input
+        type="number"
+        value={value}
+        min={min}
+        max={max}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          if (!isNaN(v)) onChange(v);
+        }}
+        className="text-[10px] font-bold font-mono text-[#7c3aed] bg-transparent border-none outline-none text-center appearance-none font-[inherit]"
+        style={{ width: `${w}px`, MozAppearance: "textfield" }}
+      />
+      {suffix && <span className="text-[9px] text-[#7c3aed] font-semibold">{suffix}</span>}
+    </span>
   );
 }
 
@@ -199,7 +185,7 @@ function ContextPanel({
   context: AIContext | null;
   onSendMessage: (text: string) => void;
   ctxSettings: CtxSettings;
-  onCtxSettingsChange: (s: CtxSettings) => void;
+  onCtxSettingsChange: (s: CtxSettings, skipReload?: boolean) => void;
 }) {
   const rl = context?.rate_limit;
   const perf = context?.performance;
@@ -253,7 +239,7 @@ function ContextPanel({
                 <Trophy size={10} className="text-[#f79009]" />
                 Performances
               </div>
-              <MiniSelect value={ctxSettings.period} options={PERIOD_OPTIONS} onChange={(v) => onCtxSettingsChange({ ...ctxSettings, period: v })} />
+              <MiniInput value={ctxSettings.period} onChange={(v) => onCtxSettingsChange({ ...ctxSettings, period: v })} suffix="j" min={1} max={365} w={32} />
             </div>
 
             {/* Sport filter pills */}
@@ -345,8 +331,8 @@ function ContextPanel({
               Value bets - {vbs.length}
             </div>
             <div className="flex items-center gap-1">
-              <MiniSelect value={ctxSettings.vb_limit} options={VB_LIMIT_OPTIONS} onChange={(v) => onCtxSettingsChange({ ...ctxSettings, vb_limit: v })} />
-              <MiniSelect value={ctxSettings.min_edge} options={MIN_EDGE_OPTIONS} onChange={(v) => onCtxSettingsChange({ ...ctxSettings, min_edge: v })} />
+              <MiniInput value={ctxSettings.vb_limit} onChange={(v) => onCtxSettingsChange({ ...ctxSettings, vb_limit: v })} min={1} max={20} w={28} />
+              <MiniInput value={ctxSettings.min_edge} onChange={(v) => onCtxSettingsChange({ ...ctxSettings, min_edge: v })} suffix="%" min={0} max={50} w={28} />
             </div>
           </div>
           {vbs.length > 0 ? (
@@ -384,6 +370,21 @@ function ContextPanel({
               </button>
             ))}
           </div>
+        </div>
+
+        {/* ── NOTES / DONNEES PERSO ── */}
+        <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
+            <StickyNote size={10} className="text-[#f79009]" />
+            Notes & donnees
+          </div>
+          <textarea
+            value={ctxSettings.notes}
+            onChange={(e) => onCtxSettingsChange({ ...ctxSettings, notes: e.target.value }, true)}
+            placeholder="Ajoute des infos pour l'IA : bankroll, objectifs, contraintes, donnees externes..."
+            rows={3}
+            className="w-full text-[11px] text-[#111318] bg-[#f7f8fa] border border-[#e3e6eb] rounded-lg px-2.5 py-2 outline-none resize-y leading-relaxed font-[inherit] placeholder:text-[#b0b7c3] focus:border-[#7c3aed] focus:bg-white transition-colors min-h-[60px] max-h-[150px]"
+          />
         </div>
       </div>
     </div>
@@ -540,10 +541,15 @@ export default function AIAnalyste() {
     }
   }
 
-  function handleCtxSettingsChange(newSettings: CtxSettings) {
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleCtxSettingsChange(newSettings: CtxSettings, skipReload = false) {
     setCtxSettings(newSettings);
     saveCtxSettings(newSettings);
-    loadContext(newSettings);
+    if (skipReload) return;
+    // Debounce API reload (300ms)
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => loadContext(newSettings), 300);
   }
 
   async function loadConversation(id: number) {
@@ -936,7 +942,7 @@ export default function AIAnalyste() {
                         <Trophy size={10} className="text-[#f79009]" />
                         Performances
                       </div>
-                      <MiniSelect value={ctxSettings.period} options={PERIOD_OPTIONS} onChange={(v) => handleCtxSettingsChange({ ...ctxSettings, period: v })} />
+                      <MiniInput value={ctxSettings.period} onChange={(v) => handleCtxSettingsChange({ ...ctxSettings, period: v })} suffix="j" min={1} max={365} w={32} />
                     </div>
                     {/* Sport filter pills */}
                     <div className="flex gap-1 flex-wrap mb-2">
@@ -1006,8 +1012,8 @@ export default function AIAnalyste() {
                       Value bets - {context?.value_bets?.length || 0}
                     </div>
                     <div className="flex items-center gap-1">
-                      <MiniSelect value={ctxSettings.vb_limit} options={VB_LIMIT_OPTIONS} onChange={(v) => handleCtxSettingsChange({ ...ctxSettings, vb_limit: v })} />
-                      <MiniSelect value={ctxSettings.min_edge} options={MIN_EDGE_OPTIONS} onChange={(v) => handleCtxSettingsChange({ ...ctxSettings, min_edge: v })} />
+                      <MiniInput value={ctxSettings.vb_limit} onChange={(v) => handleCtxSettingsChange({ ...ctxSettings, vb_limit: v })} min={1} max={20} w={28} />
+                      <MiniInput value={ctxSettings.min_edge} onChange={(v) => handleCtxSettingsChange({ ...ctxSettings, min_edge: v })} suffix="%" min={0} max={50} w={28} />
                     </div>
                   </div>
                   {context?.value_bets && context.value_bets.length > 0 ? (
@@ -1035,6 +1041,21 @@ export default function AIAnalyste() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Notes & donnees */}
+                <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
+                    <StickyNote size={10} className="text-[#f79009]" />
+                    Notes & donnees
+                  </div>
+                  <textarea
+                    value={ctxSettings.notes}
+                    onChange={(e) => handleCtxSettingsChange({ ...ctxSettings, notes: e.target.value }, true)}
+                    placeholder="Ajoute des infos pour l'IA..."
+                    rows={3}
+                    className="w-full text-[11px] text-[#111318] bg-[#f7f8fa] border border-[#e3e6eb] rounded-lg px-2.5 py-2 outline-none resize-y leading-relaxed font-[inherit] placeholder:text-[#b0b7c3] focus:border-[#7c3aed] focus:bg-white transition-colors min-h-[60px] max-h-[150px]"
+                  />
                 </div>
               </div>
             </div>
