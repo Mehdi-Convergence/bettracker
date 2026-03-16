@@ -477,7 +477,7 @@ export default function Parametres() {
               <div className="flex gap-5 items-start flex-wrap">
                 {/* Preview card */}
                 <div className="shrink-0 w-[280px]">
-                  <div className="text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2.5">Aperçu carte</div>
+                  <div className="text-[11px] font-bold text-[var(--text-muted2)] uppercase tracking-wider mb-2.5">Aperçu carte</div>
                   <div className="rounded-xl p-[18px_20px] text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]" style={{ background: "linear-gradient(145deg, #0f172a, #1a2540)" }}>
                     <div className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded bg-[rgba(59,91,219,0.3)] text-[#7eb8ff] font-[var(--font-mono)] uppercase tracking-wider mb-3">
                       🎾 ATP · Indian Wells QF
@@ -524,12 +524,12 @@ export default function Parametres() {
 
                 {/* Config */}
                 <div className="flex-1 min-w-[220px]">
-                  <div className="text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2.5">Configuration par défaut</div>
-                  <div className="border border-[#e3e6eb] rounded-[10px] overflow-hidden">
+                  <div className="text-[11px] font-bold text-[var(--text-muted2)] uppercase tracking-wider mb-2.5">Configuration par défaut</div>
+                  <div className="border border-[var(--border-color)] rounded-[10px] overflow-hidden">
                     <div className={rowCls}>
                       <div className="flex-1 pr-5">
-                        <div className="text-[13px] font-medium text-[#111318]">Pseudo public affiché</div>
-                        <div className="text-[11px] text-[#8a919e] mt-0.5">Visible en bas de chaque carte partagée</div>
+                        <div className="text-[13px] font-medium text-[var(--text-primary)]">Pseudo public affiché</div>
+                        <div className="text-[11px] text-[var(--text-muted)] mt-0.5">Visible en bas de chaque carte partagée</div>
                       </div>
                       <input
                         type="text"
@@ -541,35 +541,35 @@ export default function Parametres() {
                     </div>
                     <div className={rowCls}>
                       <div className="flex-1 pr-5">
-                        <div className="text-[13px] font-medium text-[#111318]">Afficher la mise</div>
-                        <div className="text-[11px] text-[#8a919e] mt-0.5">Montant misé visible sur la carte</div>
+                        <div className="text-[13px] font-medium text-[var(--text-primary)]">Afficher la mise</div>
+                        <div className="text-[11px] text-[var(--text-muted)] mt-0.5">Montant misé visible sur la carte</div>
                       </div>
                       <Toggle checked={getVal("share_show_stake") ?? false} onChange={(v) => setVal("share_show_stake", v)} />
                     </div>
                     <div className={rowCls}>
                       <div className="flex-1 pr-5">
-                        <div className="text-[13px] font-medium text-[#111318]">Afficher le gain/perte en €</div>
-                        <div className="text-[11px] text-[#8a919e] mt-0.5">Si off : % ROI uniquement</div>
+                        <div className="text-[13px] font-medium text-[var(--text-primary)]">Afficher le gain/perte en €</div>
+                        <div className="text-[11px] text-[var(--text-muted)] mt-0.5">Si off : % ROI uniquement</div>
                       </div>
                       <Toggle checked={getVal("share_show_gain_euros") ?? true} onChange={(v) => setVal("share_show_gain_euros", v)} />
                     </div>
                     <div className={rowCls}>
                       <div className="flex-1 pr-5">
-                        <div className="text-[13px] font-medium text-[#111318]">Afficher le bookmaker</div>
+                        <div className="text-[13px] font-medium text-[var(--text-primary)]">Afficher le bookmaker</div>
                       </div>
                       <Toggle checked={getVal("share_show_bookmaker") ?? true} onChange={(v) => setVal("share_show_bookmaker", v)} />
                     </div>
                     <div className={rowCls}>
                       <div className="flex-1 pr-5">
-                        <div className="text-[13px] font-medium text-[#111318]">Afficher le CLV</div>
-                        <div className="text-[11px] text-[#8a919e] mt-0.5">Crédibilise la valeur long terme, recommandé</div>
+                        <div className="text-[13px] font-medium text-[var(--text-primary)]">Afficher le CLV</div>
+                        <div className="text-[11px] text-[var(--text-muted)] mt-0.5">Crédibilise la valeur long terme, recommandé</div>
                       </div>
                       <Toggle checked={getVal("share_show_clv") ?? true} onChange={(v) => setVal("share_show_clv", v)} />
                     </div>
-                    <div className={rowCls + " bg-[#f4f5f7]"}>
+                    <div className={rowCls + " bg-[var(--bg-surface)]"}>
                       <div className="flex-1 pr-5">
-                        <div className="text-[13px] font-medium text-[#111318]">Watermark BetTracker</div>
-                        <div className="text-[11px] text-[#8a919e] mt-0.5">Toujours affiché, contrepartie de la feature gratuite</div>
+                        <div className="text-[13px] font-medium text-[var(--text-primary)]">Watermark BetTracker</div>
+                        <div className="text-[11px] text-[var(--text-muted)] mt-0.5">Toujours affiché, contrepartie de la feature gratuite</div>
                       </div>
                       <Toggle checked={true} onChange={() => {}} disabled />
                     </div>
@@ -581,8 +581,8 @@ export default function Parametres() {
           </div>
 
           {/* ═══ Section 4: Affichage & Langue ═══ */}
-          <div ref={sectionRefs.display} id="display" className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl shadow-sm overflow-hidden animate-fade-up" style={{ animationDelay: "0.15s" }}>
-            <div className="px-5 py-4 border-b border-[#e3e6eb]">
+          <div ref={sectionRefs.display} id="display" className="bg-[var(--bg-card)] border-[1.5px] border-[var(--border-color)] rounded-xl shadow-sm overflow-hidden animate-fade-up" style={{ animationDelay: "0.15s" }}>
+            <div className="px-5 py-4 border-b border-[var(--border-color)]">
               <div className={sectionTitleCls}>
                 <Settings size={16} style={{ color: C.accent }} /> Affichage & Langue
               </div>
@@ -590,7 +590,7 @@ export default function Parametres() {
             <div className="p-5">
               {/* Theme */}
               <div className="mb-5">
-                <div className="text-[12px] font-semibold text-[#3c4149] mb-2.5">Thème</div>
+                <div className="text-[12px] font-semibold text-[var(--text-secondary)] mb-2.5">Thème</div>
                 <div className="flex gap-2.5">
                   {([
                     { id: "light", label: "Clair (défaut)", icon: Sun, sb: "#1e2535", main: "#f4f5f7", bar: "#fff", cnt: "#e3e6eb" },
@@ -602,7 +602,7 @@ export default function Parametres() {
                       <button
                         key={t.id}
                         onClick={() => setVal("theme", t.id)}
-                        className="flex-1 border-2 rounded-[9px] p-2.5 cursor-pointer transition-all text-center bg-transparent hover:border-[#cdd1d9]"
+                        className="flex-1 border-2 rounded-[9px] p-2.5 cursor-pointer transition-all text-center bg-transparent hover:border-[var(--border-strong)]"
                         style={{
                           borderColor: isSelected ? C.accentBd : C.border,
                           background: isSelected ? C.accentBg : "transparent",
@@ -615,7 +615,7 @@ export default function Parametres() {
                             <div className="flex-1 rounded-sm" style={{ background: t.cnt }} />
                           </div>
                         </div>
-                        <div className={`text-[11.5px] font-semibold ${isSelected ? "text-[#3b5bdb]" : "text-[#3c4149]"}`}>
+                        <div className={`text-[11.5px] font-semibold ${isSelected ? "text-[var(--accent)]" : "text-[var(--text-secondary)]"}`}>
                           {t.label}
                         </div>
                       </button>
@@ -625,10 +625,10 @@ export default function Parametres() {
               </div>
 
               {/* Settings rows */}
-              <div className="border border-[#e3e6eb] rounded-[10px] overflow-hidden">
+              <div className="border border-[var(--border-color)] rounded-[10px] overflow-hidden">
                 <div className={rowCls}>
                   <div className="flex-1 pr-5">
-                    <div className="text-[13.5px] font-medium text-[#111318]">Langue</div>
+                    <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Langue</div>
                   </div>
                   <select
                     value={getVal("language") ?? "fr"}
@@ -642,8 +642,8 @@ export default function Parametres() {
                 </div>
                 <div className={rowCls}>
                   <div className="flex-1 pr-5">
-                    <div className="text-[13.5px] font-medium text-[#111318]">Devise d'affichage</div>
-                    <div className="text-[12px] text-[#8a919e] mt-0.5">Cosmétique : affiche le symbole, ne convertit pas les montants</div>
+                    <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Devise d'affichage</div>
+                    <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Cosmétique : affiche le symbole, ne convertit pas les montants</div>
                   </div>
                   <select
                     value={getVal("currency") ?? "EUR"}
@@ -658,8 +658,8 @@ export default function Parametres() {
                 </div>
                 <div className={rowCls}>
                   <div className="flex-1 pr-5">
-                    <div className="text-[13.5px] font-medium text-[#111318]">Format des cotes</div>
-                    <div className="text-[12px] text-[#8a919e] mt-0.5">Affecte toutes les vues et les cartes de partage</div>
+                    <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Format des cotes</div>
+                    <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Affecte toutes les vues et les cartes de partage</div>
                   </div>
                   <select
                     value={getVal("odds_format") ?? "decimal"}
@@ -673,8 +673,8 @@ export default function Parametres() {
                 </div>
                 <div className={rowCls}>
                   <div className="flex-1 pr-5">
-                    <div className="text-[13.5px] font-medium text-[#111318]">Vue par défaut : Tickets</div>
-                    <div className="text-[12px] text-[#8a919e] mt-0.5">Vue affichée à l'ouverture du module Tickets</div>
+                    <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Vue par défaut : Tickets</div>
+                    <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Vue affichée à l'ouverture du module Tickets</div>
                   </div>
                   <select
                     value={getVal("default_tickets_view") ?? "kanban"}
@@ -688,8 +688,8 @@ export default function Parametres() {
                 </div>
                 <div className={rowCls}>
                   <div className="flex-1 pr-5">
-                    <div className="text-[13.5px] font-medium text-[#111318]">Vue par défaut : Campagnes</div>
-                    <div className="text-[12px] text-[#8a919e] mt-0.5">Vue affichée à l'ouverture du module Campagnes</div>
+                    <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Vue par défaut : Campagnes</div>
+                    <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Vue affichée à l'ouverture du module Campagnes</div>
                   </div>
                   <select
                     value={getVal("default_campaigns_view") ?? "grid"}
@@ -706,14 +706,14 @@ export default function Parametres() {
           </div>
 
           {/* ── Lien Profil ── */}
-          <div className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl shadow-sm px-5 py-3.5 flex items-center justify-between">
+          <div className="bg-[var(--bg-card)] border-[1.5px] border-[var(--border-color)] rounded-xl shadow-sm px-5 py-3.5 flex items-center justify-between">
             <div>
-              <div className="text-[13.5px] font-semibold text-[#111318]">Plan & Facturation</div>
-              <div className="text-[12px] text-[#8a919e] mt-0.5">Gérer votre abonnement, vos factures et votre plan dans le Profil</div>
+              <div className="text-[13.5px] font-semibold text-[var(--text-primary)]">Plan & Facturation</div>
+              <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Gérer votre abonnement, vos factures et votre plan dans le Profil</div>
             </div>
             <a
               href="/settings"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#e3e6eb] bg-transparent text-[#3c4149] text-[13px] font-medium no-underline transition-all hover:border-[rgba(59,91,219,0.18)] hover:text-[#3b5bdb]"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-secondary)] text-[13px] font-medium no-underline transition-all hover:border-[var(--accent-border)] hover:text-[var(--accent)]"
             >
               Aller au Profil <ExternalLink size={12} />
             </a>
@@ -730,13 +730,13 @@ export default function Parametres() {
           style={{ background: "rgba(10,13,20,0.6)" }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowShareModal(false); }}
         >
-          <div className="bg-white rounded-2xl shadow-xl w-[700px] max-w-[95vw] max-h-[90vh] overflow-y-auto flex flex-col animate-fade-up">
-            <div className="px-5 py-4 border-b border-[#e3e6eb] flex items-center justify-between shrink-0">
+          <div className="bg-[var(--bg-card)] rounded-2xl shadow-xl w-[700px] max-w-[95vw] max-h-[90vh] overflow-y-auto flex flex-col animate-fade-up">
+            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
               <div>
-                <h3 className="text-[15px] font-bold text-[#111318]">Partager ce ticket</h3>
-                <div className="text-[12px] text-[#8a919e] mt-0.5">Sinner vs Fritz · Dom @ 1.65 · ✓ Gagné</div>
+                <h3 className="text-[15px] font-bold text-[var(--text-primary)]">Partager ce ticket</h3>
+                <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Sinner vs Fritz · Dom @ 1.65 · ✓ Gagné</div>
               </div>
-              <button onClick={() => setShowShareModal(false)} className="w-[30px] h-[30px] rounded-lg border-none bg-transparent cursor-pointer text-[#8a919e] hover:bg-[#f4f5f7] hover:text-[#111318] transition-all flex items-center justify-center">
+              <button onClick={() => setShowShareModal(false)} className="w-[30px] h-[30px] rounded-lg border-none bg-transparent cursor-pointer text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] transition-all flex items-center justify-center">
                 <X size={15} />
               </button>
             </div>
@@ -744,7 +744,7 @@ export default function Parametres() {
             <div className="p-5 flex gap-5 flex-1">
               {/* Preview side */}
               <div className="shrink-0 w-[260px]">
-                <div className="text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2.5">Aperçu</div>
+                <div className="text-[11px] font-bold text-[var(--text-muted2)] uppercase tracking-wider mb-2.5">Aperçu</div>
                 <div ref={ticketPreviewRef} className="rounded-xl p-[18px_20px] text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]" style={{ background: "linear-gradient(145deg, #0f172a, #1a2540)" }}>
                   <div className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded bg-[rgba(59,91,219,0.3)] text-[#7eb8ff] font-[var(--font-mono)] uppercase tracking-wider mb-3">
                     🎾 ATP · Indian Wells QF
@@ -775,71 +775,71 @@ export default function Parametres() {
                   </div>
                 </div>
                 {/* Tweet preview */}
-                <div className="mt-2.5 p-3 bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg">
-                  <div className="text-[10.5px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-1.5">Texte X/Twitter</div>
-                  <div className="text-[12.5px] text-[#3c4149] leading-relaxed">
-                    <strong className="text-[#111318]">✅ Sinner vs Fritz : Dom @ 1.65</strong><br />
+                <div className="mt-2.5 p-3 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-lg">
+                  <div className="text-[10.5px] font-bold text-[var(--text-muted2)] uppercase tracking-wider mb-1.5">Texte X/Twitter</div>
+                  <div className="text-[12.5px] text-[var(--text-secondary)] leading-relaxed">
+                    <strong className="text-[var(--text-primary)]">✅ Sinner vs Fritz : Dom @ 1.65</strong><br />
                     Edge : +5.8% | CLV : +3.8%<br />
                     +19.50€<br /><br />
-                    <span className="text-[#3b5bdb]">#ValueBetting #BetTracker</span>
+                    <span className="text-[var(--accent)]">#ValueBetting #BetTracker</span>
                   </div>
                 </div>
               </div>
 
               {/* Options + Actions */}
               <div className="flex-1 min-w-0">
-                <div className="text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">Options pour ce partage</div>
-                <div className="text-[11.5px] text-[#8a919e] mb-2">Modifiables à la volée, ne change pas vos paramètres globaux</div>
-                <div className="border border-[#e3e6eb] rounded-[10px] overflow-hidden mb-4">
+                <div className="text-[11px] font-bold text-[var(--text-muted2)] uppercase tracking-wider mb-2">Options pour ce partage</div>
+                <div className="text-[11.5px] text-[var(--text-muted)] mb-2">Modifiables à la volée, ne change pas vos paramètres globaux</div>
+                <div className="border border-[var(--border-color)] rounded-[10px] overflow-hidden mb-4">
                   {[
                     { label: "Afficher la mise", desc: null },
                     { label: "Afficher le gain en €", desc: "Si off : % ROI uniquement" },
                     { label: "Afficher le bookmaker", desc: null },
                     { label: "Afficher le CLV", desc: null },
                   ].map((opt, i) => (
-                    <div key={i} className="flex items-center justify-between px-3.5 py-2.5 border-b border-[#e3e6eb] last:border-b-0">
+                    <div key={i} className="flex items-center justify-between px-3.5 py-2.5 border-b border-[var(--border-color)] last:border-b-0">
                       <div>
-                        <div className="text-[13px] font-medium text-[#111318]">{opt.label}</div>
-                        {opt.desc && <div className="text-[11px] text-[#8a919e] mt-0.5">{opt.desc}</div>}
+                        <div className="text-[13px] font-medium text-[var(--text-primary)]">{opt.label}</div>
+                        {opt.desc && <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{opt.desc}</div>}
                       </div>
                       <Toggle checked={i !== 0} onChange={() => {}} />
                     </div>
                   ))}
-                  <div className="flex items-center justify-between px-3.5 py-2.5 bg-[#f4f5f7]">
+                  <div className="flex items-center justify-between px-3.5 py-2.5 bg-[var(--bg-surface)]">
                     <div>
-                      <div className="text-[13px] font-medium text-[#111318]">Watermark BetTracker</div>
-                      <div className="text-[11px] text-[#8a919e] mt-0.5">Toujours présent</div>
+                      <div className="text-[13px] font-medium text-[var(--text-primary)]">Watermark BetTracker</div>
+                      <div className="text-[11px] text-[var(--text-muted)] mt-0.5">Toujours présent</div>
                     </div>
                     <Toggle checked={true} onChange={() => {}} disabled />
                   </div>
                 </div>
 
-                <div className="text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">Pseudo affiché</div>
+                <div className="text-[11px] font-bold text-[var(--text-muted2)] uppercase tracking-wider mb-2">Pseudo affiché</div>
                 <input
                   type="text"
                   defaultValue={pseudo}
                   className={inputCls + " mb-4"}
                 />
 
-                <div className="text-[11px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">Actions</div>
+                <div className="text-[11px] font-bold text-[var(--text-muted2)] uppercase tracking-wider mb-2">Actions</div>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={handleCopyImage}
                     disabled={shareAction === "copy"}
-                    className="p-2.5 rounded-[9px] border-[1.5px] border-[#e3e6eb] bg-transparent cursor-pointer flex flex-col items-center gap-1.5 transition-all hover:border-[rgba(59,91,219,0.18)] hover:bg-[rgba(59,91,219,0.07)] disabled:opacity-50"
+                    className="p-2.5 rounded-[9px] border-[1.5px] border-[var(--border-color)] bg-transparent cursor-pointer flex flex-col items-center gap-1.5 transition-all hover:border-[var(--accent-border)] hover:bg-[var(--accent-bg)] disabled:opacity-50"
                   >
                     <span className="text-[20px]">📋</span>
-                    <span className="text-[12px] font-semibold text-[#3c4149]">{shareAction === "copy" ? "Copie..." : "Copier l'image"}</span>
-                    <span className="text-[10.5px] text-[#8a919e]">PNG presse-papier</span>
+                    <span className="text-[12px] font-semibold text-[var(--text-secondary)]">{shareAction === "copy" ? "Copie..." : "Copier l'image"}</span>
+                    <span className="text-[10.5px] text-[var(--text-muted)]">PNG presse-papier</span>
                   </button>
                   <button
                     onClick={handleDownloadPng}
                     disabled={shareAction === "download"}
-                    className="p-2.5 rounded-[9px] border-[1.5px] border-[#e3e6eb] bg-transparent cursor-pointer flex flex-col items-center gap-1.5 transition-all hover:border-[rgba(59,91,219,0.18)] hover:bg-[rgba(59,91,219,0.07)] disabled:opacity-50"
+                    className="p-2.5 rounded-[9px] border-[1.5px] border-[var(--border-color)] bg-transparent cursor-pointer flex flex-col items-center gap-1.5 transition-all hover:border-[var(--accent-border)] hover:bg-[var(--accent-bg)] disabled:opacity-50"
                   >
                     <span className="text-[20px]">⬇️</span>
-                    <span className="text-[12px] font-semibold text-[#3c4149]">{shareAction === "download" ? "Export..." : "Télécharger"}</span>
-                    <span className="text-[10.5px] text-[#8a919e]">Fichier PNG local</span>
+                    <span className="text-[12px] font-semibold text-[var(--text-secondary)]">{shareAction === "download" ? "Export..." : "Télécharger"}</span>
+                    <span className="text-[10.5px] text-[var(--text-muted)]">Fichier PNG local</span>
                   </button>
                   <button
                     onClick={handleShareX}
@@ -853,11 +853,11 @@ export default function Parametres() {
               </div>
             </div>
 
-            <div className="px-5 py-4 border-t border-[#e3e6eb] flex items-center justify-between shrink-0">
-              <span className="text-[12px] text-[#8a919e]">Génération côté client, aucune donnée envoyée</span>
+            <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-between shrink-0">
+              <span className="text-[12px] text-[var(--text-muted)]">Génération côté client, aucune donnée envoyée</span>
               <button
                 onClick={() => setShowShareModal(false)}
-                className="px-3.5 py-2 rounded-lg border border-[#e3e6eb] bg-transparent text-[#8a919e] text-[12.5px] font-medium cursor-pointer hover:border-[#cdd1d9] hover:text-[#3c4149] transition-all"
+                className="px-3.5 py-2 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-muted)] text-[12.5px] font-medium cursor-pointer hover:border-[var(--border-strong)] hover:text-[var(--text-secondary)] transition-all"
               >
                 Fermer
               </button>

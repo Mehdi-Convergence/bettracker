@@ -155,7 +155,7 @@ export default function SpotlightTour({ steps, onComplete }: Props) {
     : {
         position: "fixed" as const,
         inset: 0,
-        background: "rgba(0,0,0,0.55)",
+        background: "var(--overlay)",
         zIndex: 10000,
         pointerEvents: "none" as const,
       };
@@ -203,7 +203,7 @@ export default function SpotlightTour({ steps, onComplete }: Props) {
       >
         <div
           style={{
-            background: "white",
+            background: "var(--bg-card)",
             borderRadius: 12,
             padding: "20px 24px 16px",
             boxShadow: "0 20px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,0,0,0.05)",
@@ -222,11 +222,11 @@ export default function SpotlightTour({ steps, onComplete }: Props) {
             {current + 1} / {visibleSteps.length}
           </div>
 
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#111318", marginBottom: 6 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>
             {step.title}
           </div>
 
-          <div style={{ fontSize: 13.5, color: "#5a6170", lineHeight: 1.55, marginBottom: 16 }}>
+          <div style={{ fontSize: 13.5, color: "var(--text-muted)", lineHeight: 1.55, marginBottom: 16 }}>
             {step.content}
           </div>
 
@@ -239,10 +239,10 @@ export default function SpotlightTour({ steps, onComplete }: Props) {
                 alignItems: "center",
                 gap: 4,
                 padding: "6px 12px",
-                border: "1px solid #e3e6eb",
+                border: "1px solid var(--border-color)",
                 borderRadius: 8,
-                background: "white",
-                color: current === 0 ? "#ccc" : "#5a6170",
+                background: "var(--bg-card)",
+                color: current === 0 ? "var(--border-strong)" : "var(--text-muted)",
                 fontSize: 13,
                 cursor: current === 0 ? "default" : "pointer",
                 fontWeight: 500,

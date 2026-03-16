@@ -56,7 +56,7 @@ export default function PMURaceCard({ race, expanded, onToggle, onSelectRunner }
     <div
       className="bg-white rounded-xl border overflow-hidden transition-all"
       style={{
-        borderColor: expanded ? cfg.border : "#e3e6eb",
+        borderColor: expanded ? cfg.border : "var(--border-color)",
         boxShadow: expanded ? `0 0 0 1px ${cfg.border}` : "0 1px 3px rgba(16,24,40,.06)",
       }}
     >
@@ -212,7 +212,7 @@ export default function PMURaceCard({ race, expanded, onToggle, onSelectRunner }
                           {runner.edge_win != null ? (
                             <span
                               className="font-mono font-bold text-[12px]"
-                              style={{ color: edgeWin > 0 ? "#12b76a" : edgeWin < -0.03 ? "#f04438" : "#8a919e" }}
+                              style={{ color: edgeWin > 0 ? "var(--green)" : edgeWin < -0.03 ? "var(--red)" : "var(--text-muted)" }}
                             >
                               {edgeWin > 0 ? "+" : ""}{(edgeWin * 100).toFixed(1)}%
                             </span>

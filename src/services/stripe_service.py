@@ -32,6 +32,19 @@ def create_checkout_session(
     return session.url
 
 
+def retrieve_checkout_line_items(session_id: str) -> str | None:
+    """Retrieve the price ID from a checkout session by expanding line_items."""
+    s = _client()
+    try:
+        session = s.checkout.Session.retrieve(session_id, expand=["line_items"])
+        items = session.get("line_items", {}).get("data", [])
+        if items:
+            return (items[0].get("price") or {}).get("id")
+    except Exception:
+        pass
+    return None
+
+
 def create_billing_portal_session(customer_id: str, return_url: str) -> str:
     """Create a Stripe Billing Portal Session and return the redirect URL."""
     s = _client()

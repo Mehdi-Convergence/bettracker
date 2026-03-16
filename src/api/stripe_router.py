@@ -16,6 +16,7 @@ from src.services.stripe_service import (
     create_billing_portal_session,
     create_checkout_session,
     get_tier_from_price,
+    retrieve_checkout_line_items,
 )
 
 logger = logging.getLogger(__name__)
@@ -165,8 +166,15 @@ def _handle_checkout_completed(db: Session, session: dict) -> None:
 
     # Resolve tier from the subscription's price
     price_id = _extract_price_id_from_session(session)
+    if not price_id:
+        # Fallback: retrieve line_items via API (webhook doesn't always include them)
+        session_id = session.get("id")
+        if session_id:
+            price_id = retrieve_checkout_line_items(session_id)
     if price_id:
         user.tier = get_tier_from_price(price_id)
+    else:
+        logger.warning("checkout.session.completed: could not extract price_id for user %s", user_id_str)
 
     db.commit()
     logger.info("User %s upgraded via checkout — tier=%s", user_id_str, user.tier)

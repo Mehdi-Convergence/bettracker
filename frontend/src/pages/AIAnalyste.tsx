@@ -259,7 +259,7 @@ function ContextPanel({
                         ? "border-transparent text-white"
                         : "border-[#e3e6eb] bg-[#f7f8fa] text-[#b0b7c3]"
                     }`}
-                    style={active ? { backgroundColor: SPORT_COLORS[s] || "#8a919e" } : undefined}
+                    style={active ? { backgroundColor: SPORT_COLORS[s] || "var(--text-muted)" } : undefined}
                   >
                     {SPORT_LABELS[s] || s}
                   </button>
@@ -961,7 +961,7 @@ export default function AIAnalyste() {
                             className={`px-1.5 py-[1px] rounded text-[9px] font-semibold border cursor-pointer transition-all font-[inherit] ${
                               active ? "border-transparent text-white" : "border-[#e3e6eb] bg-[#f7f8fa] text-[#b0b7c3]"
                             }`}
-                            style={active ? { backgroundColor: SPORT_COLORS[s] || "#8a919e" } : undefined}
+                            style={active ? { backgroundColor: SPORT_COLORS[s] || "var(--text-muted)" } : undefined}
                           >
                             {SPORT_LABELS[s] || s}
                           </button>

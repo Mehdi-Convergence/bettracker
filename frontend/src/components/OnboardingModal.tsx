@@ -54,13 +54,13 @@ export default function OnboardingModal() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(0, 0, 0, 0.6)",
+        background: "var(--overlay)",
         backdropFilter: "blur(4px)",
       }}
     >
       <div
         style={{
-          background: "white",
+          background: "var(--bg-card)",
           borderRadius: 16,
           padding: "40px 44px 32px",
           maxWidth: 440,
@@ -85,22 +85,22 @@ export default function OnboardingModal() {
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
             </svg>
           </div>
-          <span style={{ fontWeight: 800, fontSize: 18, color: "#111318" }}>
+          <span style={{ fontWeight: 800, fontSize: 18, color: "var(--text-primary)" }}>
             Bet<span style={{ color: "#4f8cff" }}>Tracker</span>
           </span>
         </div>
 
         {/* Welcome */}
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: "#111318", margin: "0 0 6px" }}>
+        <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 6px" }}>
           Bienvenue{firstName ? `, ${firstName}` : ""} !
         </h2>
-        <p style={{ fontSize: 14, color: "#5a6170", margin: "0 0 28px", lineHeight: 1.5 }}>
+        <p style={{ fontSize: 14, color: "var(--text-muted)", margin: "0 0 28px", lineHeight: 1.5 }}>
           Configurez votre bankroll et mise par défaut pour commencer. Vous pourrez les modifier plus tard dans les paramètres.
         </p>
 
         {/* Bankroll */}
         <div style={{ marginBottom: 20 }}>
-          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#111318", marginBottom: 6 }}>
+          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginBottom: 6 }}>
             Bankroll initiale (€)
           </label>
           <input
@@ -112,23 +112,25 @@ export default function OnboardingModal() {
             style={{
               width: "100%",
               padding: "10px 14px",
-              border: "1px solid #e3e6eb",
+              background: "var(--bg-surface)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border-color)",
               borderRadius: 8,
               fontSize: 15,
               outline: "none",
               boxSizing: "border-box",
             }}
             onFocus={(e) => (e.target.style.borderColor = "#4f8cff")}
-            onBlur={(e) => (e.target.style.borderColor = "#e3e6eb")}
+            onBlur={(e) => (e.target.style.borderColor = "var(--border-color)")}
           />
-          <p style={{ fontSize: 12, color: "#8a919e", margin: "4px 0 0" }}>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
             Le capital total que vous dédiez aux paris sportifs
           </p>
         </div>
 
         {/* Stake */}
         <div style={{ marginBottom: 24 }}>
-          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#111318", marginBottom: 6 }}>
+          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginBottom: 6 }}>
             Mise par défaut (% de la bankroll)
           </label>
           <input
@@ -142,22 +144,24 @@ export default function OnboardingModal() {
             style={{
               width: "100%",
               padding: "10px 14px",
-              border: "1px solid #e3e6eb",
+              background: "var(--bg-surface)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border-color)",
               borderRadius: 8,
               fontSize: 15,
               outline: "none",
               boxSizing: "border-box",
             }}
             onFocus={(e) => (e.target.style.borderColor = "#4f8cff")}
-            onBlur={(e) => (e.target.style.borderColor = "#e3e6eb")}
+            onBlur={(e) => (e.target.style.borderColor = "var(--border-color)")}
           />
-          <p style={{ fontSize: 12, color: "#8a919e", margin: "4px 0 0" }}>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>
             Pourcentage de votre bankroll misé par pari (recommandé : 1-3%)
           </p>
         </div>
 
         {error && (
-          <p style={{ color: "#f04438", fontSize: 13, margin: "0 0 12px" }}>{error}</p>
+          <p style={{ color: "var(--red)", fontSize: 13, margin: "0 0 12px" }}>{error}</p>
         )}
 
         {/* CTA */}
@@ -189,7 +193,7 @@ export default function OnboardingModal() {
             width: "100%",
             padding: "8px 0",
             background: "transparent",
-            color: "#8a919e",
+            color: "var(--text-muted)",
             border: "none",
             fontSize: 13,
             cursor: "pointer",

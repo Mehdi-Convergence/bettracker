@@ -30,7 +30,7 @@ import { campaignDetailTour } from "@/tours/index";
 import CampaignClosureModal from "@/components/CampaignClosureModal";
 
 // ── Design tokens ──
-const ACCENT = "#3b5bdb";
+const ACCENT = "var(--accent)";
 const PURPLE = "#7c3aed";
 
 // ══════════════════════════════════════════════
@@ -241,9 +241,9 @@ export default function CampaignDetail() {
   if (!campaign || !stats) {
     return (
       <div className="text-center py-20">
-        <p className="text-[#8a919e]">Campagne introuvable.</p>
+        <p style={{ color: "var(--text-muted)" }}>Campagne introuvable.</p>
         <button onClick={() => navigate("/campaign")}
-          className="mt-3 text-sm text-[#3b5bdb] hover:underline cursor-pointer">
+          className="mt-3 text-sm hover:underline cursor-pointer" style={{ color: "var(--accent)" }}>
           Retour aux campagnes
         </button>
       </div>
@@ -286,13 +286,13 @@ export default function CampaignDetail() {
       {/* ═══════════════════════════════════════════ */}
       <div className="flex items-center gap-3" data-tour="campaign-header">
         <button onClick={() => navigate("/campaign")}
-          className="w-8 h-8 rounded-lg bg-white border border-[#e3e6eb] flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer"
-          style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+          className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer border"
+          style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
           <ArrowLeft size={16} className="text-slate-600" />
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2.5">
-            <span className="text-xl font-bold text-[#111318] truncate">{campaign.name}</span>
+            <span className="text-xl font-bold truncate" style={{ color: "var(--text-primary)" }}>{campaign.name}</span>
             <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${statusCfg.bg} ${statusCfg.text}`}>
               <span className="w-1.5 h-1.5 rounded-full" style={{
                 backgroundColor: statusCfg.dot,
@@ -300,11 +300,11 @@ export default function CampaignDetail() {
               }} />
               {statusCfg.label}
             </span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#3b5bdb]/10 text-[#3b5bdb]">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ backgroundColor: "var(--accent-bg)", color: "var(--accent)" }}>
               ALGO
             </span>
           </div>
-          <p className="text-xs text-[#8a919e] mt-0.5">
+          <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
             Football · Edge {"\u2265"} {(campaign.min_edge * 100).toFixed(0)}% · Mise {(campaign.flat_stake * 100).toFixed(0)}%
             {campaign.target_bankroll && ` · Objectif ${campaign.target_bankroll}€`}
           </p>
@@ -312,23 +312,23 @@ export default function CampaignDetail() {
         {!isArchived && (
           <div className="flex items-center gap-2 shrink-0">
             <button onClick={handleTogglePause}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-[#e3e6eb] text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-              style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
               {campaign.status === "active" ? <Pause size={14} /> : <Play size={14} />}
               {campaign.status === "active" ? "Pause" : "Reprendre"}
             </button>
             <div className="relative">
               <button onClick={() => setShowMenu(!showMenu)}
-                className="p-2 rounded-lg bg-white border border-[#e3e6eb] text-[#8a919e] hover:bg-slate-50 transition-colors cursor-pointer"
-                style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+                className="p-2 rounded-lg border hover:bg-slate-50 transition-colors cursor-pointer"
+                style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-muted)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
                 <MoreVertical size={16} />
               </button>
               {showMenu && (
-                <div className="absolute right-0 top-10 w-44 bg-white rounded-lg border border-[#e3e6eb] py-1 z-50"
-                  style={{ boxShadow: "0 4px 16px rgba(16,24,40,.1)" }}>
+                <div className="absolute right-0 top-10 w-44 rounded-lg border py-1 z-50"
+                  style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 4px 16px rgba(16,24,40,.1)" }}>
                   <MenuBtn icon={<Copy size={14} />} label="Dupliquer" onClick={() => setShowMenu(false)} />
                   <MenuBtn icon={<Archive size={14} />} label="Archiver" onClick={handleArchive} />
-                  <div className="border-t border-[#e3e6eb] my-1" />
+                  <div className="border-t my-1" style={{ borderColor: "var(--border-color)" }} />
                   <MenuBtn icon={<Trash2 size={14} />} label="Supprimer" onClick={() => setShowMenu(false)} danger />
                 </div>
               )}
@@ -352,7 +352,7 @@ export default function CampaignDetail() {
           color={ACCENT} />
         <KpiCard label="Mise totale"
           value={`${stats.total_staked.toFixed(0)}€`}
-          color="#111318" />
+          color="var(--text-primary)" />
         <KpiCard label="Gain net"
           value={`${stats.total_pnl >= 0 ? "+" : ""}${stats.total_pnl.toFixed(2)}€`}
           color={stats.total_pnl >= 0 ? GREEN : RED} />
@@ -361,7 +361,7 @@ export default function CampaignDetail() {
           color={AMBER} />
         <KpiCard label="Drawdown max"
           value={stats.max_drawdown_pct > 0 ? `-${stats.max_drawdown_pct.toFixed(1)}%` : "0%"}
-          color={stats.max_drawdown_pct > 5 ? RED : "#111318"} />
+          color={stats.max_drawdown_pct > 5 ? RED : "var(--text-primary)"} />
         <KpiCard label="EV attendu"
           value={`${stats.ev_expected >= 0 ? "+" : ""}${stats.ev_expected.toFixed(2)}€`}
           color={stats.ev_expected >= 0 ? GREEN : RED} />
@@ -375,15 +375,18 @@ export default function CampaignDetail() {
         {/* ── LEFT: Performance ── */}
         <div className="space-y-5">
           {/* Bankroll chart */}
-          <div className="bg-white rounded-xl border border-[#e3e6eb] p-4" data-tour="bankroll-chart" style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+          <div className="rounded-xl border p-4" data-tour="bankroll-chart" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[#111318] font-semibold text-sm">Courbe bankroll</h3>
-              <div className="flex items-center gap-1 bg-[#f4f5f7] rounded-lg p-0.5" data-tour="period-selector">
+              <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>Courbe bankroll</h3>
+              <div className="flex items-center gap-1 rounded-lg p-0.5" data-tour="period-selector" style={{ backgroundColor: "var(--bg-surface)" }}>
                 {(["7j", "14j", "tout"] as const).map((p) => (
                   <button key={p} onClick={() => setChartPeriod(p)}
                     className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
-                      chartPeriod === p ? "bg-white text-[#3b5bdb] shadow-sm" : "text-[#8a919e] hover:text-[#111318]"
-                    }`}>
+                      chartPeriod === p ? "shadow-sm" : ""
+                    }`}
+                    style={chartPeriod === p
+                      ? { backgroundColor: "var(--bg-card)", color: "var(--accent)" }
+                      : { color: "var(--text-muted)" }}>
                     {p === "tout" ? "Tout" : p}
                   </button>
                 ))}
@@ -396,7 +399,7 @@ export default function CampaignDetail() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#e3e6eb" />
                     <XAxis dataKey="date" stroke="#8a919e" tick={{ fontSize: 10 }} />
                     <YAxis stroke="#8a919e" tick={{ fontSize: 11 }} />
-                    <Tooltip contentStyle={{ background: "#fff", border: "1px solid #e3e6eb", borderRadius: 8, boxShadow: "0 1px 3px rgba(0,0,0,0.1)", fontSize: 12 }} />
+                    <Tooltip contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: 8, boxShadow: "0 1px 3px rgba(0,0,0,0.1)", fontSize: 12 }} />
                     <Legend iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                     <Line type="monotone" dataKey="algo" name="Algo" stroke={ACCENT} strokeWidth={2} dot={false} />
                     <Line type="monotone" dataKey="manuel" name="Manuel" stroke={PURPLE} strokeWidth={2} strokeDasharray="5 5" dot={false} />
@@ -404,7 +407,7 @@ export default function CampaignDetail() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-48 flex items-center justify-center text-sm text-[#8a919e]">
+              <div className="h-48 flex items-center justify-center text-sm" style={{ color: "var(--text-muted)" }}>
                 Pas assez de données pour afficher la courbe.
               </div>
             )}
@@ -412,8 +415,8 @@ export default function CampaignDetail() {
 
           {/* Algo vs Manual */}
           {(stats.algo_stats || stats.manual_stats) && (
-            <div className="bg-white rounded-xl border border-[#e3e6eb] p-4" style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
-              <h3 className="text-[#111318] font-semibold text-sm mb-3">Algo vs Manuel</h3>
+            <div className="rounded-xl border p-4" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+              <h3 className="font-semibold text-sm mb-3" style={{ color: "var(--text-primary)" }}>Algo vs Manuel</h3>
               <div className="grid grid-cols-2 gap-4">
                 <SourceBlock label="Algo" color={ACCENT} stats={stats.algo_stats} />
                 <SourceBlock label="Manuel" color={PURPLE} stats={stats.manual_stats} />
@@ -422,27 +425,27 @@ export default function CampaignDetail() {
           )}
 
           {/* Ticket distribution */}
-          <div className="bg-white rounded-xl border border-[#e3e6eb] p-4" style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
-            <h3 className="text-[#111318] font-semibold text-sm mb-3">Répartition tickets</h3>
+          <div className="rounded-xl border p-4" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+            <h3 className="font-semibold text-sm mb-3" style={{ color: "var(--text-primary)" }}>Répartition tickets</h3>
             <div className="space-y-2">
               <DistBar label="Gagnés" count={ticketDistribution.won} total={ticketDistribution.total} color={GREEN} />
               <DistBar label="Perdus" count={ticketDistribution.lost} total={ticketDistribution.total} color={RED} />
               <DistBar label="En cours" count={ticketDistribution.pending} total={ticketDistribution.total} color={AMBER} />
-              <DistBar label="Annulés" count={ticketDistribution.voided} total={ticketDistribution.total} color="#8a919e" />
+              <DistBar label="Annulés" count={ticketDistribution.voided} total={ticketDistribution.total} color="var(--text-muted)" />
             </div>
           </div>
 
           {/* Streaks */}
-          <div className="bg-white rounded-xl border border-[#e3e6eb] p-4" style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
-            <h3 className="text-[#111318] font-semibold text-sm mb-3">Séries</h3>
+          <div className="rounded-xl border p-4" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+            <h3 className="font-semibold text-sm mb-3" style={{ color: "var(--text-primary)" }}>Séries</h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="text-center p-3 rounded-lg bg-emerald-50 border border-emerald-100">
                 <div className="text-lg font-bold font-[var(--font-mono)]" style={{ color: GREEN }}>{stats.longest_winning_streak}</div>
-                <div className="text-[10px] text-[#8a919e]">Série gagnante max</div>
+                <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>Série gagnante max</div>
               </div>
               <div className="text-center p-3 rounded-lg bg-red-50 border border-red-100">
                 <div className="text-lg font-bold font-[var(--font-mono)]" style={{ color: RED }}>{stats.longest_losing_streak}</div>
-                <div className="text-[10px] text-[#8a919e]">Série perdante max</div>
+                <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>Série perdante max</div>
               </div>
             </div>
           </div>
@@ -452,18 +455,18 @@ export default function CampaignDetail() {
         <div className="space-y-5">
           {/* Recommendations (shown first) */}
           {recos && recos.recommendations.length > 0 && (
-            <div className="bg-white rounded-xl border border-[#e3e6eb]" data-tour="recommendations" style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
-              <div className="p-4 border-b border-[#e3e6eb] flex items-center justify-between">
+            <div className="rounded-xl border" data-tour="recommendations" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+              <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: "var(--border-color)" }}>
                 <div>
-                  <h3 className="text-[#111318] font-semibold text-sm">Recommandations</h3>
-                  <p className="text-xs text-[#8a919e]">{recos.recommendations.length} proposition{recos.recommendations.length > 1 ? "s" : ""}</p>
+                  <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>Recommandations</h3>
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>{recos.recommendations.length} proposition{recos.recommendations.length > 1 ? "s" : ""}</p>
                 </div>
                 <button onClick={refreshRecos}
-                  className="text-xs text-[#8a919e] hover:text-[#111318] cursor-pointer inline-flex items-center gap-1">
+                  className="text-xs cursor-pointer inline-flex items-center gap-1" style={{ color: "var(--text-muted)" }}>
                   <RefreshCw size={12} className={recsLoading ? "animate-spin" : ""} /> Actualiser
                 </button>
               </div>
-              <div className="divide-y divide-[#f4f5f7]">
+              <div className="divide-y divide-[var(--bg-surface)]">
                 {recos.recommendations.map((reco, idx) => (
                   <RecoRow key={`${reco.home_team}-${reco.away_team}-${idx}`}
                     reco={reco} idx={idx} accepting={acceptingIdx === idx}
@@ -476,26 +479,28 @@ export default function CampaignDetail() {
           {/* Tickets */}
           <div className="space-y-0" data-tour="tickets-section">
             {/* Tickets header */}
-            <div className="bg-white rounded-t-xl border border-[#e3e6eb] px-4 py-3" style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+            <div className="rounded-t-xl border px-4 py-3" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="text-[#111318] font-semibold text-sm">Tickets</h3>
-                  <p className="text-xs text-[#8a919e]">{bets.length} ticket{bets.length > 1 ? "s" : ""}</p>
+                  <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>Tickets</h3>
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>{bets.length} ticket{bets.length > 1 ? "s" : ""}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {/* View toggle */}
-                  <div className="flex items-center bg-[#f4f5f7] rounded-lg p-0.5" data-tour="tickets-view-toggle">
+                  <div className="flex items-center rounded-lg p-0.5" data-tour="tickets-view-toggle" style={{ backgroundColor: "var(--bg-surface)" }}>
                     <button onClick={() => setTicketView("kanban")}
-                      className={`p-1.5 rounded-md transition-all cursor-pointer ${ticketView === "kanban" ? "bg-white shadow-sm text-[#3b5bdb]" : "text-[#8a919e]"}`}>
+                      className={`p-1.5 rounded-md transition-all cursor-pointer ${ticketView === "kanban" ? "shadow-sm" : ""}`}
+                      style={ticketView === "kanban" ? { backgroundColor: "var(--bg-card)", color: "var(--accent)" } : { color: "var(--text-muted)" }}>
                       <Columns3 size={14} />
                     </button>
                     <button onClick={() => setTicketView("list")}
-                      className={`p-1.5 rounded-md transition-all cursor-pointer ${ticketView === "list" ? "bg-white shadow-sm text-[#3b5bdb]" : "text-[#8a919e]"}`}>
+                      className={`p-1.5 rounded-md transition-all cursor-pointer ${ticketView === "list" ? "shadow-sm" : ""}`}
+                      style={ticketView === "list" ? { backgroundColor: "var(--bg-card)", color: "var(--accent)" } : { color: "var(--text-muted)" }}>
                       <LayoutList size={14} />
                     </button>
                   </div>
                   {!isArchived && (
-                    <button className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white border border-[#e3e6eb] text-[#8a919e] hover:text-[#111318] hover:bg-slate-50 transition-colors cursor-pointer">
+                    <button className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border hover:bg-slate-50 transition-colors cursor-pointer" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
                       <Plus size={12} /> Ticket manuel
                     </button>
                   )}
@@ -503,7 +508,7 @@ export default function CampaignDetail() {
               </div>
               {/* Filters */}
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1 bg-[#f4f5f7] rounded-lg p-0.5">
+                <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ backgroundColor: "var(--bg-surface)" }}>
                   {[
                     { key: "all", label: "Tous" },
                     { key: "pending", label: "En cours" },
@@ -512,24 +517,28 @@ export default function CampaignDetail() {
                   ].map((f) => (
                     <button key={f.key} onClick={() => setTicketStatusFilter(f.key)}
                       className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
-                        ticketStatusFilter === f.key ? "bg-white text-[#3b5bdb] shadow-sm" : "text-[#8a919e]"
-                      }`}>
+                        ticketStatusFilter === f.key ? "shadow-sm" : ""
+                      }`}
+                      style={ticketStatusFilter === f.key
+                        ? { backgroundColor: "var(--bg-card)", color: "var(--accent)" }
+                        : { color: "var(--text-muted)" }}>
                       {f.label}
                     </button>
                   ))}
                 </div>
                 <select value={ticketSourceFilter} onChange={(e) => setTicketSourceFilter(e.target.value)}
-                  className="px-2 py-1 rounded-lg text-[11px] bg-white border border-[#e3e6eb] text-[#8a919e] cursor-pointer focus:outline-none">
+                  className="px-2 py-1 rounded-lg text-[11px] cursor-pointer focus:outline-none border"
+                  style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
                   <option value="all">Algo + Manuel</option>
                   <option value="algo">Algo</option>
                   <option value="manual">Manuel</option>
                 </select>
-                <span className="text-[11px] text-[#8a919e] ml-auto">{filteredBets.length} résultat{filteredBets.length > 1 ? "s" : ""}</span>
+                <span className="text-[11px] ml-auto" style={{ color: "var(--text-muted)" }}>{filteredBets.length} résultat{filteredBets.length > 1 ? "s" : ""}</span>
               </div>
             </div>
 
             {/* Ticket content */}
-            <div className="bg-white rounded-b-xl border border-x border-b border-t-0 border-[#e3e6eb]" style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+            <div className="rounded-b-xl border border-x border-b border-t-0" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
               {ticketView === "kanban" ? (
                 <div className="p-4">
                   <TicketKanban
@@ -563,14 +572,14 @@ export default function CampaignDetail() {
       {/* ═══════════════════════════════════════════ */}
       {/* ZONE 4 — RECAP PARAMS (collapsible) */}
       {/* ═══════════════════════════════════════════ */}
-      <div className="bg-white rounded-xl border border-[#e3e6eb]" data-tour="campaign-params" style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+      <div className="rounded-xl border" data-tour="campaign-params" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
         <button onClick={() => setShowParams(!showParams)}
-          className="w-full p-4 flex items-center justify-between hover:bg-[#f4f5f7]/50 transition-colors cursor-pointer">
-          <span className="text-[#111318] font-semibold text-sm">Paramètres de la campagne</span>
-          {showParams ? <ChevronUp size={16} className="text-[#8a919e]" /> : <ChevronDown size={16} className="text-[#8a919e]" />}
+          className="w-full p-4 flex items-center justify-between transition-colors cursor-pointer hover:opacity-90">
+          <span className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>Paramètres de la campagne</span>
+          {showParams ? <ChevronUp size={16} style={{ color: "var(--text-muted)" }} /> : <ChevronDown size={16} style={{ color: "var(--text-muted)" }} />}
         </button>
         {showParams && (
-          <div className="px-4 pb-4 border-t border-[#e3e6eb]">
+          <div className="px-4 pb-4 border-t" style={{ borderColor: "var(--border-color)" }}>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-4">
               <ParamBlock title="Identité">
                 <ParamRow label="Nom" value={campaign.name} />
@@ -631,8 +640,8 @@ export default function CampaignDetail() {
 
 function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="bg-white rounded-xl p-3 border border-[#e3e6eb]" style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
-      <p className="text-[10px] text-[#8a919e] mb-1">{label}</p>
+    <div className="rounded-xl p-3 border" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+      <p className="text-[10px] mb-1" style={{ color: "var(--text-muted)" }}>{label}</p>
       <p className="text-lg font-bold font-[var(--font-mono)]" style={{ color }}>{value}</p>
     </div>
   );
@@ -643,21 +652,21 @@ function SourceBlock({ label, color, stats }: {
 }) {
   if (!stats || stats.total_bets === 0) {
     return (
-      <div className="rounded-lg border border-[#e3e6eb] p-3 opacity-50">
+      <div className="rounded-lg border p-3 opacity-50" style={{ borderColor: "var(--border-color)" }}>
         <div className="text-xs font-semibold mb-2" style={{ color }}>{label}</div>
-        <p className="text-xs text-[#8a919e]">Aucun ticket</p>
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>Aucun ticket</p>
       </div>
     );
   }
   return (
-    <div className="rounded-lg border border-[#e3e6eb] p-3">
+    <div className="rounded-lg border p-3" style={{ borderColor: "var(--border-color)" }}>
       <div className="text-xs font-semibold mb-2" style={{ color }}>{label}</div>
       <div className="space-y-1.5 text-xs">
-        <div className="flex justify-between"><span className="text-[#8a919e]">ROI</span><span className="font-semibold font-[var(--font-mono)]" style={{ color: stats.roi_pct >= 0 ? GREEN : RED }}>{stats.roi_pct >= 0 ? "+" : ""}{stats.roi_pct.toFixed(1)}%</span></div>
-        <div className="flex justify-between"><span className="text-[#8a919e]">Tickets</span><span className="font-semibold">{stats.total_bets}</span></div>
-        <div className="flex justify-between"><span className="text-[#8a919e]">Réussite</span><span className="font-semibold">{(stats.win_rate * 100).toFixed(0)}%</span></div>
-        <div className="flex justify-between"><span className="text-[#8a919e]">CLV moy.</span><span className="font-semibold font-[var(--font-mono)]">{stats.avg_clv != null ? `${stats.avg_clv >= 0 ? "+" : ""}${stats.avg_clv.toFixed(1)}%` : "\u2014"}</span></div>
-        <div className="flex justify-between"><span className="text-[#8a919e]">Mise tot.</span><span className="font-semibold font-[var(--font-mono)]">{stats.total_staked.toFixed(0)}€</span></div>
+        <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>ROI</span><span className="font-semibold font-[var(--font-mono)]" style={{ color: stats.roi_pct >= 0 ? GREEN : RED }}>{stats.roi_pct >= 0 ? "+" : ""}{stats.roi_pct.toFixed(1)}%</span></div>
+        <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Tickets</span><span className="font-semibold">{stats.total_bets}</span></div>
+        <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Réussite</span><span className="font-semibold">{(stats.win_rate * 100).toFixed(0)}%</span></div>
+        <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>CLV moy.</span><span className="font-semibold font-[var(--font-mono)]">{stats.avg_clv != null ? `${stats.avg_clv >= 0 ? "+" : ""}${stats.avg_clv.toFixed(1)}%` : "\u2014"}</span></div>
+        <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Mise tot.</span><span className="font-semibold font-[var(--font-mono)]">{stats.total_staked.toFixed(0)}€</span></div>
       </div>
     </div>
   );
@@ -667,11 +676,11 @@ function DistBar({ label, count, total, color }: { label: string; count: number;
   const pct = total > 0 ? (count / total) * 100 : 0;
   return (
     <div className="flex items-center gap-3">
-      <span className="text-xs text-[#8a919e] w-16 shrink-0">{label}</span>
-      <div className="flex-1 h-2 bg-[#f4f5f7] rounded-full overflow-hidden">
+      <span className="text-xs w-16 shrink-0" style={{ color: "var(--text-muted)" }}>{label}</span>
+      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ backgroundColor: "var(--bg-surface)" }}>
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
-      <span className="text-xs font-semibold text-[#111318] w-8 text-right font-[var(--font-mono)]">{count}</span>
+      <span className="text-xs font-semibold w-8 text-right font-[var(--font-mono)]" style={{ color: "var(--text-primary)" }}>{count}</span>
     </div>
   );
 }
@@ -679,7 +688,7 @@ function DistBar({ label, count, total, color }: { label: string; count: number;
 function ParamBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h4 className="text-xs font-semibold text-[#111318] mb-2 pb-1 border-b border-[#e3e6eb]">{title}</h4>
+      <h4 className="text-xs font-semibold mb-2 pb-1 border-b" style={{ color: "var(--text-primary)", borderColor: "var(--border-color)" }}>{title}</h4>
       <div className="space-y-1.5">{children}</div>
     </div>
   );
@@ -688,8 +697,8 @@ function ParamBlock({ title, children }: { title: string; children: React.ReactN
 function ParamRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between text-xs">
-      <span className="text-[#8a919e]">{label}</span>
-      <span className="text-[#111318] font-medium">{value}</span>
+      <span style={{ color: "var(--text-muted)" }}>{label}</span>
+      <span className="font-medium" style={{ color: "var(--text-primary)" }}>{value}</span>
     </div>
   );
 }
@@ -700,9 +709,10 @@ function MenuBtn({ icon, label, onClick, danger = false }: {
   return (
     <button onClick={onClick}
       className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors cursor-pointer ${
-        danger ? "text-red-600 hover:bg-red-50" : "text-[#111318] hover:bg-[#f4f5f7]"
-      }`}>
-      <span className={danger ? "text-red-400" : "text-[#8a919e]"}>{icon}</span>
+        danger ? "text-red-600 hover:bg-red-50" : "hover:bg-[var(--bg-surface)]"
+      }`}
+      style={!danger ? { color: "var(--text-primary)" } : {}}>
+      <span className={danger ? "text-red-400" : ""} style={!danger ? { color: "var(--text-muted)" } : {}}>{icon}</span>
       {label}
     </button>
   );
@@ -718,13 +728,13 @@ function RecoRow({ reco, idx, accepting, onAccept, onSkip }: {
     ? new Date(reco.date).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
     : reco.date;
   return (
-    <div className="p-3 hover:bg-[#f4f5f7]/50 transition-colors flex items-center justify-between gap-3">
+    <div className="p-3 transition-colors flex items-center justify-between gap-3 hover:bg-[var(--bg-surface)/50]">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-[#111318] font-medium">{reco.home_team} vs {reco.away_team}</span>
+          <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{reco.home_team} vs {reco.away_team}</span>
           <Badge variant={outcomeBadgeVariant(reco.outcome)} size="xs">{outcomeLabel(reco.outcome)}</Badge>
         </div>
-        <div className="text-[11px] text-[#8a919e] mt-0.5">
+        <div className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
           {info ? `${info.flag} ${info.name}` : reco.league} · {fmtDate}
         </div>
       </div>
@@ -740,7 +750,7 @@ function RecoRow({ reco, idx, accepting, onAccept, onSkip }: {
           {accepting ? "..." : "Valider"}
         </button>
         <button onClick={() => onSkip(idx)}
-          className="px-2 py-1 rounded-lg text-[11px] text-[#8a919e] hover:text-[#111318] hover:bg-slate-100 transition-colors cursor-pointer">
+          className="px-2 py-1 rounded-lg text-[11px] hover:bg-slate-100 transition-colors cursor-pointer" style={{ color: "var(--text-muted)" }}>
           Ignorer
         </button>
       </div>
@@ -804,18 +814,18 @@ function TicketKanban({ bets, recos, isArchived, acceptingIdx, updatingBetId, de
           const info = LEAGUE_INFO[reco.league];
           const accepting = acceptingIdx === idx;
           return (
-            <div className="bg-white rounded-xl border border-[#e3e6eb] p-3" style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+            <div className="rounded-xl border p-3" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
               <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-xs font-medium text-[#111318] truncate">{reco.home_team} vs {reco.away_team}</span>
+                <span className="text-xs font-medium truncate" style={{ color: "var(--text-primary)" }}>{reco.home_team} vs {reco.away_team}</span>
                 <Badge variant={outcomeBadgeVariant(reco.outcome)} size="xs">{outcomeLabel(reco.outcome)}</Badge>
               </div>
-              <div className="text-[10px] text-[#8a919e] mb-2">
+              <div className="text-[10px] mb-2" style={{ color: "var(--text-muted)" }}>
                 {info ? `${info.flag} ${info.name}` : reco.league}
               </div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="font-bold text-sm font-[var(--font-mono)]" style={{ color: AMBER }}>{reco.best_odds.toFixed(2)}</span>
                 <span className="text-[10px] font-semibold font-[var(--font-mono)]" style={{ color: GREEN }}>+{(reco.edge * 100).toFixed(1)}%</span>
-                <span className="text-[10px] font-[var(--font-mono)] text-[#8a919e]">{reco.suggested_stake.toFixed(2)}€</span>
+                <span className="text-[10px] font-[var(--font-mono)]" style={{ color: "var(--text-muted)" }}>{reco.suggested_stake.toFixed(2)}€</span>
               </div>
               {!isArchived && (
                 <div className="flex gap-1.5">
@@ -825,7 +835,7 @@ function TicketKanban({ bets, recos, isArchived, acceptingIdx, updatingBetId, de
                     {accepting ? "..." : "Valider"}
                   </button>
                   <button onClick={() => onSkip(idx)}
-                    className="px-2 py-1 rounded-lg text-[10px] font-semibold text-[#8a919e] hover:bg-slate-100 transition-colors cursor-pointer">
+                    className="px-2 py-1 rounded-lg text-[10px] font-semibold hover:bg-slate-100 transition-colors cursor-pointer" style={{ color: "var(--text-muted)" }}>
                     Ignorer
                   </button>
                 </div>
@@ -845,20 +855,20 @@ function TicketKanban({ bets, recos, isArchived, acceptingIdx, updatingBetId, de
           : bet.match_date.slice(0, 10);
 
         return (
-          <div className={`bg-white rounded-xl border border-[#e3e6eb] p-3 ${isDeleting ? "opacity-40" : ""}`}
-            style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
+          <div className={`rounded-xl border p-3 ${isDeleting ? "opacity-40" : ""}`}
+            style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-medium text-[#111318] truncate">{bet.home_team} vs {bet.away_team}</span>
+              <span className="text-xs font-medium truncate" style={{ color: "var(--text-primary)" }}>{bet.home_team} vs {bet.away_team}</span>
               <Badge variant={outcomeBadgeVariant(bet.outcome_bet)} size="xs">{outcomeLabel(bet.outcome_bet)}</Badge>
             </div>
-            <div className="text-[10px] text-[#8a919e] mb-2">
+            <div className="text-[10px] mb-2" style={{ color: "var(--text-muted)" }}>
               {info ? `${info.flag} ${info.name}` : bet.league} · {fmtDate} · {bet.odds_at_bet.toFixed(2)}
             </div>
 
             {isPending && !isArchived ? (
               <div className="flex gap-1.5">
                 {isUpdating ? (
-                  <Loader2 size={12} className="animate-spin text-[#8a919e]" />
+                  <Loader2 size={12} className="animate-spin" style={{ color: "var(--text-muted)" }} />
                 ) : (
                   <>
                     <button onClick={() => onUpdateBet(bet.id, "won")}
@@ -894,7 +904,7 @@ function TicketKanban({ bets, recos, isArchived, acceptingIdx, updatingBetId, de
               </span>
               {!isArchived && (
                 <button onClick={() => onDeleteBet(bet.id)} disabled={isDeleting || isUpdating}
-                  className="p-1 rounded text-[#8a919e] hover:text-red-400 hover:bg-red-50 transition-colors cursor-pointer">
+                  className="p-1 rounded hover:text-red-400 hover:bg-red-50 transition-colors cursor-pointer" style={{ color: "var(--text-muted)" }}>
                   <Trash2 size={11} />
                 </button>
               )}
@@ -919,14 +929,14 @@ function TicketTable({ bets, isArchived, updatingBetId, deletingBetId, onUpdateB
   onDeleteBet: (id: number) => void;
 }) {
   if (bets.length === 0) {
-    return <div className="p-8 text-center text-sm text-[#8a919e]">Aucun ticket.</div>;
+    return <div className="p-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>Aucun ticket.</div>;
   }
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-[#e3e6eb] text-[#8a919e]">
+          <tr className="border-b" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
             <th className="text-left px-3 py-2 font-medium">Date</th>
             <th className="text-left px-3 py-2 font-medium">Match</th>
             <th className="text-left px-3 py-2 font-medium">Issue</th>
@@ -950,11 +960,11 @@ function TicketTable({ bets, isArchived, updatingBetId, deletingBetId, onUpdateB
               : bet.match_date.slice(0, 10);
 
             return (
-              <tr key={bet.id} className={`border-b border-[#f4f5f7] hover:bg-[#f4f5f7]/50 transition-colors ${isDeleting ? "opacity-40" : ""}`}>
-                <td className="px-3 py-2.5 text-[#8a919e]">{fmtDate}</td>
+              <tr key={bet.id} className={`border-b transition-colors hover:bg-[var(--bg-surface)/50] ${isDeleting ? "opacity-40" : ""}`} style={{ borderColor: "var(--bg-surface)" }}>
+                <td className="px-3 py-2.5" style={{ color: "var(--text-muted)" }}>{fmtDate}</td>
                 <td className="px-3 py-2.5">
-                  <div className="text-[#111318] font-medium">{bet.home_team} vs {bet.away_team}</div>
-                  <div className="text-[10px] text-[#8a919e]">{info ? `${info.flag} ${info.name}` : bet.league}</div>
+                  <div className="font-medium" style={{ color: "var(--text-primary)" }}>{bet.home_team} vs {bet.away_team}</div>
+                  <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>{info ? `${info.flag} ${info.name}` : bet.league}</div>
                 </td>
                 <td className="px-3 py-2.5">
                   <Badge variant={outcomeBadgeVariant(bet.outcome_bet)} size="xs">{outcomeLabel(bet.outcome_bet)}</Badge>
@@ -966,7 +976,7 @@ function TicketTable({ bets, isArchived, updatingBetId, deletingBetId, onUpdateB
                 <td className="px-3 py-2.5">
                   {isPending ? (
                     isUpdating ? (
-                      <Loader2 size={12} className="animate-spin text-[#8a919e]" />
+                      <Loader2 size={12} className="animate-spin" style={{ color: "var(--text-muted)" }} />
                     ) : !isArchived ? (
                       <div className="flex gap-1">
                         <button onClick={() => onUpdateBet(bet.id, "won")}
@@ -984,7 +994,7 @@ function TicketTable({ bets, isArchived, updatingBetId, deletingBetId, onUpdateB
                   )}
                 </td>
                 <td className="px-3 py-2.5 text-right font-[var(--font-mono)] font-semibold"
-                  style={{ color: bet.profit_loss != null ? (bet.profit_loss >= 0 ? GREEN : RED) : "#8a919e" }}>
+                  style={{ color: bet.profit_loss != null ? (bet.profit_loss >= 0 ? GREEN : RED) : "var(--text-muted)" }}>
                   {bet.profit_loss != null ? `${bet.profit_loss >= 0 ? "+" : ""}${bet.profit_loss.toFixed(2)}` : "\u2014"}
                 </td>
                 <td className="px-3 py-2.5 text-right font-[var(--font-mono)]" style={{ color: GREEN }}>
@@ -1000,7 +1010,7 @@ function TicketTable({ bets, isArchived, updatingBetId, deletingBetId, onUpdateB
                 <td className="px-3 py-2.5">
                   {!isArchived && (
                     <button onClick={() => onDeleteBet(bet.id)} disabled={isDeleting || isUpdating}
-                      className="p-1 rounded text-[#8a919e] hover:text-red-400 hover:bg-red-50 transition-colors cursor-pointer">
+                      className="p-1 rounded hover:text-red-400 hover:bg-red-50 transition-colors cursor-pointer" style={{ color: "var(--text-muted)" }}>
                       <Trash2 size={12} />
                     </button>
                   )}

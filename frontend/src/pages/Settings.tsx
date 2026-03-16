@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import confetti from "canvas-confetti";
 import { useNavigate } from "react-router-dom";
 import {
   User,
@@ -157,13 +158,40 @@ export default function Settings() {
   });
   const { showTour, completeTour } = useTour("settings");
 
+  const fireConfetti = useCallback(() => {
+    const duration = 2500;
+    const end = Date.now() + duration;
+    const colors = ["#3b5bdb", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444"];
+    const frame = () => {
+      confetti({
+        particleCount: 3,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0, y: 0.7 },
+        colors,
+      });
+      confetti({
+        particleCount: 3,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1, y: 0.7 },
+        colors,
+      });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    };
+    // Big initial burst
+    confetti({ particleCount: 100, spread: 100, origin: { y: 0.6 }, colors });
+    frame();
+  }, []);
+
   useEffect(() => {
     if (billingSuccess) {
       refreshUser();
+      fireConfetti();
       const timer = setTimeout(() => setBillingSuccess(false), 8000);
       return () => clearTimeout(timer);
     }
-  }, [billingSuccess, refreshUser]);
+  }, [billingSuccess, refreshUser, fireConfetti]);
 
   // Profile
   const [displayName, setDisplayName] = useState(user?.display_name || "");
@@ -737,7 +765,7 @@ export default function Settings() {
                   </div>
                   {user?.totp_enabled ? (
                     <button onClick={() => { setTwoFaStep("disable"); setTwoFaError(""); setTwoFaSuccess(""); setTwoFaCode(""); setTwoFaDisablePwd(""); }}
-                      className="px-4 py-2 rounded-lg border border-[rgba(240,68,56,0.25)] bg-transparent text-[#f04438] text-[13px] font-semibold cursor-pointer transition-all hover:bg-[rgba(240,68,56,0.06)]">
+                      className="px-4 py-2 rounded-lg border border-[rgba(240,68,56,0.25)] bg-transparent text-[var(--red)] text-[13px] font-semibold cursor-pointer transition-all hover:bg-[var(--red-bg)]">
                       Desactiver
                     </button>
                   ) : (

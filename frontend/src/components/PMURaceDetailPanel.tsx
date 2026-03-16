@@ -177,13 +177,13 @@ export default function PMURaceDetailPanel({ race, runnerIndex, onClose }: Props
                 {runner.edge_win != null && (
                   <div className="flex items-center justify-between px-3 py-2.5 rounded-lg"
                     style={{
-                      backgroundColor: edgeWin > 0 ? "#12b76a0f" : edgeWin < -0.03 ? "#f044380f" : "#f4f5f7",
-                      border: `1px solid ${edgeWin > 0 ? "#12b76a30" : edgeWin < -0.03 ? "#f0443830" : "#e3e6eb"}`,
+                      backgroundColor: edgeWin > 0 ? "var(--green-bg)" : edgeWin < -0.03 ? "var(--red-bg)" : "var(--bg-surface)",
+                      border: `1px solid ${edgeWin > 0 ? "#12b76a30" : edgeWin < -0.03 ? "#f0443830" : "var(--border-color)"}`,
                     }}>
                     <span className="text-[12px] text-[#8a919e]">Edge victoire</span>
                     <span
                       className="text-[14px] font-bold font-mono"
-                      style={{ color: edgeWin > 0 ? "#12b76a" : edgeWin < -0.03 ? "#f04438" : "#8a919e" }}
+                      style={{ color: edgeWin > 0 ? "var(--green)" : edgeWin < -0.03 ? "var(--red)" : "var(--text-muted)" }}
                     >
                       {edgeWin > 0 ? "+" : ""}{(edgeWin * 100).toFixed(1)}%
                     </span>
@@ -192,13 +192,13 @@ export default function PMURaceDetailPanel({ race, runnerIndex, onClose }: Props
                 {runner.edge_place != null && (
                   <div className="flex items-center justify-between px-3 py-2.5 rounded-lg"
                     style={{
-                      backgroundColor: edgePlace > 0 ? "#12b76a0f" : edgePlace < -0.03 ? "#f044380f" : "#f4f5f7",
-                      border: `1px solid ${edgePlace > 0 ? "#12b76a30" : edgePlace < -0.03 ? "#f0443830" : "#e3e6eb"}`,
+                      backgroundColor: edgePlace > 0 ? "var(--green-bg)" : edgePlace < -0.03 ? "var(--red-bg)" : "var(--bg-surface)",
+                      border: `1px solid ${edgePlace > 0 ? "#12b76a30" : edgePlace < -0.03 ? "#f0443830" : "var(--border-color)"}`,
                     }}>
                     <span className="text-[12px] text-[#8a919e]">Edge place</span>
                     <span
                       className="text-[14px] font-bold font-mono"
-                      style={{ color: edgePlace > 0 ? "#12b76a" : edgePlace < -0.03 ? "#f04438" : "#8a919e" }}
+                      style={{ color: edgePlace > 0 ? "var(--green)" : edgePlace < -0.03 ? "var(--red)" : "var(--text-muted)" }}
                     >
                       {edgePlace > 0 ? "+" : ""}{(edgePlace * 100).toFixed(1)}%
                     </span>

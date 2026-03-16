@@ -1464,15 +1464,15 @@ function TicketsKanban({
                 )}
               </div>
               <div className="flex items-center justify-between mt-1">
-                <div className="flex items-center gap-1 text-[10px] text-[#b0b7c3]">
+                <div className="flex items-center gap-1 text-[10px]" style={{ color: "var(--text-muted2)" }}>
                   <span className="w-1.5 h-1.5 rounded-full" style={{ background: getCampaignColor(b.campaign_id) }} />
                   <span className="truncate max-w-[100px]">{getCampaignName(b.campaign_id)}</span>
                 </div>
-                <span className="text-[10px] font-[var(--font-mono)] text-[#b0b7c3]">{b.campaign_id ? "BK Camp." : "BK Globale"}</span>
+                <span className="text-[10px] font-[var(--font-mono)]" style={{ color: "var(--text-muted2)" }}>{b.campaign_id ? "BK Camp." : "BK Globale"}</span>
               </div>
               {/* Hypothetical result for ignored tickets */}
               {isIgnored && b.profit_loss != null && (
-                <div className="mt-1.5 px-2 py-1 rounded bg-[rgba(138,145,158,.06)] border border-[rgba(138,145,158,.12)] text-[10.5px] text-[#8a919e] italic">
+                <div className="mt-1.5 px-2 py-1 rounded border border-[rgba(138,145,158,.12)] text-[10.5px] italic" style={{ backgroundColor: "rgba(138,145,158,.06)", color: "var(--text-muted)" }}>
                   Aurait rapporté {b.profit_loss >= 0 ? `+${b.profit_loss.toFixed(2)}€` : `${b.profit_loss.toFixed(2)}€`}
                 </div>
               )}
@@ -1500,7 +1500,8 @@ function TicketsKanban({
       />
       {/* Add manual button below kanban */}
       <button onClick={onAddManual}
-        className="w-full mt-3 py-2.5 rounded-lg border-[1.5px] border-dashed border-[#cdd1d9] bg-transparent text-[#8a919e] text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 hover:border-[#3b5bdb] hover:text-[#3b5bdb] hover:bg-[rgba(59,91,219,.03)] transition-all">
+        className="w-full mt-3 py-2.5 rounded-lg border-[1.5px] border-dashed bg-transparent text-xs font-medium cursor-pointer flex items-center justify-center gap-1.5 hover:border-[#3b5bdb] hover:text-[#3b5bdb] hover:bg-[rgba(59,91,219,.03)] transition-all"
+        style={{ borderColor: "var(--border-strong)", color: "var(--text-muted)" }}>
         <Plus size={12} /> Ajouter un ticket manuel
       </button>
     </div>
@@ -1548,8 +1549,8 @@ function CampMiniDash({ detail, history, campBets }: {
   }
 
   return (
-    <div className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl p-4" style={{ boxShadow: SH_SM }}>
-      <div className="text-[13px] font-bold mb-3 flex items-center gap-2">
+    <div className="border-[1.5px] rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: SH_SM }}>
+      <div className="text-[13px] font-bold mb-3 flex items-center gap-2" style={{ color: "var(--text-primary)" }}>
         ⚽ {campaign.name}
         <span className="text-[10px] px-2 py-0.5 rounded font-[var(--font-mono)] font-semibold"
           style={{ background: `${statusColor}12`, color: statusColor }}>{statusLabel}</span>
@@ -1622,18 +1623,22 @@ function CampBetsTable({ bets, campaigns: _campaigns, onUpdateResult, onDeleteBe
   return (
     <div className="space-y-2">
       <div className="flex gap-2 items-center flex-wrap">
-        <div className="flex gap-0.5 bg-[#f4f5f7] border border-[#e3e6eb] rounded-lg p-0.5">
+        <div className="flex gap-0.5 border rounded-lg p-0.5" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-color)" }}>
           {["all", "pending", "won", "lost"].map((f) => (
             <button key={f} onClick={() => { setFilter(f); setPg(1); }}
               className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-                filter === f ? "bg-white text-[#111318] font-semibold shadow-sm" : "text-[#8a919e] hover:text-[#3c4149]"
-              }`}>
+                filter === f ? "font-semibold shadow-sm" : "hover:text-[#3c4149]"
+              }`}
+              style={filter === f
+                ? { backgroundColor: "var(--bg-card)", color: "var(--text-primary)" }
+                : { color: "var(--text-muted)" }}>
               {f === "all" ? "Tous" : f === "pending" ? "En cours" : f === "won" ? "Gagné" : "Perdu"}
             </button>
           ))}
         </div>
         <select value={tagF} onChange={(e) => { setTagF(e.target.value); setPg(1); }}
-          className="px-2.5 py-1.5 border border-[#e3e6eb] rounded-lg bg-white text-[12.5px] text-[#3c4149] outline-none cursor-pointer">
+          className="px-2.5 py-1.5 border rounded-lg text-[12.5px] outline-none cursor-pointer"
+          style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)", color: "var(--text-secondary)" }}>
           <option value="all">Tous tags</option>
           <option value="ALGO">ALGO</option>
           <option value="MANUEL">MANUEL</option>
@@ -1641,15 +1646,16 @@ function CampBetsTable({ bets, campaigns: _campaigns, onUpdateResult, onDeleteBe
           <option value="COMBI">COMBI</option>
         </select>
         <button onClick={() => onExport(filtered)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-white text-[#8a919e] text-xs font-medium hover:text-[#12b76a] transition-colors cursor-pointer ml-auto">
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium hover:text-[#12b76a] transition-colors cursor-pointer ml-auto"
+          style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-card)", color: "var(--text-muted)" }}>
           <Download size={12} /> Export CSV campagne
         </button>
       </div>
 
-      <div className="bg-white border-[1.5px] border-[#e3e6eb] rounded-xl overflow-hidden" style={{ boxShadow: SH_SM }}>
+      <div className="border-[1.5px] rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: SH_SM }}>
         <div className="overflow-x-auto">
           <table className="w-full text-[12.5px] border-collapse">
-            <thead className="bg-[#f4f5f7] border-b-[1.5px] border-[#e3e6eb]">
+            <thead className="border-b-[1.5px]" style={{ backgroundColor: "var(--bg-surface)", borderColor: "var(--border-color)" }}>
               <tr>
                 <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Date</th>
                 <th className="px-3 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted2)" }}>Match</th>
@@ -1688,19 +1694,20 @@ function CampBetsTable({ bets, campaigns: _campaigns, onUpdateResult, onDeleteBe
                           className="px-1.5 py-0.5 rounded text-[10px] border border-[#e3e6eb] text-[#8a919e] hover:text-[#f04438] cursor-pointer">L</button>
                       </>}
                       <button onClick={() => onDeleteBet(b.id)}
-                        className="px-1.5 py-0.5 rounded text-[10px] border border-[#e3e6eb] text-[#b0b7c3] hover:border-[rgba(240,68,56,.2)] hover:text-[#f04438] cursor-pointer"
+                        className="px-1.5 py-0.5 rounded text-[10px] border hover:border-[rgba(240,68,56,.2)] hover:text-[#f04438] cursor-pointer"
+                        style={{ borderColor: "var(--border-color)", color: "var(--text-muted2)" }}
                         title="Supprimer"><Trash2 size={10} /></button>
                     </div>
                   </td>
                 </tr>
               ))}
               {paged.length === 0 && (
-                <tr><td colSpan={10} className="px-3 py-12 text-center text-sm text-[#8a919e]">Aucun ticket</td></tr>
+                <tr><td colSpan={10} className="px-3 py-12 text-center text-sm" style={{ color: "var(--text-muted)" }}>Aucun ticket</td></tr>
               )}
             </tbody>
           </table>
         </div>
-        <div className="flex items-center justify-between px-4 py-3 border-t border-[#e3e6eb] text-[12.5px] text-[#8a919e]">
+        <div className="flex items-center justify-between px-4 py-3 border-t text-[12.5px]" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
           <span>{filtered.length} tickets · page {pg} / {tp}</span>
           <div className="flex gap-1">
             <PBtn onClick={() => setPg(Math.max(1, pg - 1))} disabled={pg <= 1}>‹</PBtn>
