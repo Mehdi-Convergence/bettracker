@@ -25,6 +25,23 @@ interface DashboardGridProps {
   renderWidget: (widget: DashboardWidget) => React.ReactNode;
 }
 
+function getResponsiveCols(width: number): number {
+  if (width < 480) return 2;
+  if (width < 768) return 4;
+  if (width < 1024) return 6;
+  return 12;
+}
+
+function adaptLayoutForCols(widgets: DashboardWidget[], cols: number): DashboardWidget[] {
+  if (cols >= 12) return widgets;
+  // Re-flow widgets to fit within fewer columns
+  return widgets.map((w) => ({
+    ...w,
+    w: Math.min(w.w, cols),
+    x: Math.min(w.x, Math.max(0, cols - Math.min(w.w, cols))),
+  }));
+}
+
 export function DashboardGrid({
   widgets,
   isEditMode,
@@ -43,6 +60,10 @@ export function DashboardGrid({
     window.addEventListener("resize", updateWidth);
     return () => window.removeEventListener("resize", updateWidth);
   }, []);
+
+  const cols = getResponsiveCols(containerWidth);
+  const isMobile = containerWidth < 768;
+  const adaptedWidgets = adaptLayoutForCols(widgets, cols);
 
   const handleLayoutChange = useCallback(
     (newLayout: Layout) => {
@@ -63,7 +84,7 @@ export function DashboardGrid({
     <div className="dashboard-grid-container">
       <GridLayout
         className={`layout ${!isEditMode ? "dashboard-read-only" : ""}`}
-        layout={widgets.map((w) => {
+        layout={adaptedWidgets.map((w) => {
           const def = widgetRegistry[w.type];
           return {
             i: w.id,
@@ -71,27 +92,27 @@ export function DashboardGrid({
             y: w.y,
             w: w.w,
             h: w.h,
-            minW: def?.minSize.w ?? 2,
+            minW: Math.min(def?.minSize.w ?? 2, cols),
             minH: def?.minSize.h ?? 2,
-            static: !isEditMode,
+            static: !isEditMode || isMobile,
           };
         })}
         gridConfig={{
-          cols: 12,
-          rowHeight: 60,
-          margin: [16, 16] as const,
+          cols,
+          rowHeight: isMobile ? 50 : 60,
+          margin: (isMobile ? [8, 8] : [16, 16]) as const,
           containerPadding: [0, 0] as const,
           maxRows: Infinity,
         }}
         width={containerWidth}
         dragConfig={{
-          enabled: isEditMode,
+          enabled: isEditMode && !isMobile,
           handle: ".widget-drag-handle",
           bounded: false,
           threshold: 3,
         }}
         resizeConfig={{
-          enabled: isEditMode,
+          enabled: isEditMode && !isMobile,
           handles: ["se"] as const,
         }}
         onLayoutChange={handleLayoutChange}

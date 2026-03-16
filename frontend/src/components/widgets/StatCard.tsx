@@ -22,8 +22,8 @@ export function StatCard({ label, value, trend, trendInverted = false, color = "
     <div className="relative h-full w-full rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-all overflow-hidden">
       <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: barColor }} />
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-0.5">{label}</p>
-        <span className="text-3xl font-bold tracking-tight" style={{ color }}>
+        <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-0.5 truncate max-w-full">{label}</p>
+        <span className="text-xl sm:text-3xl font-bold tracking-tight" style={{ color }}>
           {prefix}{typeof value === "number" ? value.toLocaleString("fr-FR") : value}{suffix}
         </span>
         {hasTrend && (
