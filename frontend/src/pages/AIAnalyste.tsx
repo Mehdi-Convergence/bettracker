@@ -752,51 +752,154 @@ export default function AIAnalyste() {
           onSendMessage={handleSend}
         />
 
-        {/* ── MOBILE SIDEBAR ── */}
+        {/* ── MOBILE CONTEXT DRAWER ── */}
         {showMobileSidebar && (
           <div className="absolute inset-0 z-50 lg:hidden flex">
             <div className="absolute inset-0 bg-black/30" onClick={() => setShowMobileSidebar(false)} />
-            <div className="relative ml-auto w-[300px] bg-white h-full flex flex-col animate-slide-in overflow-hidden">
-              <div className="shrink-0 px-4 py-3 border-b border-[#e3e6eb] flex items-center gap-2">
-                <button onClick={() => setShowMobileSidebar(false)} className="p-1 rounded cursor-pointer border-none bg-transparent text-[#8a919e] hover:text-[#111318]">
-                  <ChevronLeft size={18} />
-                </button>
-                <span className="text-[14px] font-bold text-[#111318]">Contexte</span>
-              </div>
-              <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
+            <div className="relative ml-auto w-[310px] max-w-[85vw] bg-[#fafbfc] h-full flex flex-col animate-slide-in overflow-hidden">
+              <div className="shrink-0 px-4 py-3 border-b border-[#e3e6eb] bg-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setShowMobileSidebar(false)} className="p-1 rounded cursor-pointer border-none bg-transparent text-[#8a919e] hover:text-[#111318]">
+                    <ChevronLeft size={18} />
+                  </button>
+                  <div className="flex items-center gap-2 text-[13px] font-bold text-[#111318]">
+                    <div className="w-2 h-2 rounded-full bg-[#12b76a] animate-pulse" />
+                    Contexte actif
+                  </div>
+                </div>
                 {context?.rate_limit && (
-                  <div className="flex items-center justify-between px-2 py-2 rounded-lg bg-[#f7f8fa] text-[12px]">
-                    <span className="text-[#8a919e]">Quota</span>
-                    <span className="font-bold font-mono text-[#111318]">{context.rate_limit.remaining}/{context.rate_limit.limit}</span>
+                  <span className="px-2 py-0.5 rounded text-[9.5px] font-semibold bg-[rgba(18,183,106,.08)] text-[#12b76a] tracking-wide uppercase">
+                    {context.rate_limit.remaining}/{context.rate_limit.limit}
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3">
+                {/* Quota */}
+                {context?.rate_limit && (
+                  <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
+                      <Gauge size={10} className="text-[#3b5bdb]" />
+                      Quota quotidien
+                    </div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11.5px] text-[#8a919e]">Messages</span>
+                      <span className="text-[13px] font-bold font-mono text-[#111318]">{context.rate_limit.used}/{context.rate_limit.limit}</span>
+                    </div>
+                    <div className="w-full h-[6px] rounded-full bg-[#f0f1f3] overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-500" style={{
+                        width: `${Math.min((context.rate_limit.used / context.rate_limit.limit) * 100, 100)}%`,
+                        backgroundColor: context.rate_limit.remaining <= 2 ? "#f04438" : context.rate_limit.remaining <= 10 ? "#f79009" : "#12b76a",
+                      }} />
+                    </div>
                   </div>
                 )}
-                <button
-                  onClick={handleNewConversation}
-                  className="w-full py-2 rounded-lg border border-dashed border-[#e3e6eb] text-[12px] font-semibold text-[#7c3aed] cursor-pointer hover:bg-[rgba(124,58,237,.04)] transition-colors bg-transparent font-[inherit]"
-                >
-                  + Nouvelle conversation
-                </button>
-                {conversations.map((c) => (
-                  <div
-                    key={c.id}
-                    className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border cursor-pointer transition-all ${
-                      conversationId === c.id ? "border-[#7c3aed] bg-[rgba(124,58,237,.04)]" : "border-[#e3e6eb] hover:border-[rgba(124,58,237,.18)]"
-                    }`}
-                    onClick={() => loadConversation(c.id)}
-                  >
-                    <MessageCircle size={12} className="text-[#b0b7c3] shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[12px] font-semibold text-[#111318] truncate">{c.title || "Sans titre"}</div>
-                      <div className="text-[10px] text-[#b0b7c3]">{c.message_count} msg</div>
+
+                {/* Performance 30j */}
+                {context?.performance && context.performance.total_bets > 0 && (
+                  <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2.5">
+                      <Trophy size={10} className="text-[#f79009]" />
+                      Performances - 30j
                     </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteConversation(c.id); }}
-                      className="p-1 rounded text-[#b0b7c3] hover:text-[#f04438] cursor-pointer border-none bg-transparent"
-                    >
-                      <Trash2 size={11} />
+                    <div className="text-center mb-2">
+                      <span className={`text-[28px] font-extrabold font-mono leading-none ${context.performance.roi >= 0 ? "text-[#12b76a]" : "text-[#f04438]"}`}>
+                        {context.performance.roi >= 0 ? "+" : ""}{context.performance.roi}%
+                      </span>
+                      <span className="text-[11px] text-[#8a919e] ml-1.5">ROI</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <div className="text-center">
+                        <div className="text-[15px] font-bold font-mono text-[#111318]">{context.performance.total_bets}</div>
+                        <div className="text-[9.5px] text-[#b0b7c3]">Tickets</div>
+                      </div>
+                      <div className="text-center">
+                        <div className={`text-[15px] font-bold font-mono ${context.performance.win_rate >= 50 ? "text-[#12b76a]" : "text-[#f79009]"}`}>{context.performance.win_rate}%</div>
+                        <div className="text-[9.5px] text-[#b0b7c3]">Reussite</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[15px] font-bold font-mono text-[#111318]">{context.performance.total_stake.toLocaleString("fr-FR")}</div>
+                        <div className="text-[9.5px] text-[#b0b7c3]">Mise totale</div>
+                      </div>
+                      <div className="text-center">
+                        <div className={`text-[15px] font-bold font-mono ${context.performance.total_pl >= 0 ? "text-[#12b76a]" : "text-[#f04438]"}`}>
+                          {context.performance.total_pl >= 0 ? "+" : ""}{context.performance.total_pl.toLocaleString("fr-FR")}
+                        </div>
+                        <div className="text-[9.5px] text-[#b0b7c3]">Gain net</div>
+                      </div>
+                    </div>
+                    {context.performance.timeline.length > 1 && (
+                      <Sparkline data={context.performance.timeline.map((t) => t.pl)} w={260} h={36} />
+                    )}
+                  </div>
+                )}
+
+                {/* Value bets */}
+                {context?.value_bets && context.value_bets.length > 0 && (
+                  <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
+                      <Target size={10} className="text-[#3b5bdb]" />
+                      Value bets du jour - {context.value_bets.length}
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      {context.value_bets.map((vb, i) => (
+                        <ValueBetRow key={i} vb={vb} onSend={(t) => { setShowMobileSidebar(false); handleSend(t); }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Conversations */}
+                <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider">
+                      <Clock size={10} className="text-[#3b5bdb]" />
+                      Conversations
+                    </div>
+                    <button onClick={() => { setShowMobileSidebar(false); handleNewConversation(); }}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded text-[9.5px] font-semibold text-[#7c3aed] bg-[rgba(124,58,237,.06)] hover:bg-[rgba(124,58,237,.12)] transition-colors cursor-pointer border-none font-[inherit]">
+                      <RotateCcw size={9} /> Nouveau
                     </button>
                   </div>
-                ))}
+                  {conversations.length === 0 ? (
+                    <div className="text-[11px] text-[#b0b7c3] text-center py-2">Aucune conversation</div>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      {conversations.slice(0, 10).map((c) => (
+                        <div key={c.id}
+                          className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all ${
+                            conversationId === c.id ? "bg-[rgba(124,58,237,.06)]" : "hover:bg-[#f7f8fa]"
+                          } group`}
+                          onClick={() => { loadConversation(c.id); setShowMobileSidebar(false); }}>
+                          <MessageCircle size={11} className="text-[#b0b7c3] shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] font-medium text-[#111318] truncate">{c.title || "Sans titre"}</div>
+                            <div className="text-[9px] text-[#b0b7c3]">{c.message_count} msg</div>
+                          </div>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteConversation(c.id); }}
+                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-[#b0b7c3] hover:text-[#f04438] transition-all cursor-pointer border-none bg-transparent">
+                            <Trash2 size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Questions suggerees */}
+                <div className="rounded-xl bg-white border border-[#e3e6eb] p-3">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#b0b7c3] uppercase tracking-wider mb-2">
+                    <MessageCircle size={10} className="text-[#3b5bdb]" />
+                    Questions suggerees
+                  </div>
+                  <div className="flex gap-1 flex-wrap">
+                    {["Quel est mon ROI ce mois-ci ?", "Value bets football ce soir", "Analyse mes derniers paris", "Resume mes campagnes actives", "Quel sport est le plus rentable ?", "Simulation bankroll Kelly"].map((q) => (
+                      <button key={q} onClick={() => { setShowMobileSidebar(false); handleSend(q); }}
+                        className="px-2 py-[3px] rounded text-[10px] font-medium border border-[#e3e6eb] bg-[#f7f8fa] text-[#8a919e] cursor-pointer transition-all hover:border-[rgba(124,58,237,.15)] hover:text-[#7c3aed] hover:bg-[rgba(124,58,237,.05)] whitespace-nowrap font-[inherit]">
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

@@ -362,7 +362,7 @@ export default function Settings() {
         {/* ── RIGHT: Tabs Card ── */}
         <div className="bg-white border border-[#e3e6eb] rounded-xl shadow-sm overflow-hidden animate-fade-up" style={{ animationDelay: "0.05s" }}>
           {/* Tab bar */}
-          <div className="flex border-b border-[#e3e6eb] px-1.5">
+          <div className="flex border-b border-[#e3e6eb] px-1.5 overflow-x-auto">
             {TABS.map((t) => {
               const tourMap: Record<string, string> = {
                 compte: "tab-account",
@@ -630,7 +630,7 @@ export default function Settings() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {PLANS.map((plan) => {
                   const isCurrent = plan.id === user?.tier;
                   const isElite = plan.id === "premium";
