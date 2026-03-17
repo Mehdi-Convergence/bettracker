@@ -392,6 +392,20 @@ export function createCheckoutSession(tier: "pro" | "premium", billing: "monthly
   });
 }
 
+export function createReactivateCheckout(userId: number, email: string, tier: "pro" | "premium", billing: "monthly" | "annual" = "monthly") {
+  return request<{ url: string }>("/stripe/reactivate-checkout", {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId, email, tier, billing }),
+  });
+}
+
+export function verifyStripeSession(sessionId: string) {
+  return request<{ upgraded: boolean; tier: string; message?: string }>("/stripe/verify-session", {
+    method: "POST",
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+}
+
 export function createBillingPortalSession() {
   return request<{ url: string }>("/stripe/portal", {
     method: "POST",

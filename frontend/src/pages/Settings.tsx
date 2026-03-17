@@ -152,9 +152,10 @@ export default function Settings() {
     if (t === "danger") return "danger";
     return "compte";
   });
-  const [billingSuccess, setBillingSuccess] = useState(() => {
+  const [billingSuccess, setBillingSuccess] = useState(false);
+  const [stripeSessionId] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("success") === "1";
+    return params.get("success") === "1" ? params.get("session_id") : null;
   });
   const { showTour, completeTour } = useTour("settings");
 
@@ -185,13 +186,28 @@ export default function Settings() {
   }, []);
 
   useEffect(() => {
-    if (billingSuccess) {
-      refreshUser();
+    if (!stripeSessionId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { verifyStripeSession } = await import("@/services/api");
+        await verifyStripeSession(stripeSessionId);
+      } catch (e) {
+        console.error("Stripe verify-session failed:", e);
+      }
+      if (cancelled) return;
+      await refreshUser();
+      setBillingSuccess(true);
       fireConfetti();
-      const timer = setTimeout(() => setBillingSuccess(false), 8000);
-      return () => clearTimeout(timer);
-    }
-  }, [billingSuccess, refreshUser, fireConfetti]);
+      // Clean URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete("success");
+      url.searchParams.delete("session_id");
+      window.history.replaceState({}, "", url.toString());
+      setTimeout(() => setBillingSuccess(false), 8000);
+    })();
+    return () => { cancelled = true; };
+  }, [stripeSessionId, refreshUser, fireConfetti]);
 
   // Profile
   const [displayName, setDisplayName] = useState(user?.display_name || "");

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LogIn, Mail, Lock, Eye, EyeOff, UserPlus, Check, ScanSearch, BarChart2, Bot, MessageCircle, ShieldCheck, KeyRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { requestEmailCode, verifyEmailCode, setAccessToken } from "@/services/api";
+import { requestEmailCode, verifyEmailCode, setAccessToken, createReactivateCheckout } from "@/services/api";
 
 type Mode = "login" | "signup";
 type LoginMethod = "password" | "email-code";
@@ -34,6 +34,10 @@ export default function Login() {
   const [emailCodeLoading, setEmailCodeLoading] = useState(false);
   const [emailCodeSuccess, setEmailCodeSuccess] = useState("");
 
+  // Inactive account
+  const [inactiveAccount, setInactiveAccount] = useState<{ user_id: number; email: string } | null>(null);
+  const [reactivateLoading, setReactivateLoading] = useState(false);
+
   // Signup
   const [signupName, setSignupName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
@@ -44,8 +48,25 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setInactiveAccount(null);
     setLoading(true);
     try {
+      // Pre-check for inactive account (403 with inactive flag)
+      const preCheck = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
+      if (preCheck.status === 403) {
+        const data = await preCheck.json();
+        if (data.inactive) {
+          setInactiveAccount({ user_id: data.user_id, email: data.email });
+          setLoading(false);
+          return;
+        }
+      }
+      // Normal login flow
       const result = await login(email, password);
       if (result && result.requires_2fa) {
         setLoginToken(result.login_token);
@@ -57,6 +78,19 @@ export default function Login() {
       setError(err instanceof Error ? err.message : "Erreur de connexion");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReactivate = async (tier: "pro" | "premium") => {
+    if (!inactiveAccount) return;
+    setReactivateLoading(true);
+    try {
+      const { url } = await createReactivateCheckout(inactiveAccount.user_id, inactiveAccount.email, tier);
+      window.location.href = url;
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erreur lors de la reactivation");
+    } finally {
+      setReactivateLoading(false);
     }
   };
 
@@ -149,7 +183,7 @@ export default function Login() {
         <div className="absolute -bottom-20 -left-20 w-[400px] h-[400px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(18,183,106,0.08) 0%, transparent 65%)" }} />
 
         {/* Logo — ancré en haut à gauche */}
-        <div className="relative z-10 flex items-center gap-2.5" style={{ padding: "40px 0 0 44px" }}>
+        <Link to="/" className="relative z-10 flex items-center gap-2.5 no-underline" style={{ padding: "40px 0 0 44px" }}>
           <div className="w-8 h-8 bg-[#4f8cff] rounded-lg flex items-center justify-center">
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" className="w-[17px] h-[17px]">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
@@ -158,7 +192,7 @@ export default function Login() {
           <span className="font-extrabold text-[17px] tracking-tight text-white">
             Bet<span className="text-[#7eb8ff]">Tracker</span>
           </span>
-        </div>
+        </Link>
 
         {/* Center content — centré horizontalement */}
         <div className="relative z-10 flex-1 flex flex-col justify-center items-center">
@@ -326,18 +360,73 @@ export default function Login() {
             </form>
           )}
 
+          {/* ── INACTIVE ACCOUNT ── */}
+          {mode === "login" && inactiveAccount && !twoFactorRequired && (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-3 px-4 py-4 rounded-[10px]" style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" className="shrink-0"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                <div>
+                  <div className="text-[13px] font-semibold text-[#92400e]">Compte inactif</div>
+                  <div className="text-[12px] text-[#b45309] mt-0.5">
+                    Votre compte ({inactiveAccount.email}) a ete desactive. Choisissez un plan pour le reactiver.
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-[9px] text-[13px] font-medium text-[#f04438]" style={{ background: "rgba(240,68,56,0.06)", border: "1px solid rgba(240,68,56,0.2)" }}>
+                  {error}
+                </div>
+              )}
+
+              <button
+                onClick={() => handleReactivate("pro")}
+                disabled={reactivateLoading}
+                className="w-full py-[13px] rounded-[10px] border-none bg-[#3b5bdb] text-white text-[14px] font-bold cursor-pointer flex items-center justify-center gap-2 transition-all hover:bg-[#2f4ac7] disabled:opacity-70"
+              >
+                {reactivateLoading ? (
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                ) : null}
+                Reactiver avec Pro — 29EUR/mois
+              </button>
+              <button
+                onClick={() => handleReactivate("premium")}
+                disabled={reactivateLoading}
+                className="w-full py-[13px] rounded-[10px] border-none text-white text-[14px] font-bold cursor-pointer flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-70"
+                style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)" }}
+              >
+                Reactiver avec Elite — 69EUR/mois
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setInactiveAccount(null); setError(""); }}
+                className="text-[12.5px] text-[#8a919e] bg-transparent border-none cursor-pointer hover:text-[#3c4149] transition-colors text-center"
+              >
+                Retour a la connexion
+              </button>
+            </div>
+          )}
+
           {/* ── LOGIN FORM ── */}
-          {mode === "login" && !twoFactorRequired && (
+          {mode === "login" && !twoFactorRequired && !inactiveAccount && (
             <div>
               {/* Methode de connexion */}
-              <div className="flex gap-1 mb-5">
+              <div className="relative flex p-0.5 mb-5 rounded-xl" style={{ background: "#f4f5f7" }}>
+                {/* Sliding indicator */}
+                <div
+                  className="absolute top-0.5 bottom-0.5 rounded-[10px] bg-white transition-all duration-200"
+                  style={{
+                    width: "calc(50% - 2px)",
+                    left: loginMethod === "password" ? "2px" : "calc(50%)",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
+                  }}
+                />
                 <button
                   type="button"
                   onClick={() => { setLoginMethod("password"); setError(""); }}
-                  className={`flex items-center gap-1.5 px-3 py-[7px] rounded-lg text-[12.5px] font-medium cursor-pointer border transition-all ${
-                    loginMethod === "password"
-                      ? "bg-[#eef1fb] text-[#3b5bdb] border-[#c5cef7]"
-                      : "bg-transparent text-[#8a919e] border-transparent hover:text-[#3c4149]"
+                  className={`relative z-10 flex-1 flex items-center justify-center gap-1.5 py-[9px] rounded-[10px] text-[12.5px] font-semibold cursor-pointer border-none bg-transparent transition-colors ${
+                    loginMethod === "password" ? "text-[#111318]" : "text-[#8a919e] hover:text-[#6b7280]"
                   }`}
                 >
                   <Lock size={13} />
@@ -346,10 +435,8 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => { setLoginMethod("email-code"); setError(""); setEmailCodeStep("email"); setEmailCode(""); setEmailCodeSuccess(""); }}
-                  className={`flex items-center gap-1.5 px-3 py-[7px] rounded-lg text-[12.5px] font-medium cursor-pointer border transition-all ${
-                    loginMethod === "email-code"
-                      ? "bg-[#eef1fb] text-[#3b5bdb] border-[#c5cef7]"
-                      : "bg-transparent text-[#8a919e] border-transparent hover:text-[#3c4149]"
+                  className={`relative z-10 flex-1 flex items-center justify-center gap-1.5 py-[9px] rounded-[10px] text-[12.5px] font-semibold cursor-pointer border-none bg-transparent transition-colors ${
+                    loginMethod === "email-code" ? "text-[#111318]" : "text-[#8a919e] hover:text-[#6b7280]"
                   }`}
                 >
                   <KeyRound size={13} />

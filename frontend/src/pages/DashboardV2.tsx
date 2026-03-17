@@ -469,6 +469,7 @@ export default function DashboardV2() {
           activePresetId={activePresetId}
           onSelectPreset={handleSelectPreset}
           onCreatePreset={handleCreatePreset}
+          onSaveAsNew={handleCreatePreset}
           onRenamePreset={handleRenamePreset}
           onDeletePreset={handleDeletePreset}
           onDuplicatePreset={handleDuplicatePreset}

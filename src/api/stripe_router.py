@@ -17,6 +17,7 @@ from src.services.stripe_service import (
     create_checkout_session,
     get_tier_from_price,
     retrieve_checkout_line_items,
+    retrieve_checkout_session,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,13 @@ router = APIRouter(tags=["stripe"])
 class CheckoutBody(BaseModel):
     tier: str  # "pro" | "premium"
     billing: str = "monthly"  # "monthly" | "annual"
+
+
+class ReactivateCheckoutBody(BaseModel):
+    user_id: int
+    email: str
+    tier: str  # "pro" | "premium"
+    billing: str = "monthly"
 
 
 # ── POST /stripe/checkout ────────────────────────────────────────────────────
@@ -51,7 +59,7 @@ def checkout(
             detail="Stripe non configuré",
         )
 
-    success_url = settings.FRONTEND_URL + "/settings?tab=billing&success=1"
+    success_url = settings.FRONTEND_URL + "/settings?tab=billing&success=1&session_id={CHECKOUT_SESSION_ID}"
     cancel_url = settings.FRONTEND_URL + "/settings?tab=billing"
 
     try:
@@ -67,6 +75,53 @@ def checkout(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Erreur Stripe lors de la création de la session",
+        ) from exc
+
+    return {"url": url}
+
+
+# ── POST /stripe/reactivate-checkout ─────────────────────────────────────────
+
+
+@router.post("/stripe/reactivate-checkout")
+def reactivate_checkout(
+    body: ReactivateCheckoutBody,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Create a Stripe Checkout Session for reactivating an inactive account (no auth required)."""
+    # Verify user exists, is inactive, and email matches
+    user = db.query(User).filter(User.id == body.user_id, User.email == body.email).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte introuvable")
+    if user.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ce compte est deja actif")
+
+    if body.tier == "pro":
+        price_id = settings.STRIPE_PRO_ANNUAL_PRICE_ID if body.billing == "annual" else settings.STRIPE_PRO_PRICE_ID
+    elif body.tier == "premium":
+        price_id = settings.STRIPE_PREMIUM_ANNUAL_PRICE_ID if body.billing == "annual" else settings.STRIPE_PREMIUM_PRICE_ID
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tier invalide (pro ou premium)")
+
+    if not price_id:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Stripe non configure")
+
+    success_url = settings.FRONTEND_URL + "/login?reactivated=1"
+    cancel_url = settings.FRONTEND_URL + "/login"
+
+    try:
+        url = create_checkout_session(
+            customer_id=user.stripe_customer_id,
+            price_id=price_id,
+            user_id=user.id,
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )
+    except _stripe_lib.StripeError as exc:
+        logger.error("Stripe reactivate checkout error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Erreur Stripe lors de la creation de la session",
         ) from exc
 
     return {"url": url}
@@ -142,6 +197,63 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)) -> dic
     return {"status": "ok"}
 
 
+# ── POST /stripe/verify-session ──────────────────────────────────────────────
+
+
+class VerifySessionBody(BaseModel):
+    session_id: str
+
+
+@router.post("/stripe/verify-session")
+def verify_session(
+    body: VerifySessionBody,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Verify a Stripe checkout session and upgrade the user's tier.
+
+    Called by the frontend after returning from Stripe Checkout.
+    This ensures the tier is upgraded even if the webhook hasn't arrived yet.
+    """
+    session = retrieve_checkout_session(body.session_id)
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session Stripe introuvable")
+
+    # Verify session belongs to this user
+    metadata_user_id = (session.get("metadata") or {}).get("user_id")
+    if str(current_user.id) != str(metadata_user_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Session ne correspond pas a l'utilisateur")
+
+    # Verify payment was successful
+    if session.get("payment_status") != "paid":
+        return {"upgraded": False, "tier": current_user.tier, "message": "Paiement non confirme"}
+
+    # Extract tier from price
+    price_id = _extract_price_id_from_session(session)
+    if not price_id:
+        price_id = retrieve_checkout_line_items(body.session_id)
+
+    if not price_id:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Impossible de determiner le plan")
+
+    new_tier = get_tier_from_price(price_id)
+
+    # Update user
+    customer_id = session.get("customer")
+    subscription_id = session.get("subscription")
+    if customer_id:
+        current_user.stripe_customer_id = customer_id
+    if subscription_id:
+        current_user.stripe_subscription_id = subscription_id
+    current_user.tier = new_tier
+    if not current_user.is_active:
+        current_user.is_active = True
+    db.commit()
+
+    logger.info("User %s upgraded via verify-session — tier=%s", current_user.id, new_tier)
+    return {"upgraded": True, "tier": new_tier}
+
+
 # ── Internal helpers ─────────────────────────────────────────────────────────
 
 
@@ -175,6 +287,11 @@ def _handle_checkout_completed(db: Session, session: dict) -> None:
         user.tier = get_tier_from_price(price_id)
     else:
         logger.warning("checkout.session.completed: could not extract price_id for user %s", user_id_str)
+
+    # Reactivate inactive account on successful checkout
+    if not user.is_active:
+        user.is_active = True
+        logger.info("User %s reactivated via checkout", user_id_str)
 
     db.commit()
     logger.info("User %s upgraded via checkout — tier=%s", user_id_str, user.tier)

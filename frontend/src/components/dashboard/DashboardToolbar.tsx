@@ -28,8 +28,10 @@ interface DashboardToolbarProps {
   // Presets
   presets: PresetInfo[];
   activePresetId: string | null;
+  defaultPresetId?: string | null;
   onSelectPreset: (id: string) => void;
   onCreatePreset: (name: string) => void;
+  onSaveAsNew: (name: string) => void;
   onRenamePreset: (id: string, name: string) => void;
   onDeletePreset: (id: string) => void;
   onDuplicatePreset: (id: string) => void;
@@ -46,14 +48,18 @@ export function DashboardToolbar({
   activePresetId,
   onSelectPreset,
   onCreatePreset,
+  onSaveAsNew,
   onRenamePreset,
   onDeletePreset,
   onDuplicatePreset,
+  defaultPresetId,
 }: DashboardToolbarProps) {
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isSavingAsNew, setIsSavingAsNew] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
+  const isOnDefault = activePresetId === defaultPresetId;
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -97,13 +103,24 @@ export function DashboardToolbar({
     }
   };
 
+  const handleSaveAsNewSubmit = () => {
+    const name = inputValue.trim();
+    if (name) {
+      onSaveAsNew(name);
+      setInputValue("");
+      setIsSavingAsNew(false);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       if (isCreating) handleCreateSubmit();
+      else if (isSavingAsNew) handleSaveAsNewSubmit();
       else if (renamingId) handleRenameSubmit();
     }
     if (e.key === "Escape") {
       setIsCreating(false);
+      setIsSavingAsNew(false);
       setRenamingId(null);
       setInputValue("");
     }
@@ -167,13 +184,15 @@ export function DashboardToolbar({
                         {preset.name}
                       </button>
                       <div className="hidden group-hover:flex items-center gap-0.5 pr-1">
-                        <button
-                          onClick={() => { setRenamingId(preset.id); setInputValue(preset.name); }}
-                          className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
-                          title="Renommer"
-                        >
-                          <PenLine className="h-3.5 w-3.5" />
-                        </button>
+                        {preset.id !== defaultPresetId && (
+                          <button
+                            onClick={() => { setRenamingId(preset.id); setInputValue(preset.name); }}
+                            className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                            title="Renommer"
+                          >
+                            <PenLine className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                         <button
                           onClick={() => onDuplicatePreset(preset.id)}
                           className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
@@ -181,7 +200,7 @@ export function DashboardToolbar({
                         >
                           <Copy className="h-3.5 w-3.5" />
                         </button>
-                        {presets.length > 1 && (
+                        {presets.length > 1 && preset.id !== defaultPresetId && (
                           <button
                             onClick={() => onDeletePreset(preset.id)}
                             className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
@@ -249,14 +268,45 @@ export function DashboardToolbar({
             <RotateCcw className="h-4 w-4" />
             Reset
           </button>
-          <button
-            onClick={onSave}
-            disabled={isSaving}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            {isSaving ? "..." : "Sauvegarder"}
-          </button>
+          {isOnDefault ? (
+            isSavingAsNew ? (
+              <div className="flex items-center gap-1">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Nom du dashboard..."
+                  className="px-2 py-1.5 text-sm border border-emerald-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 w-[160px]"
+                  autoFocus
+                />
+                <button onClick={handleSaveAsNewSubmit} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg">
+                  <Check className="h-4 w-4" />
+                </button>
+                <button onClick={() => { setIsSavingAsNew(false); setInputValue(""); }} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setIsSavingAsNew(true); setInputValue(""); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
+              >
+                <Save className="h-4 w-4" />
+                Enregistrer sous...
+              </button>
+            )
+          ) : (
+            <button
+              onClick={onSave}
+              disabled={isSaving}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              {isSaving ? "..." : "Sauvegarder"}
+            </button>
+          )}
           <button
             onClick={onToggleEditMode}
             className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"

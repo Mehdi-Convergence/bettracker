@@ -410,19 +410,6 @@ export default function Layout() {
                 <ShieldAlert size={collapsed ? 18 : 16} className="shrink-0" />
                 {!collapsed && "Admin"}
               </NavLink>
-              <NavLink
-                to="/dashboard-v2"
-                title={collapsed ? "Dashboard V2" : undefined}
-                className={`flex items-center ${collapsed ? "justify-center" : "gap-[9px]"} ${collapsed ? "px-0 py-2" : "px-2.5 py-2"} rounded-lg text-[13.5px] font-semibold no-underline mt-1`}
-                style={{
-                  background: "rgba(59,130,246,0.10)",
-                  color: "#3b82f6",
-                  border: "1px solid rgba(59,130,246,0.18)",
-                }}
-              >
-                <LayoutDashboard size={collapsed ? 18 : 16} className="shrink-0" />
-                {!collapsed && "Dashboard V2"}
-              </NavLink>
             </>
           )}
         </nav>

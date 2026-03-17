@@ -23,6 +23,7 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Admin = lazy(() => import("./pages/Admin"));
 const DashboardV2 = lazy(() => import("./pages/DashboardV2"));
+const DashboardV3 = lazy(() => import("./pages/DashboardV3"));
 const MentionsLegales = lazy(() => import("./pages/MentionsLegales"));
 const CGU = lazy(() => import("./pages/CGU"));
 const ConfidentialitePolicy = lazy(() => import("./pages/ConfidentialitePolicy"));
@@ -71,7 +72,7 @@ export default function App() {
             <Route path="/cgu" element={<CGU />} />
             <Route path="/confidentialite" element={<ConfidentialitePolicy />} />
             <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="dashboard" element={<DashboardV3 />} />
               <Route path="scanner" element={<TierGuard minTier="pro"><Scanner /></TierGuard>} />
               <Route path="backtest" element={<TierGuard minTier="pro"><Backtest /></TierGuard>} />
               <Route path="campaign" element={<TierGuard minTier="premium"><Campaign /></TierGuard>} />
@@ -82,6 +83,7 @@ export default function App() {
               <Route path="parametres" element={<Parametres />} />
               <Route path="analytics" element={<TierGuard minTier="pro"><Analytics /></TierGuard>} />
               <Route path="admin" element={<Admin />} />
+              <Route path="dashboard-v1" element={<Dashboard />} />
               <Route path="dashboard-v2" element={<DashboardV2 />} />
             </Route>
           </Routes>

@@ -55,6 +55,15 @@ def create_billing_portal_session(customer_id: str, return_url: str) -> str:
     return session.url
 
 
+def retrieve_checkout_session(session_id: str) -> dict | None:
+    """Retrieve a checkout session by ID."""
+    s = _client()
+    try:
+        return s.checkout.Session.retrieve(session_id, expand=["line_items"])
+    except Exception:
+        return None
+
+
 def construct_webhook_event(payload: bytes, sig_header: str):
     """Verify and parse an incoming Stripe webhook event."""
     s = _client()

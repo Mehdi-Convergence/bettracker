@@ -79,23 +79,40 @@ def _verify_password(password: str, hashed: str) -> bool:
 @router.post("/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 def register(request: Request, body: RegisterRequest, db: Session = Depends(get_db)):
-    """Create a new user account with a 7-day free trial."""
-    existing = db.query(User).filter(User.email == body.email.lower(), User.is_active == True).first()
-    if existing:
+    """Create a new user account with a 7-day free trial, or reactivate an inactive one."""
+    email_lower = body.email.lower()
+
+    # Check active account
+    existing_active = db.query(User).filter(User.email == email_lower, User.is_active == True).first()
+    if existing_active:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Inscription impossible. Vérifiez vos informations.")
 
-    user = User(
-        email=body.email.lower(),
-        hashed_password=_hash_password(body.password),
-        display_name=body.display_name,
-        tier="free",
-        trial_ends_at=datetime.now(timezone.utc) + timedelta(days=settings.TRIAL_DAYS),
-    )
-    token = secrets.token_urlsafe(32)
-    user.email_verification_token = token
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    # Check inactive account — reactivate instead of creating a duplicate
+    existing_inactive = db.query(User).filter(User.email == email_lower, User.is_active == False).first()
+    if existing_inactive:
+        existing_inactive.is_active = True
+        existing_inactive.hashed_password = _hash_password(body.password)
+        existing_inactive.display_name = body.display_name
+        existing_inactive.tier = "free"
+        existing_inactive.trial_ends_at = datetime.now(timezone.utc) + timedelta(days=settings.TRIAL_DAYS)
+        token = secrets.token_urlsafe(32)
+        existing_inactive.email_verification_token = token
+        db.commit()
+        db.refresh(existing_inactive)
+        user = existing_inactive
+    else:
+        user = User(
+            email=email_lower,
+            hashed_password=_hash_password(body.password),
+            display_name=body.display_name,
+            tier="free",
+            trial_ends_at=datetime.now(timezone.utc) + timedelta(days=settings.TRIAL_DAYS),
+        )
+        token = secrets.token_urlsafe(32)
+        user.email_verification_token = token
+        db.add(user)
+        db.commit()
+        db.refresh(user)
 
     from src.services.email import send_welcome_email, send_verification_email
     threading.Thread(target=send_welcome_email, args=(user.email, user.display_name), daemon=True).start()
@@ -117,10 +134,26 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     if cache_get(lock_key):
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Trop de tentatives. Reessayez dans 15 minutes.")
 
-    user = db.query(User).filter(User.email == email_lower, User.is_active == True).first()
+    user = db.query(User).filter(User.email == email_lower).first()
 
     # Email inconnu : reponse neutre sans incrementer le compteur (anti-enumeration)
     if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email ou mot de passe incorrect")
+
+    # Compte inactif : verifier le mdp puis retourner une reponse specifique
+    if not user.is_active:
+        if _verify_password(body.password, user.hashed_password):
+            cache_delete(fail_key)
+            cache_delete(lock_key)
+            return JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content={
+                    "detail": "Votre compte est inactif. Reactivez-le en souscrivant a un abonnement.",
+                    "inactive": True,
+                    "user_id": user.id,
+                    "email": user.email,
+                },
+            )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email ou mot de passe incorrect")
 
     # Mauvais mot de passe : incremente le compteur et verrouille si necessaire
