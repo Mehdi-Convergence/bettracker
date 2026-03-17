@@ -60,16 +60,18 @@ def _odds_api_budget_check(sport: str, cost: int = 1) -> bool:
 
 
 def _sync_odds_api_usage(client) -> None:
-    """Sync Redis budget counter with real Odds API usage from response headers."""
-    from datetime import datetime as _dt
+    """Sync Redis monthly counter with real Odds API usage from response headers.
 
+    The Odds API 'remaining_requests' header is the MONTHLY remaining, not daily.
+    We store it separately and do NOT overwrite the daily incremental counter.
+    """
     remaining = getattr(client, "remaining_requests", None)
     if remaining is None:
         return
     # Total plan credits = 20000 (plan $30)
-    real_used = 20000 - remaining
-    day_key = f"odds_api_daily:{_dt.now().strftime('%Y-%m-%d')}"
-    cache_set(day_key, real_used, ttl=86400)
+    real_used_month = 20000 - remaining
+    cache_set("odds_api_month_used", real_used_month, ttl=86400 * 35)
+    cache_set("odds_api_month_remaining", remaining, ttl=86400 * 35)
 
 
 def _track_scan_result(sport: str, match_count: int, error: str | None = None) -> None:

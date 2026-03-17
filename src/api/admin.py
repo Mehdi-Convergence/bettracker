@@ -202,11 +202,8 @@ def get_quota_status(
     used_today = int(cache_get(f"odds_api_daily:{today}") or 0)
     by_sport_raw: dict = cache_get(f"odds_api_daily:{today}:by_sport") or {}
 
-    # Sum of last 30 days for monthly usage
-    used_month = 0
-    for offset in range(30):
-        day = (_now_utc() - timedelta(days=offset)).strftime("%Y-%m-%d")
-        used_month += int(cache_get(f"odds_api_daily:{day}") or 0)
+    # Monthly usage from real Odds API header (synced by _sync_odds_api_usage)
+    used_month = int(cache_get("odds_api_month_used") or 0)
 
     by_sport = [{"sport": k, "calls": int(v)} for k, v in by_sport_raw.items()]
 
