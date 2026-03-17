@@ -503,6 +503,12 @@
   height: 420px;
 }
 
+.landing-page .lp-hero-screenshot {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
 /* Mock sidebar */
 .landing-page .lp-mock-sidebar {
   width: 172px;

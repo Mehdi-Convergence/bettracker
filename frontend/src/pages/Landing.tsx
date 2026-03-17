@@ -139,7 +139,7 @@ export default function Landing() {
             </p>
           </div>
 
-          {/* App mockup */}
+          {/* App screenshot */}
           <div className="lp-mock-wrapper lp-fade-up lp-fade-up-delay-2">
             <div className="lp-mock-browser">
               <div className="lp-mock-chrome">
@@ -150,141 +150,7 @@ export default function Landing() {
                 </div>
                 <div className="lp-mock-url">bettracker.fr/scanner</div>
               </div>
-
-              <div className="lp-mock-body">
-                <div className="lp-mock-sidebar" aria-hidden="true">
-                  <div className="lp-mock-sidebar-logo">
-                    <div className="lp-mock-sidebar-logo-icon">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" width="11" height="11" aria-hidden="true">
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                      </svg>
-                    </div>
-                    <span className="lp-mock-sidebar-logo-text">Bet<span>Tracker</span></span>
-                  </div>
-                  <span className="lp-mock-sidebar-section">Analyse</span>
-                  <div className="lp-mock-nav-item">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="12" height="12" aria-hidden="true">
-                      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
-                    </svg>
-                    Dashboard
-                  </div>
-                  <div className="lp-mock-nav-item active">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="12" height="12" aria-hidden="true">
-                      <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-                    </svg>
-                    Scanner
-                  </div>
-                  <span className="lp-mock-sidebar-section">Paris</span>
-                  <div className="lp-mock-nav-item">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="12" height="12" aria-hidden="true">
-                      <path d="M2 20h20M5 20V8l7-5 7 5v12" />
-                    </svg>
-                    Tickets
-                    <span className="lp-mock-nav-badge">3</span>
-                  </div>
-                  <div className="lp-mock-nav-item">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="12" height="12" aria-hidden="true">
-                      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" />
-                    </svg>
-                    Campagnes
-                  </div>
-                </div>
-
-                <div className="lp-mock-scanner" aria-hidden="true">
-                  <div className="lp-mock-scanner-header">
-                    <span className="lp-mock-scanner-title">14 matchs &middot; Edge d&eacute;tect&eacute;</span>
-                    <span className="lp-mock-scanner-btn">Scanner</span>
-                  </div>
-                  <div className="lp-mock-scanner-list">
-                    <div className="lp-mock-match-card selected">
-                      <div className="lp-mock-match-league">
-                        <span>&#127934;</span> ATP Indian Wells R4
-                      </div>
-                      <div className="lp-mock-match-teams">Sinner vs Fritz</div>
-                      <div className="lp-mock-match-odds">
-                        <div className="lp-mock-odd edge">1.65 <small style={{ fontSize: "8px" }}>+5.8%</small></div>
-                        <div className="lp-mock-odd dash">&mdash;</div>
-                        <div className="lp-mock-odd">2.30</div>
-                      </div>
-                    </div>
-                    <div className="lp-mock-match-card">
-                      <div className="lp-mock-match-league">
-                        <span>&#9917;</span> Bundesliga J27
-                      </div>
-                      <div className="lp-mock-match-teams">Bayern vs Dortmund</div>
-                      <div className="lp-mock-match-odds">
-                        <div className="lp-mock-odd edge">1.58 <small style={{ fontSize: "8px" }}>+4.1%</small></div>
-                        <div className="lp-mock-odd">3.90</div>
-                        <div className="lp-mock-odd">5.20</div>
-                      </div>
-                    </div>
-                    <div className="lp-mock-match-card">
-                      <div className="lp-mock-match-league">
-                        <span>&#127934;</span> ATP Indian Wells QF
-                      </div>
-                      <div className="lp-mock-match-teams">Zverev vs Alcaraz</div>
-                      <div className="lp-mock-match-odds">
-                        <div className="lp-mock-odd">1.95</div>
-                        <div className="lp-mock-odd dash">&mdash;</div>
-                        <div className="lp-mock-odd edge-away">1.85 <small style={{ fontSize: "8px" }}>+7.2%</small></div>
-                      </div>
-                    </div>
-                    <div className="lp-mock-match-card">
-                      <div className="lp-mock-match-league">
-                        <span>&#9917;</span> Premier League J30
-                      </div>
-                      <div className="lp-mock-match-teams">Arsenal vs Man. City</div>
-                      <div className="lp-mock-match-odds">
-                        <div className="lp-mock-odd">2.40</div>
-                        <div className="lp-mock-odd edge">3.50 <small style={{ fontSize: "8px" }}>+3.4%</small></div>
-                        <div className="lp-mock-odd">2.90</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="lp-mock-detail" aria-hidden="true">
-                  <div>
-                    <div className="lp-mock-detail-title">Jannik Sinner vs Taylor Fritz</div>
-                    <div className="lp-mock-detail-sub">ATP Indian Wells &middot; R4 &middot; Court central</div>
-                  </div>
-
-                  <div className="lp-mock-proba-row">
-                    <div className="lp-mock-proba-card winner">
-                      <div className="lp-mock-proba-label">Sinner</div>
-                      <div className="lp-mock-proba-value">67.2%</div>
-                      <div className="lp-mock-edge-badge">edge +5.8%</div>
-                    </div>
-                    <div className="lp-mock-proba-card">
-                      <div className="lp-mock-proba-label">Nul</div>
-                      <div className="lp-mock-proba-value" style={{ color: "rgba(255,255,255,0.3)", fontSize: "12px" }}>&mdash;</div>
-                    </div>
-                    <div className="lp-mock-proba-card">
-                      <div className="lp-mock-proba-label">Fritz</div>
-                      <div className="lp-mock-proba-value">32.8%</div>
-                    </div>
-                  </div>
-
-                  <div className="lp-mock-stats-row">
-                    <div className="lp-mock-stat-card">
-                      <div className="lp-mock-stat-label">Forme Sinner</div>
-                      <div className="lp-mock-stat-value">V V V D V</div>
-                    </div>
-                    <div className="lp-mock-stat-card">
-                      <div className="lp-mock-stat-label">Forme Fritz</div>
-                      <div className="lp-mock-stat-value">V D V D V</div>
-                    </div>
-                    <div className="lp-mock-stat-card">
-                      <div className="lp-mock-stat-label">Cote</div>
-                      <div className="lp-mock-stat-value green">1.65</div>
-                    </div>
-                    <div className="lp-mock-stat-card">
-                      <div className="lp-mock-stat-label">EV</div>
-                      <div className="lp-mock-stat-value green">+1.74</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <img src="/screenshots/Hero.png" alt="BetTracker Scanner" className="lp-hero-screenshot" />
             </div>
           </div>
         </div>
