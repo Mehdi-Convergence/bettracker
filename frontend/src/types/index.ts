@@ -756,6 +756,7 @@ export interface AdminSystemStatus {
   worker: { ok: boolean; last_heartbeat: string | null };
   last_deploy: string | null;
   uptime_seconds: number | null;
+  email_quota?: { used_today: number; limit: number };
 }
 
 export interface AdminScanStatus {

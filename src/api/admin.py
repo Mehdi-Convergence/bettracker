@@ -150,12 +150,18 @@ def get_system_overview(
         worker_ok = age < 7200
         last_heartbeat = _ts_to_iso(latest_ts)
 
+    # Email quota (Resend free tier: 100/jour)
+    today = _now_utc().strftime("%Y-%m-%d")
+    emails_today = int(cache_get(f"email:daily:{today}") or 0)
+    email_limit = 100
+
     return {
         "redis": {"ok": redis_ok, "latency_ms": redis_latency_ms},
         "db": {"ok": db_ok, "size_mb": db_size_mb},
         "worker": {"ok": worker_ok, "last_heartbeat": last_heartbeat},
         "last_deploy": _ts_to_iso(cache_get("deploy:last_timestamp")),
         "uptime_seconds": None,
+        "email_quota": {"used_today": emails_today, "limit": email_limit},
     }
 
 
@@ -396,6 +402,45 @@ def get_alerts(
                     "timestamp": now_iso,
                 }
             )
+
+    # Email quota alerts (Resend free tier: 100/jour)
+    emails_today = int(cache_get(f"email:daily:{today}") or 0)
+    email_limit = 100
+    if email_limit > 0:
+        email_pct = emails_today / email_limit
+        if email_pct >= 0.95:
+            alerts.append(
+                {
+                    "id": "email_quota_critical",
+                    "severity": "CRITICAL",
+                    "message": f"Quota emails critique ({emails_today}/{email_limit} aujourd'hui)",
+                    "sport": None,
+                    "timestamp": now_iso,
+                }
+            )
+        elif email_pct >= 0.8:
+            alerts.append(
+                {
+                    "id": "email_quota_warning",
+                    "severity": "WARNING",
+                    "message": f"Quota emails a {round(email_pct * 100)}% ({emails_today}/{email_limit} aujourd'hui)",
+                    "sport": None,
+                    "timestamp": now_iso,
+                }
+            )
+
+    # Erreurs 2FA login (>5 en 24h = potentielle attaque)
+    twofa_errors_24h = int(cache_get("auth:2fa_errors_24h") or 0)
+    if twofa_errors_24h > 5:
+        alerts.append(
+            {
+                "id": "twofa_errors",
+                "severity": "WARNING",
+                "message": f"{twofa_errors_24h} erreurs 2FA en 24h — verifier logs",
+                "sport": None,
+                "timestamp": now_iso,
+            }
+        )
 
     # Stripe payment errors
     stripe_errors = cache_get("stripe:errors_24h") or []

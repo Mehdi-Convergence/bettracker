@@ -20,6 +20,7 @@ import {
   EyeOff,
   CheckCheck,
   CreditCard,
+  Mail,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
@@ -869,7 +870,52 @@ function AdminDashboard() {
         );
       })()}
 
-      {/* ── Section 6: Recent Errors ── */}
+      {/* ── Section 6b: Email Quota ── */}
+      {system?.email_quota && (
+        <SectionCard
+          title="Quota emails (Resend)"
+          icon={<Mail size={14} className="text-[#3b5bdb]" />}
+          action={
+            system.email_quota.used_today >= system.email_quota.limit * 0.8 ? (
+              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold" style={{
+                background: system.email_quota.used_today >= system.email_quota.limit * 0.95 ? "#f04438" : "#f79009",
+                color: "#fff",
+              }}>
+                {system.email_quota.used_today >= system.email_quota.limit * 0.95 ? "Critique" : "Alerte"}
+              </span>
+            ) : undefined
+          }
+        >
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[12px] font-semibold text-[#3c4149]">Emails envoyes aujourd'hui</span>
+              <span className="font-mono text-[13px] font-bold" style={{
+                color: system.email_quota.used_today >= system.email_quota.limit * 0.95 ? "var(--red)"
+                  : system.email_quota.used_today >= system.email_quota.limit * 0.8 ? "var(--amber)"
+                  : "var(--green)",
+              }}>
+                {system.email_quota.used_today} / {system.email_quota.limit}
+              </span>
+            </div>
+            <div className="h-2.5 bg-[#f4f5f7] rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min((system.email_quota.used_today / system.email_quota.limit) * 100, 100)}%`,
+                  background: system.email_quota.used_today >= system.email_quota.limit * 0.95 ? "var(--red)"
+                    : system.email_quota.used_today >= system.email_quota.limit * 0.8 ? "var(--amber)"
+                    : "var(--green)",
+                }}
+              />
+            </div>
+            <div className="text-[10.5px] text-[#8a919e]">
+              {Math.round((system.email_quota.used_today / system.email_quota.limit) * 100)}% utilise — Resend free tier (100/jour)
+            </div>
+          </div>
+        </SectionCard>
+      )}
+
+      {/* ── Section 6c: Recent Errors ── */}
       <SectionCard
         title="Erreurs recentes"
         icon={<XCircle size={14} className="text-[#f04438]" />}

@@ -35,6 +35,10 @@ class User(Base, TimestampMixin):
     totp_secret: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
+    # 2FA (Email)
+    email_2fa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    preferred_2fa_method: Mapped[str | None] = mapped_column(String(20), nullable=True, default=None)  # "totp" | "email" | None
+
     # Admin
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 

@@ -150,7 +150,7 @@ export default function Portfolio() {
   const [sortCol, setSortCol] = useState("match_date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const pageSize = 25;
 
   // ── Campaign view state ──
   const [selectedCampId, setSelectedCampId] = useState<number | null>(null);

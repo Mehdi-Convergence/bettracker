@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LogIn, Mail, Lock, Eye, EyeOff, UserPlus, Check, ScanSearch, BarChart2, Bot, MessageCircle, ShieldCheck, KeyRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { requestEmailCode, verifyEmailCode, setAccessToken, createReactivateCheckout } from "@/services/api";
+import { requestEmailCode, verifyEmailCode, setAccessToken, createReactivateCheckout, sendEmail2FACode } from "@/services/api";
 
 type Mode = "login" | "signup";
 type LoginMethod = "password" | "email-code";
@@ -26,6 +26,10 @@ export default function Login() {
   const [loginToken, setLoginToken] = useState("");
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+  const [availableMethods, setAvailableMethods] = useState<string[]>([]);
+  const [active2FAMethod, setActive2FAMethod] = useState<string>("totp");
+  const [emailCodeSent, setEmailCodeSent] = useState(false);
+  const [sendingEmailCode, setSendingEmailCode] = useState(false);
 
   // Email code step
   const [emailCodeStep, setEmailCodeStep] = useState<"email" | "code">("email");
@@ -70,7 +74,16 @@ export default function Login() {
       const result = await login(email, password);
       if (result && result.requires_2fa) {
         setLoginToken(result.login_token);
+        setAvailableMethods(result.available_methods || ["totp"]);
+        const preferred = result.preferred_method || "totp";
+        setActive2FAMethod(preferred);
         setTwoFactorRequired(true);
+        setEmailCodeSent(false);
+        // If preferred method is email, auto-send the code
+        if (preferred === "email") {
+          sendEmail2FACode(result.login_token).catch(() => {});
+          setEmailCodeSent(true);
+        }
       } else {
         navigate("/dashboard");
       }
@@ -94,12 +107,33 @@ export default function Login() {
     }
   };
 
+  const handleSendEmailCode = async () => {
+    setSendingEmailCode(true);
+    try {
+      await sendEmail2FACode(loginToken);
+      setEmailCodeSent(true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erreur d'envoi");
+    } finally {
+      setSendingEmailCode(false);
+    }
+  };
+
+  const handleSwitchMethod = (method: string) => {
+    setActive2FAMethod(method);
+    setTwoFactorCode("");
+    setError("");
+    if (method === "email" && !emailCodeSent) {
+      handleSendEmailCode();
+    }
+  };
+
   const handleTwoFactorSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setTwoFactorLoading(true);
     try {
-      await login2FAVerify(loginToken, twoFactorCode);
+      await login2FAVerify(loginToken, twoFactorCode, active2FAMethod);
       navigate("/dashboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Code invalide");
@@ -132,9 +166,19 @@ export default function Login() {
     try {
       const result = await verifyEmailCode(emailCodeEmail, emailCode) as Record<string, unknown>;
       if (result.requires_2fa) {
-        setLoginToken(result.login_token as string);
+        const token = result.login_token as string;
+        setLoginToken(token);
+        const methods = (result.available_methods as string[]) || ["totp"];
+        setAvailableMethods(methods);
+        const preferred = (result.preferred_method as string) || "totp";
+        setActive2FAMethod(preferred);
         setTwoFactorRequired(true);
+        setEmailCodeSent(false);
         setLoginMethod("password");
+        if (preferred === "email") {
+          sendEmail2FACode(token).catch(() => {});
+          setEmailCodeSent(true);
+        }
       } else {
         setAccessToken(result.access_token as string);
         navigate("/dashboard");
@@ -306,10 +350,14 @@ export default function Login() {
             <form onSubmit={handleTwoFactorSubmit}>
               <div className="flex flex-col gap-3.5">
                 <div className="flex items-center gap-3 px-4 py-3.5 rounded-[10px]" style={{ background: "var(--accent-bg)", border: "1px solid var(--accent-border)" }}>
-                  <ShieldCheck size={20} className="text-[#3b5bdb] shrink-0" />
+                  {active2FAMethod === "email" ? <Mail size={20} className="text-[#3b5bdb] shrink-0" /> : <ShieldCheck size={20} className="text-[#3b5bdb] shrink-0" />}
                   <div>
-                    <div className="text-[13px] font-semibold text-[#111318]">Double authentification activee</div>
-                    <div className="text-[12px] text-[#8a919e] mt-0.5">Entrez le code a 6 chiffres de votre application d'authentification</div>
+                    <div className="text-[13px] font-semibold text-[#111318]">Double authentification</div>
+                    <div className="text-[12px] text-[#8a919e] mt-0.5">
+                      {active2FAMethod === "email"
+                        ? "Un code a 6 chiffres a ete envoye a votre adresse email"
+                        : "Entrez le code a 6 chiffres de votre application d'authentification"}
+                    </div>
                   </div>
                 </div>
 
@@ -349,13 +397,41 @@ export default function Login() {
                   Verifier le code
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => { setTwoFactorRequired(false); setTwoFactorCode(""); setError(""); }}
-                  className="text-[12.5px] text-[#8a919e] bg-transparent border-none cursor-pointer hover:text-[#3c4149] transition-colors text-center"
-                >
-                  Retour a la connexion
-                </button>
+                {/* Method switcher + resend */}
+                <div className="flex flex-col items-center gap-2 mt-1">
+                  {active2FAMethod === "email" && (
+                    <button
+                      type="button"
+                      onClick={handleSendEmailCode}
+                      disabled={sendingEmailCode}
+                      className="text-[12.5px] text-[#3b5bdb] bg-transparent border-none cursor-pointer hover:underline transition-colors font-medium disabled:opacity-50"
+                    >
+                      {sendingEmailCode ? "Envoi en cours..." : "Renvoyer le code par email"}
+                    </button>
+                  )}
+
+                  {availableMethods.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchMethod(active2FAMethod === "totp" ? "email" : "totp")}
+                      className="text-[12.5px] text-[#8a919e] bg-transparent border-none cursor-pointer hover:text-[#3b5bdb] transition-colors flex items-center gap-1.5"
+                    >
+                      {active2FAMethod === "totp" ? (
+                        <><Mail size={12} /> Recevoir le code par email</>
+                      ) : (
+                        <><KeyRound size={12} /> Utiliser l'application d'authentification</>
+                      )}
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => { setTwoFactorRequired(false); setTwoFactorCode(""); setError(""); setEmailCodeSent(false); }}
+                    className="text-[12.5px] text-[#8a919e] bg-transparent border-none cursor-pointer hover:text-[#3c4149] transition-colors"
+                  >
+                    Retour a la connexion
+                  </button>
+                </div>
               </div>
             </form>
           )}

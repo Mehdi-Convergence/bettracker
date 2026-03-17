@@ -7,7 +7,6 @@ import {
   Lock,
   Shield,
   ShieldCheck,
-  KeyRound,
   Star,
   Eye,
   EyeOff,
@@ -17,8 +16,8 @@ import {
   Trash2,
   Bell,
   CreditCard,
-  X,
   QrCode,
+  CheckCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -31,6 +30,10 @@ import {
   setup2FA,
   verify2FA,
   disable2FA,
+  setupEmail2FA,
+  verifyEmail2FA,
+  disableEmail2FA,
+  setPreferred2FAMethod,
 } from "@/services/api";
 import { Toggle } from "@/components/ui";
 import type { UserStats } from "@/types";
@@ -246,7 +249,7 @@ export default function Settings() {
   const [billingLoading, setBillingLoading] = useState<string | null>(null);
   const [billingError, setBillingError] = useState("");
 
-  // 2FA states
+  // 2FA TOTP states
   const [twoFaStep, setTwoFaStep] = useState<"idle" | "setup" | "disable">("idle");
   const [twoFaQr, setTwoFaQr] = useState("");
   const [twoFaSecret, setTwoFaSecret] = useState("");
@@ -255,6 +258,14 @@ export default function Settings() {
   const [twoFaError, setTwoFaError] = useState("");
   const [twoFaSuccess, setTwoFaSuccess] = useState("");
   const [twoFaLoading, setTwoFaLoading] = useState(false);
+
+  // 2FA Email states
+  const [email2FaStep, setEmail2FaStep] = useState<"idle" | "setup" | "disable">("idle");
+  const [email2FaCode, setEmail2FaCode] = useState("");
+  const [email2FaDisablePwd, setEmail2FaDisablePwd] = useState("");
+  const [email2FaError, setEmail2FaError] = useState("");
+  const [email2FaSuccess, setEmail2FaSuccess] = useState("");
+  const [email2FaLoading, setEmail2FaLoading] = useState(false);
 
   useEffect(() => {
     getUserStats().then(setStats).catch(() => {});
@@ -286,16 +297,16 @@ export default function Settings() {
     }
   };
 
-  const handlePwdSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePwdSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setPwdErr("");
     setPwdMsg("");
-    if (newPwd.length < 8) { setPwdErr("Min. 8 caractères"); return; }
+    if (newPwd.length < 8) { setPwdErr("Min. 8 caracteres"); return; }
     if (newPwd !== confirmPwd) { setPwdErr("Les mots de passe ne correspondent pas"); return; }
     setPwdLoading(true);
     try {
       await changePassword({ current_password: currentPwd, new_password: newPwd });
-      setPwdMsg("Mot de passe modifié avec succès");
+      setPwdMsg("Mot de passe modifie avec succes");
       setCurrentPwd(""); setNewPwd(""); setConfirmPwd("");
     } catch (err: unknown) {
       setPwdErr(err instanceof Error ? err.message : "Erreur");
@@ -343,6 +354,54 @@ export default function Settings() {
     } catch (err: unknown) {
       setTwoFaError(err instanceof Error ? err.message : "Erreur");
     } finally { setTwoFaLoading(false); }
+  };
+
+  const handleSetupEmail2FA = async () => {
+    setEmail2FaError(""); setEmail2FaSuccess(""); setEmail2FaLoading(true);
+    try {
+      await setupEmail2FA();
+      setEmail2FaStep("setup");
+      setEmail2FaCode("");
+    } catch (err: unknown) {
+      setEmail2FaError(err instanceof Error ? err.message : "Erreur");
+    } finally { setEmail2FaLoading(false); }
+  };
+
+  const handleVerifyEmail2FA = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmail2FaError(""); setEmail2FaLoading(true);
+    try {
+      await verifyEmail2FA(email2FaCode);
+      setEmail2FaSuccess("2FA par email active avec succes !");
+      setEmail2FaStep("idle");
+      setEmail2FaCode("");
+      refreshUser();
+    } catch (err: unknown) {
+      setEmail2FaError(err instanceof Error ? err.message : "Code invalide");
+    } finally { setEmail2FaLoading(false); }
+  };
+
+  const handleDisableEmail2FA = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmail2FaError(""); setEmail2FaLoading(true);
+    try {
+      await disableEmail2FA(email2FaDisablePwd);
+      setEmail2FaSuccess("2FA par email desactive.");
+      setEmail2FaStep("idle");
+      setEmail2FaCode(""); setEmail2FaDisablePwd("");
+      refreshUser();
+    } catch (err: unknown) {
+      setEmail2FaError(err instanceof Error ? err.message : "Erreur");
+    } finally { setEmail2FaLoading(false); }
+  };
+
+  const handleSetPreferred = async (method: string) => {
+    try {
+      await setPreferred2FAMethod(method);
+      refreshUser();
+    } catch {
+      // silencieux
+    }
   };
 
   const handleDelete = async () => {
@@ -617,7 +676,7 @@ export default function Settings() {
 
           {/* ── Tab: Sécurité ── */}
           {tab === "securite" && (
-            <form onSubmit={handlePwdSubmit} className="p-5 space-y-3.5">
+            <div className="p-5 space-y-3.5">
               <div className={sectionTitleCls}>
                 <Lock size={13} /> Mot de passe
               </div>
@@ -638,7 +697,6 @@ export default function Settings() {
                     value={currentPwd}
                     onChange={(e) => setCurrentPwd(e.target.value)}
                     className={inputWithIconCls + " pr-9"}
-                    required
                   />
                   <button type="button" onClick={() => togglePwd("current")} className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[var(--text-muted2)] hover:text-[var(--text-primary)] transition-colors p-0">
                     {showPwd.current ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -687,7 +745,7 @@ export default function Settings() {
                       value={confirmPwd}
                       onChange={(e) => setConfirmPwd(e.target.value)}
                       className={inputWithIconCls + " pr-9"}
-                      placeholder="Répéter"
+                      placeholder="Repeter"
                     />
                     <button type="button" onClick={() => togglePwd("confirm")} className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-[var(--text-muted2)] hover:text-[var(--text-primary)] transition-colors p-0">
                       {showPwd.confirm ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -699,7 +757,7 @@ export default function Settings() {
               {/* Security settings */}
               <div className="border-t border-[var(--border-color)] pt-3.5 mt-1">
                 <div className={sectionTitleCls}>
-                  <Shield size={13} /> Sécurité du compte
+                  <Shield size={13} /> Securite du compte
                 </div>
                 <div className="flex flex-col">
                   <div className="flex items-center gap-3 py-3 border-b border-[var(--border-color)]">
@@ -716,7 +774,8 @@ export default function Settings() {
                     <div className="flex-1">
                       <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Sessions actives</div>
                       <div className="text-[12px] text-[var(--text-muted)] mt-0.5">
-                        1 appareil.<button type="button" onClick={handleRevokeAll} className="bg-transparent border-none cursor-pointer text-[var(--accent)] font-medium p-0 text-[12px]">Tout révoquer</button>
+                        1 appareil.
+                        <button type="button" onClick={handleRevokeAll} className="bg-transparent border-none cursor-pointer text-[var(--accent)] font-medium p-0 text-[12px] ml-1">Tout revoquer</button>
                       </div>
                     </div>
                     <span
@@ -729,121 +788,254 @@ export default function Settings() {
                 </div>
               </div>
 
+              {/* 2FA Section */}
+              <div className="border-t border-[var(--border-color)] pt-3.5 mt-1">
+                <div className={sectionTitleCls}>
+                  <ShieldCheck size={13} /> Double authentification (2FA)
+                </div>
+                <p className="text-[12px] text-[var(--text-muted)] mb-4">Protegez votre compte avec une deuxieme methode de verification lors de la connexion.</p>
+
+                {/* Messages globaux */}
+                {(twoFaSuccess || email2FaSuccess) && (
+                  <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-lg text-[13px] font-medium text-[var(--green)] mb-4" style={{ background: "var(--green-bg)", border: "1px solid rgba(18,183,106,0.2)" }}>
+                    <Check size={15} className="shrink-0" /> {twoFaSuccess || email2FaSuccess}
+                  </div>
+                )}
+
+                {/* 2 cartes cote a cote */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+
+                  {/* Carte TOTP */}
+                  <div className="border rounded-xl p-4 flex flex-col gap-3" style={{ borderColor: user?.totp_enabled ? "rgba(18,183,106,0.25)" : C.border, background: user?.totp_enabled ? "var(--green-bg)" : C.surface }}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: user?.totp_enabled ? "rgba(18,183,106,0.15)" : C.border }}>
+                          <QrCode size={16} style={{ color: user?.totp_enabled ? C.green : C.muted }} />
+                        </div>
+                        <div>
+                          <div className="text-[13px] font-semibold text-[var(--text-primary)]">Application</div>
+                          <div className="text-[11px] text-[var(--text-muted)]">Google Authenticator, Authy...</div>
+                        </div>
+                      </div>
+                      {user?.totp_enabled ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: "rgba(18,183,106,0.15)", color: C.green }}>
+                          <CheckCircle size={9} /> Actif
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: C.redBg, color: C.red }}>
+                          Inactif
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Actions TOTP */}
+                    {twoFaStep === "idle" && (
+                      <div className="flex flex-col gap-2">
+                        {user?.totp_enabled ? (
+                          <>
+                            {user?.email_2fa_enabled && (
+                              <button
+                                type="button"
+                                onClick={() => handleSetPreferred("totp")}
+                                className="w-full py-1.5 rounded-lg text-[12px] font-semibold cursor-pointer transition-all border"
+                                style={
+                                  user?.preferred_2fa_method === "totp"
+                                    ? { background: C.accentBg, borderColor: C.accentBd, color: C.accent }
+                                    : { background: "transparent", borderColor: C.border, color: C.muted }
+                                }
+                              >
+                                {user?.preferred_2fa_method === "totp" ? "Methode par defaut" : "Definir par defaut"}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => { setTwoFaStep("disable"); setTwoFaError(""); setTwoFaSuccess(""); setTwoFaCode(""); setTwoFaDisablePwd(""); }}
+                              className="w-full py-1.5 rounded-lg text-[12px] font-semibold cursor-pointer transition-all border"
+                              style={{ borderColor: "rgba(240,68,56,0.25)", color: C.red, background: "transparent" }}
+                            >
+                              Desactiver
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleSetup2FA}
+                            disabled={twoFaLoading}
+                            className="w-full py-1.5 rounded-lg text-[12px] font-semibold cursor-pointer transition-all border-none text-white disabled:opacity-70"
+                            style={{ background: C.accent }}
+                          >
+                            <span className="flex items-center justify-center gap-1.5"><QrCode size={12} /> Configurer</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {twoFaStep === "setup" && (
+                      <form onSubmit={handleVerify2FA} className="space-y-3">
+                        <div className="flex flex-col items-center gap-2 p-3 rounded-lg" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+                          {twoFaQr && <img src={twoFaQr} alt="QR Code 2FA" className="w-[140px] h-[140px]" />}
+                          <div className="text-center">
+                            <div className="text-[11px] text-[var(--text-muted)] mb-1">Cle manuelle :</div>
+                            <code className="text-[11px] font-mono font-bold text-[var(--accent)] bg-[var(--bg-surface)] px-2 py-1 rounded border border-[var(--border-color)] select-all break-all">{twoFaSecret}</code>
+                          </div>
+                        </div>
+                        {twoFaError && (
+                          <div className="px-2 py-1.5 rounded text-[11px] font-medium" style={{ background: C.redBg, color: C.red }}>{twoFaError}</div>
+                        )}
+                        <input type="text" inputMode="numeric" maxLength={6} value={twoFaCode} onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, ""))}
+                          className={inputCls} placeholder="000000" autoFocus style={{ letterSpacing: "6px", textAlign: "center", fontSize: "18px", fontFamily: "monospace" }} />
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => { setTwoFaStep("idle"); setTwoFaError(""); }}
+                            className="flex-1 py-1.5 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-muted)] text-[12px] font-medium cursor-pointer">Annuler</button>
+                          <button type="submit" disabled={twoFaCode.length !== 6 || twoFaLoading}
+                            className="flex-1 py-1.5 rounded-lg border-none text-white text-[12px] font-semibold cursor-pointer disabled:opacity-70" style={{ background: C.accent }}>Verifier</button>
+                        </div>
+                      </form>
+                    )}
+
+                    {twoFaStep === "disable" && (
+                      <form onSubmit={handleDisable2FA} className="space-y-2.5">
+                        {twoFaError && (
+                          <div className="px-2 py-1.5 rounded text-[11px] font-medium" style={{ background: C.redBg, color: C.red }}>{twoFaError}</div>
+                        )}
+                        <input type="password" value={twoFaDisablePwd} onChange={(e) => setTwoFaDisablePwd(e.target.value)} className={inputCls} placeholder="Mot de passe actuel" />
+                        <input type="text" inputMode="numeric" maxLength={6} value={twoFaCode} onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, ""))}
+                          className={inputCls} placeholder="Code TOTP actuel" style={{ letterSpacing: "6px", textAlign: "center", fontSize: "16px", fontFamily: "monospace" }} />
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => { setTwoFaStep("idle"); setTwoFaError(""); }}
+                            className="flex-1 py-1.5 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-muted)] text-[12px] font-medium cursor-pointer">Annuler</button>
+                          <button type="submit" disabled={twoFaCode.length !== 6 || !twoFaDisablePwd || twoFaLoading}
+                            className="flex-1 py-1.5 rounded-lg border-none text-white text-[12px] font-semibold cursor-pointer disabled:opacity-70" style={{ background: C.red }}>Desactiver</button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+
+                  {/* Carte Email 2FA */}
+                  <div className="border rounded-xl p-4 flex flex-col gap-3" style={{ borderColor: user?.email_2fa_enabled ? "rgba(18,183,106,0.25)" : C.border, background: user?.email_2fa_enabled ? "var(--green-bg)" : C.surface }}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: user?.email_2fa_enabled ? "rgba(18,183,106,0.15)" : C.border }}>
+                          <Mail size={16} style={{ color: user?.email_2fa_enabled ? C.green : C.muted }} />
+                        </div>
+                        <div>
+                          <div className="text-[13px] font-semibold text-[var(--text-primary)]">Email</div>
+                          <div className="text-[11px] text-[var(--text-muted)]">Code envoye par email</div>
+                        </div>
+                      </div>
+                      {user?.email_2fa_enabled ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: "rgba(18,183,106,0.15)", color: C.green }}>
+                          <CheckCircle size={9} /> Actif
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: C.redBg, color: C.red }}>
+                          Inactif
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Actions Email 2FA */}
+                    {email2FaError && email2FaStep === "idle" && (
+                      <div className="px-2 py-1.5 rounded text-[11px] font-medium" style={{ background: C.redBg, color: C.red }}>{email2FaError}</div>
+                    )}
+                    {email2FaSuccess && email2FaStep === "idle" && (
+                      <div className="px-2 py-1.5 rounded text-[11px] font-medium" style={{ background: C.greenBg, color: C.green }}>{email2FaSuccess}</div>
+                    )}
+                    {email2FaStep === "idle" && (
+                      <div className="flex flex-col gap-2">
+                        {user?.email_2fa_enabled ? (
+                          <>
+                            {user?.totp_enabled && (
+                              <button
+                                type="button"
+                                onClick={() => handleSetPreferred("email")}
+                                className="w-full py-1.5 rounded-lg text-[12px] font-semibold cursor-pointer transition-all border"
+                                style={
+                                  user?.preferred_2fa_method === "email"
+                                    ? { background: C.accentBg, borderColor: C.accentBd, color: C.accent }
+                                    : { background: "transparent", borderColor: C.border, color: C.muted }
+                                }
+                              >
+                                {user?.preferred_2fa_method === "email" ? "Methode par defaut" : "Definir par defaut"}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => { setEmail2FaStep("disable"); setEmail2FaError(""); setEmail2FaSuccess(""); setEmail2FaCode(""); setEmail2FaDisablePwd(""); }}
+                              className="w-full py-1.5 rounded-lg text-[12px] font-semibold cursor-pointer transition-all border"
+                              style={{ borderColor: "rgba(240,68,56,0.25)", color: C.red, background: "transparent" }}
+                            >
+                              Desactiver
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleSetupEmail2FA}
+                            disabled={email2FaLoading}
+                            className="w-full py-1.5 rounded-lg text-[12px] font-semibold cursor-pointer transition-all border-none text-white disabled:opacity-70"
+                            style={{ background: C.accent }}
+                          >
+                            <span className="flex items-center justify-center gap-1.5"><Mail size={12} /> Configurer</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {email2FaStep === "setup" && (
+                      <form onSubmit={handleVerifyEmail2FA} className="space-y-2.5">
+                        <p className="text-[11.5px] text-[var(--text-muted)]">Un code a 6 chiffres a ete envoye a <strong>{user?.email}</strong>. Entrez-le ci-dessous pour activer.</p>
+                        {email2FaError && (
+                          <div className="px-2 py-1.5 rounded text-[11px] font-medium" style={{ background: C.redBg, color: C.red }}>{email2FaError}</div>
+                        )}
+                        <input type="text" inputMode="numeric" maxLength={6} value={email2FaCode} onChange={(e) => setEmail2FaCode(e.target.value.replace(/\D/g, ""))}
+                          className={inputCls} placeholder="000000" autoFocus style={{ letterSpacing: "6px", textAlign: "center", fontSize: "18px", fontFamily: "monospace" }} />
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => { setEmail2FaStep("idle"); setEmail2FaError(""); }}
+                            className="flex-1 py-1.5 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-muted)] text-[12px] font-medium cursor-pointer">Annuler</button>
+                          <button type="submit" disabled={email2FaCode.length !== 6 || email2FaLoading}
+                            className="flex-1 py-1.5 rounded-lg border-none text-white text-[12px] font-semibold cursor-pointer disabled:opacity-70" style={{ background: C.accent }}>Verifier</button>
+                        </div>
+                      </form>
+                    )}
+
+                    {email2FaStep === "disable" && (
+                      <form onSubmit={handleDisableEmail2FA} className="space-y-2.5">
+                        {email2FaError && (
+                          <div className="px-2 py-1.5 rounded text-[11px] font-medium" style={{ background: C.redBg, color: C.red }}>{email2FaError}</div>
+                        )}
+                        <input type="password" value={email2FaDisablePwd} onChange={(e) => setEmail2FaDisablePwd(e.target.value)} className={inputCls} placeholder="Mot de passe actuel" />
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => { setEmail2FaStep("idle"); setEmail2FaError(""); }}
+                            className="flex-1 py-1.5 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-muted)] text-[12px] font-medium cursor-pointer">Annuler</button>
+                          <button type="submit" disabled={!email2FaDisablePwd || email2FaLoading}
+                            className="flex-1 py-1.5 rounded-lg border-none text-white text-[12px] font-semibold cursor-pointer disabled:opacity-70" style={{ background: C.red }}>Desactiver</button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Boutons mot de passe en bas */}
               <div className="flex justify-end gap-2 pt-3.5 border-t border-[var(--border-color)] mt-1">
                 <button
                   type="button"
                   className="px-4 py-2.5 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-muted)] text-[13px] font-medium cursor-pointer hover:border-[var(--border-strong)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] transition-all"
+                  onClick={() => { setCurrentPwd(""); setNewPwd(""); setConfirmPwd(""); setPwdErr(""); setPwdMsg(""); }}
                 >
                   Annuler
                 </button>
                 <button
-                  type="submit"
-                  disabled={pwdLoading}
+                  type="button"
+                  disabled={pwdLoading || !currentPwd || !newPwd || !confirmPwd}
+                  onClick={handlePwdSubmit}
                   className="px-[18px] py-2.5 rounded-lg border-none text-white text-[13px] font-semibold cursor-pointer flex items-center gap-1.5 transition-all shadow-[0_1px_3px_rgba(59,91,219,0.3)] hover:translate-y-[-1px] hover:shadow-[0_4px_12px_rgba(59,91,219,0.3)] disabled:opacity-70"
                   style={{ background: C.accent }}
                 >
-                  Mettre à jour
+                  Sauvegarder
                 </button>
               </div>
-            </form>
-          )}
-
-          {/* ── Tab: Sécurité — 2FA section ── */}
-          {tab === "securite" && (
-            <div className="p-5 border-t border-[var(--border-color)]">
-              <div className={sectionTitleCls}>
-                <ShieldCheck size={13} /> Double authentification (2FA)
-              </div>
-              <p className="text-[12px] text-[var(--text-muted)] mt-0.5 mb-4">Protegez votre compte avec une application d'authentification (Google Authenticator, Authy, etc.).</p>
-
-              {twoFaSuccess && (
-                <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-lg text-[13px] font-medium text-[var(--green)] mb-4" style={{ background: "var(--green-bg)", border: "1px solid rgba(18,183,106,0.2)" }}>
-                  <Check size={15} className="shrink-0" /> {twoFaSuccess}
-                </div>
-              )}
-              {twoFaError && twoFaStep === "idle" && (
-                <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-lg text-[13px] font-medium text-[var(--red)] mb-4" style={{ background: "var(--red-bg)", border: "1px solid rgba(240,68,56,0.2)" }}>
-                  <X size={15} className="shrink-0" /> {twoFaError}
-                </div>
-              )}
-
-              {/* Idle state */}
-              {twoFaStep === "idle" && (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: user?.totp_enabled ? "var(--green-bg)" : "var(--red-bg)" }}>
-                      <KeyRound size={18} style={{ color: user?.totp_enabled ? C.green : C.red }} />
-                    </div>
-                    <div>
-                      <div className="text-[13.5px] font-semibold text-[var(--text-primary)]">{user?.totp_enabled ? "2FA activee" : "2FA desactivee"}</div>
-                      <div className="text-[12px] text-[var(--text-muted)] mt-0.5">{user?.totp_enabled ? "Votre compte est protege par une app d'authentification." : "Activez le 2FA pour securiser votre compte."}</div>
-                    </div>
-                  </div>
-                  {user?.totp_enabled ? (
-                    <button onClick={() => { setTwoFaStep("disable"); setTwoFaError(""); setTwoFaSuccess(""); setTwoFaCode(""); setTwoFaDisablePwd(""); }}
-                      className="px-4 py-2 rounded-lg border border-[rgba(240,68,56,0.25)] bg-transparent text-[var(--red)] text-[13px] font-semibold cursor-pointer transition-all hover:bg-[var(--red-bg)]">
-                      Desactiver
-                    </button>
-                  ) : (
-                    <button onClick={handleSetup2FA} disabled={twoFaLoading}
-                      className="px-4 py-2 rounded-lg border-none text-white text-[13px] font-semibold cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-70"
-                      style={{ background: C.accent }}>
-                      <QrCode size={14} /> Activer
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Setup state — QR code */}
-              {twoFaStep === "setup" && (
-                <form onSubmit={handleVerify2FA} className="space-y-4">
-                  <div className="flex flex-col items-center gap-3 p-4 rounded-xl" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-color)" }}>
-                    {twoFaQr && <img src={`data:image/png;base64,${twoFaQr}`} alt="QR Code 2FA" className="w-[180px] h-[180px]" />}
-                    <div className="text-center">
-                      <div className="text-[12px] text-[var(--text-muted)] mb-1">Ou entrez cette cle manuellement :</div>
-                      <code className="text-[13px] font-mono font-bold text-[var(--accent)] bg-[var(--bg-card)] px-3 py-1.5 rounded border border-[var(--border-color)] select-all">{twoFaSecret}</code>
-                    </div>
-                  </div>
-                  {twoFaError && (
-                    <div className="px-3 py-2 rounded-lg text-[12px] font-medium" style={{ background: C.redBg, color: C.red }}>{twoFaError}</div>
-                  )}
-                  <div className="flex flex-col gap-1.5">
-                    <label className={labelCls}>Code a 6 chiffres</label>
-                    <input type="text" inputMode="numeric" maxLength={6} value={twoFaCode} onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, ""))}
-                      className={inputCls} placeholder="000000" autoFocus style={{ letterSpacing: "6px", textAlign: "center", fontSize: "18px", fontFamily: "monospace" }} />
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <button type="button" onClick={() => { setTwoFaStep("idle"); setTwoFaError(""); }}
-                      className="px-4 py-2.5 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-muted)] text-[13px] font-medium cursor-pointer">Annuler</button>
-                    <button type="submit" disabled={twoFaCode.length !== 6 || twoFaLoading}
-                      className="px-4 py-2.5 rounded-lg border-none text-white text-[13px] font-semibold cursor-pointer disabled:opacity-70" style={{ background: C.accent }}>Verifier</button>
-                  </div>
-                </form>
-              )}
-
-              {/* Disable state */}
-              {twoFaStep === "disable" && (
-                <form onSubmit={handleDisable2FA} className="space-y-3.5">
-                  {twoFaError && (
-                    <div className="px-3 py-2 rounded-lg text-[12px] font-medium" style={{ background: C.redBg, color: C.red }}>{twoFaError}</div>
-                  )}
-                  <div className="flex flex-col gap-1.5">
-                    <label className={labelCls}>Mot de passe actuel</label>
-                    <input type="password" value={twoFaDisablePwd} onChange={(e) => setTwoFaDisablePwd(e.target.value)} className={inputCls} required />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className={labelCls}>Code 2FA actuel</label>
-                    <input type="text" inputMode="numeric" maxLength={6} value={twoFaCode} onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, ""))}
-                      className={inputCls} placeholder="000000" style={{ letterSpacing: "6px", textAlign: "center", fontSize: "18px", fontFamily: "monospace" }} />
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <button type="button" onClick={() => { setTwoFaStep("idle"); setTwoFaError(""); }}
-                      className="px-4 py-2.5 rounded-lg border border-[var(--border-color)] bg-transparent text-[var(--text-muted)] text-[13px] font-medium cursor-pointer">Annuler</button>
-                    <button type="submit" disabled={twoFaCode.length !== 6 || !twoFaDisablePwd || twoFaLoading}
-                      className="px-4 py-2.5 rounded-lg border-none text-white text-[13px] font-semibold cursor-pointer disabled:opacity-70" style={{ background: "var(--red)" }}>Desactiver</button>
-                  </div>
-                </form>
-              )}
             </div>
           )}
 
@@ -906,7 +1098,12 @@ export default function Settings() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-stretch">
                 {PLANS.map((plan) => {
+                  const tierRank: Record<string, number> = { free: 0, pro: 1, premium: 2 };
+                  const currentRank = tierRank[user?.tier ?? "free"] ?? 0;
+                  const planRank = tierRank[plan.id] ?? 0;
                   const isCurrent = plan.id === user?.tier;
+                  const isUpgrade = planRank > currentRank;
+                  const isDowngrade = planRank < currentRank;
                   const isElite = plan.id === "premium";
                   const isFree = plan.id === "free";
                   const displayPrice = billing === "annual" && !isFree ? plan.priceAnnual : plan.priceMonthly;
@@ -922,6 +1119,7 @@ export default function Settings() {
                           : isElite
                             ? `linear-gradient(160deg, rgba(124,58,237,0.05), ${C.white})`
                             : C.surface,
+                        opacity: isDowngrade ? 0.6 : 1,
                       }}
                     >
                       {isCurrent && (
@@ -937,7 +1135,7 @@ export default function Settings() {
                       <div className="text-[14px] font-bold text-[var(--text-primary)]">{plan.name}</div>
                       <div className="flex items-baseline gap-0.5 mt-1.5">
                         <span className="text-[24px] font-extrabold tracking-tight text-[var(--text-primary)]">{displayPrice}</span>
-                        <span className="text-[12px] text-[var(--text-muted)]">{isFree ? plan.period : plan.period}</span>
+                        <span className="text-[12px] text-[var(--text-muted)]">{plan.period}</span>
                       </div>
                       {billing === "annual" && !isFree && plan.annualTotal && (
                         <div className="text-[10.5px] mt-0.5" style={{ color: C.green }}>
@@ -967,30 +1165,32 @@ export default function Settings() {
                         ))}
                       </ul>
                       <button
-                        disabled={isCurrent || billingLoading !== null}
+                        disabled={isCurrent || isDowngrade || billingLoading !== null}
                         onClick={() => {
-                          if (!isCurrent && (plan.id === "pro" || plan.id === "premium")) {
+                          if (isUpgrade && (plan.id === "pro" || plan.id === "premium")) {
                             handleUpgrade(plan.id as "pro" | "premium");
                           }
                         }}
                         className="w-full mt-3.5 py-2.5 rounded-[7px] text-[12px] font-semibold transition-all"
                         style={{
-                          cursor: isCurrent || billingLoading !== null ? "default" : "pointer",
+                          cursor: isCurrent || isDowngrade || billingLoading !== null ? "default" : "pointer",
                           opacity: billingLoading === plan.id ? 0.7 : 1,
-                          border: isCurrent ? "none" : isElite ? "none" : `1.5px solid ${C.border}`,
-                          background: isCurrent ? C.accent : isElite ? "#7c3aed" : C.white,
-                          color: isCurrent || isElite ? "#fff" : C.muted,
+                          border: isCurrent ? "none" : isDowngrade ? `1.5px solid ${C.border}` : isElite ? "none" : `1.5px solid ${C.border}`,
+                          background: isCurrent ? C.accent : isDowngrade ? C.surface : isElite ? "#7c3aed" : isUpgrade ? C.accent : C.white,
+                          color: isCurrent || isElite || (isUpgrade && !isElite) ? "#fff" : C.muted,
                         }}
                       >
                         {billingLoading === plan.id
                           ? "Redirection..."
                           : isCurrent
                             ? "Plan actuel"
-                            : isElite
-                              ? "Passer a Elite →"
-                              : plan.id === "pro"
-                                ? "Passer a Pro →"
-                                : "Retrograder"}
+                            : isDowngrade
+                              ? "Inclus dans votre plan"
+                              : isElite
+                                ? "Passer a Elite →"
+                                : plan.id === "pro"
+                                  ? "Passer a Pro →"
+                                  : "Choisir"}
                       </button>
                     </div>
                   );

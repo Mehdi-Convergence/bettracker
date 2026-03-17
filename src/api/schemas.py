@@ -50,6 +50,8 @@ class UserResponse(BaseModel):
     visited_modules: list[str] = []
     email_verified: bool = False
     totp_enabled: bool = False
+    email_2fa_enabled: bool = False
+    preferred_2fa_method: str | None = None
 
 
 class TwoFactorVerifyRequest(BaseModel):
@@ -64,6 +66,23 @@ class TwoFactorDisableRequest(BaseModel):
 class TwoFactorLoginRequest(BaseModel):
     login_token: str
     code: str = Field(min_length=6, max_length=6)
+    method: str = "totp"
+
+
+class TwoFactorEmailEnableRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=6)
+
+
+class TwoFactorEmailDisableRequest(BaseModel):
+    password: str
+
+
+class TwoFactorPreferredMethodRequest(BaseModel):
+    method: str = Field(pattern="^(totp|email)$")
+
+
+class TwoFactorEmailSendRequest(BaseModel):
+    login_token: str
 
 
 class EmailCodeRequest(BaseModel):

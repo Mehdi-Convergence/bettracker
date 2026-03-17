@@ -9,6 +9,18 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _track_email_sent() -> None:
+    """Incremente le compteur quotidien d'emails envoyes (cle Redis email:daily:{date})."""
+    try:
+        from datetime import datetime, timezone
+        from src.cache import cache_incr
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        # TTL 48h pour conserver les stats le lendemain
+        cache_incr(f"email:daily:{today}", ttl=172800)
+    except Exception:
+        pass  # Non-blocking
+
+
 def _send(to: str, subject: str, html: str) -> bool:
     """Send an email via Resend. Returns True on success, False on failure."""
     if not settings.RESEND_API_KEY:
@@ -23,6 +35,7 @@ def _send(to: str, subject: str, html: str) -> bool:
             "html": html,
         })
         logger.info("Email sent to %s: %s", to, subject)
+        _track_email_sent()
         return True
     except Exception:
         logger.exception("Failed to send email to %s: %s", to, subject)

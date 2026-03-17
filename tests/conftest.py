@@ -52,7 +52,7 @@ def db_session():
 
 
 @pytest.fixture()
-def client(db_session):
+def client(db_session, monkeypatch):
     """FastAPI TestClient with overridden DB dependency."""
     def _override_get_db():
         try:
@@ -64,6 +64,8 @@ def client(db_session):
     # Disable rate limiting during tests
     from src.rate_limit import limiter
     limiter.enabled = False
+    # Disable real email sending during tests (avoid consuming Resend quota)
+    monkeypatch.setattr("src.services.email._send", lambda *args, **kwargs: True)
     with TestClient(app) as c:
         yield c
     limiter.enabled = True

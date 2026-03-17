@@ -29,7 +29,11 @@ from src.api.schemas import (
     ResetPasswordRequest,
     TourVisitedRequest,
     TwoFactorDisableRequest,
+    TwoFactorEmailDisableRequest,
+    TwoFactorEmailEnableRequest,
+    TwoFactorEmailSendRequest,
     TwoFactorLoginRequest,
+    TwoFactorPreferredMethodRequest,
     TwoFactorVerifyRequest,
     UpdateProfileRequest,
     UserResponse,
@@ -170,9 +174,22 @@ def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     cache_delete(lock_key)
 
     # Si 2FA activé, retourner un token temporaire et demander le code
-    if getattr(user, "totp_enabled", False):
+    totp_active = getattr(user, "totp_enabled", False)
+    email_2fa_active = getattr(user, "email_2fa_enabled", False)
+    if totp_active or email_2fa_active:
         login_token = _create_login_2fa_token(user.id)
-        return JSONResponse(content={"requires_2fa": True, "login_token": login_token})
+        available_methods = []
+        if totp_active:
+            available_methods.append("totp")
+        if email_2fa_active:
+            available_methods.append("email")
+        preferred = getattr(user, "preferred_2fa_method", None) or (available_methods[0] if available_methods else "totp")
+        return JSONResponse(content={
+            "requires_2fa": True,
+            "login_token": login_token,
+            "available_methods": available_methods,
+            "preferred_method": preferred,
+        })
 
     access_token = create_access_token(user.id, user.token_version)
     refresh_token = create_refresh_token(user.id, user.token_version)
@@ -244,10 +261,23 @@ def verify_email_code(request: Request, body: EmailCodeVerifyRequest, db: Sessio
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Code invalide ou expire")
 
-    # Si 2FA active, demander le code TOTP
-    if getattr(user, "totp_enabled", False):
+    # Si 2FA active, demander le code
+    totp_active = getattr(user, "totp_enabled", False)
+    email_2fa_active = getattr(user, "email_2fa_enabled", False)
+    if totp_active or email_2fa_active:
         login_token = _create_login_2fa_token(user.id)
-        return JSONResponse(content={"requires_2fa": True, "login_token": login_token})
+        available_methods = []
+        if totp_active:
+            available_methods.append("totp")
+        if email_2fa_active:
+            available_methods.append("email")
+        preferred = getattr(user, "preferred_2fa_method", None) or (available_methods[0] if available_methods else "totp")
+        return JSONResponse(content={
+            "requires_2fa": True,
+            "login_token": login_token,
+            "available_methods": available_methods,
+            "preferred_method": preferred,
+        })
 
     # Generation des tokens
     access_token = create_access_token(user.id, user.token_version)
@@ -543,6 +573,8 @@ def _user_to_response(user: User) -> UserResponse:
         visited_modules=visited_list,
         email_verified=getattr(user, "email_verified", False),
         totp_enabled=getattr(user, "totp_enabled", False),
+        email_2fa_enabled=getattr(user, "email_2fa_enabled", False),
+        preferred_2fa_method=getattr(user, "preferred_2fa_method", None),
     )
 
 
@@ -561,6 +593,8 @@ def _user_response_dict(user: User) -> dict:
         "onboarding_completed": user.onboarding_completed,
         "visited_modules": [m for m in visited_str.split(",") if m],
         "totp_enabled": getattr(user, "totp_enabled", False),
+        "email_2fa_enabled": getattr(user, "email_2fa_enabled", False),
+        "preferred_2fa_method": getattr(user, "preferred_2fa_method", None),
     }
 
 
@@ -668,12 +702,31 @@ def login_2fa(body: TwoFactorLoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expire ou invalide")
 
     user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
-    if not user or not getattr(user, "totp_enabled", False):
+    if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Utilisateur invalide")
 
-    totp = pyotp.TOTP(user.totp_secret)
-    if not totp.verify(body.code, valid_window=1):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Code 2FA invalide")
+    method = body.method or "totp"
+
+    if method == "totp":
+        if not getattr(user, "totp_enabled", False):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="TOTP non active pour cet utilisateur")
+        totp = pyotp.TOTP(user.totp_secret)
+        if not totp.verify(body.code, valid_window=1):
+            cache_incr("auth:2fa_errors_24h", ttl=86400)
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Code 2FA invalide")
+
+    elif method == "email":
+        if not getattr(user, "email_2fa_enabled", False):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="2FA email non active pour cet utilisateur")
+        cache_key = f"email_2fa_login:{user.id}"
+        stored_code = cache_get(cache_key)
+        if not stored_code or stored_code != body.code:
+            cache_incr("auth:2fa_errors_24h", ttl=86400)
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Code 2FA invalide ou expire")
+        cache_delete(cache_key)
+
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Methode 2FA invalide")
 
     access_token = create_access_token(user.id, user.token_version)
     refresh_token = create_refresh_token(user.id, user.token_version)
@@ -685,3 +738,113 @@ def login_2fa(body: TwoFactorLoginRequest, db: Session = Depends(get_db)):
     })
     _set_refresh_cookie(response, refresh_token)
     return response
+
+
+@router.post("/auth/2fa/email/send")
+@limiter.limit("3/minute")
+def send_2fa_email_login_code(request: Request, body: TwoFactorEmailSendRequest, db: Session = Depends(get_db)):
+    """Envoie un code 2FA par email lors du login (requiert un login_token dans le body)."""
+    from jose import JWTError
+    from jose import jwt as jose_jwt
+
+    try:
+        payload = jose_jwt.decode(body.login_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        if payload.get("type") != "login_2fa":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalide")
+        user_id = int(payload["sub"])
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expire ou invalide")
+
+    user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    if not user or not getattr(user, "email_2fa_enabled", False):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Utilisateur invalide ou 2FA email non active")
+
+    code = f"{random.randint(100000, 999999)}"
+    cache_set(f"email_2fa_login:{user.id}", code, ttl=300)
+
+    from src.services.email import send_login_code_email
+    threading.Thread(target=send_login_code_email, args=(user.email, user.display_name, code), daemon=True).start()
+
+    return {"detail": "Code envoye"}
+
+
+@router.post("/auth/2fa/email/setup")
+def setup_email_2fa(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Genere et envoie un code de validation pour activer le 2FA par email."""
+    if getattr(user, "email_2fa_enabled", False):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="2FA email deja active")
+
+    code = f"{random.randint(100000, 999999)}"
+    cache_set(f"email_2fa_setup:{user.id}", code, ttl=600)
+
+    from src.services.email import send_login_code_email
+    threading.Thread(target=send_login_code_email, args=(user.email, user.display_name, code), daemon=True).start()
+
+    return {"detail": "Code envoye par email"}
+
+
+@router.post("/auth/2fa/email/verify")
+def verify_email_2fa(
+    body: TwoFactorEmailEnableRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Verifie le code et active le 2FA par email."""
+    cache_key = f"email_2fa_setup:{user.id}"
+    stored_code = cache_get(cache_key)
+
+    if not stored_code or stored_code != body.code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Code invalide ou expire")
+
+    cache_delete(cache_key)
+
+    user.email_2fa_enabled = True
+    if not getattr(user, "preferred_2fa_method", None):
+        user.preferred_2fa_method = "email"
+    db.commit()
+
+    return {"detail": "2FA par email active"}
+
+
+@router.delete("/auth/2fa/email")
+def disable_email_2fa(
+    body: TwoFactorEmailDisableRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Desactive le 2FA par email apres verification du mot de passe."""
+    if not getattr(user, "email_2fa_enabled", False):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="2FA email non active")
+
+    if not _verify_password(body.password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Mot de passe incorrect")
+
+    user.email_2fa_enabled = False
+    # Si la methode preferee etait email, basculer sur totp si dispo, sinon None
+    if getattr(user, "preferred_2fa_method", None) == "email":
+        user.preferred_2fa_method = "totp" if getattr(user, "totp_enabled", False) else None
+    db.commit()
+
+    return {"detail": "2FA par email desactive"}
+
+
+@router.put("/auth/2fa/preferred")
+def set_preferred_2fa_method(
+    body: TwoFactorPreferredMethodRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Definit la methode 2FA preferee de l'utilisateur."""
+    if body.method == "totp" and not getattr(user, "totp_enabled", False):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="TOTP non active")
+    if body.method == "email" and not getattr(user, "email_2fa_enabled", False):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="2FA email non active")
+
+    user.preferred_2fa_method = body.method
+    db.commit()
+
+    return {"detail": "Methode preferee mise a jour"}

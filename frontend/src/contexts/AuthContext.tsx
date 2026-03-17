@@ -14,6 +14,8 @@ interface User {
   visited_modules: string[];
   email_verified: boolean;
   totp_enabled?: boolean;
+  email_2fa_enabled?: boolean;
+  preferred_2fa_method?: string | null;
 }
 
 interface AuthState {
@@ -25,11 +27,13 @@ interface AuthState {
 interface TwoFactorRequired {
   requires_2fa: true;
   login_token: string;
+  available_methods?: string[];
+  preferred_method?: string;
 }
 
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<void | TwoFactorRequired>;
-  login2FAVerify: (login_token: string, code: string) => Promise<void>;
+  login2FAVerify: (login_token: string, code: string, method?: string) => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -112,14 +116,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshUser]);
 
   const login = async (email: string, password: string): Promise<void | TwoFactorRequired> => {
-    const data = await apiPost<{ access_token?: string; user?: User; requires_2fa?: boolean; login_token?: string }>(
+    const data = await apiPost<{ access_token?: string; user?: User; requires_2fa?: boolean; login_token?: string; available_methods?: string[]; preferred_method?: string }>(
       "/auth/login",
       { email, password }
     );
 
     // Cas 2FA : retourner l'info pour que le composant Login puisse afficher le champ code
     if (data.requires_2fa && data.login_token) {
-      return { requires_2fa: true, login_token: data.login_token };
+      return { requires_2fa: true, login_token: data.login_token, available_methods: data.available_methods, preferred_method: data.preferred_method };
     }
 
     if (!data.access_token) throw new Error("Token manquant");
@@ -129,8 +133,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ user, token: data.access_token, loading: false });
   };
 
-  const login2FAVerify = async (login_token: string, code: string): Promise<void> => {
-    const data = await apiPost<{ access_token: string; user: User }>("/auth/2fa/login", { login_token, code });
+  const login2FAVerify = async (login_token: string, code: string, method: string = "totp"): Promise<void> => {
+    const data = await apiPost<{ access_token: string; user: User }>("/auth/2fa/login", { login_token, code, method });
     setAccessToken(data.access_token);
     const user = await apiGet<User>("/auth/me", data.access_token);
     setState({ user, token: data.access_token, loading: false });
