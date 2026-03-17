@@ -26,7 +26,7 @@ vi.mock('../contexts/AuthContext', () => ({
 beforeEach(() => {
   vi.clearAllMocks()
   // Mock fetch for the pre-check (returns 200 = not inactive)
-  global.fetch = vi.fn().mockResolvedValue({
+  globalThis.fetch = vi.fn().mockResolvedValue({
     status: 200,
     json: () => Promise.resolve({}),
   }) as unknown as typeof fetch
