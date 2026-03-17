@@ -2,64 +2,28 @@ import type { TourStep } from "@/components/SpotlightTour";
 
 export const dashboardTour: TourStep[] = [
   {
+    target: '[data-tour="preset-selector"]',
+    title: "Vos dashboards",
+    content: "Gerez plusieurs dashboards personnalises. Cliquez pour basculer entre vos configurations, en creer de nouvelles, les dupliquer ou les supprimer.",
+    placement: "bottom",
+  },
+  {
+    target: '[data-tour="edit-mode-btn"]',
+    title: "Mode personnalisation",
+    content: "Activez le mode edition pour modifier votre dashboard : deplacer, redimensionner, ajouter ou supprimer des widgets.",
+    placement: "bottom",
+  },
+  {
+    target: '[data-tour="widget-grid"]',
+    title: "Grille de widgets",
+    content: "En mode edition, glissez-deposez les widgets pour les reorganiser. Tirez les coins pour les redimensionner a votre guise.",
+    placement: "top",
+  },
+  {
     target: '[data-tour="period-selector"]',
-    title: "Sélecteur de période",
-    content: "Filtrez vos statistiques par période : 7 jours, 1 mois, 1 an ou dates personnalisées.",
+    title: "Filtre de periode",
+    content: "Changez la periode d'affichage des statistiques : 7 jours, 1 mois, 3 mois, 1 an ou personnalise.",
     placement: "bottom",
-  },
-  {
-    target: '[data-tour="campaign-banner"]',
-    title: "Bannière campagnes",
-    content: "Résumé rapide de vos campagnes actives avec le nombre de paris en cours. Cliquez pour accéder aux campagnes.",
-    placement: "bottom",
-  },
-  {
-    target: '[data-tour="kpi-roi"]',
-    title: "ROI global",
-    content: "Votre retour sur investissement global. Le delta (↑/↓) compare avec le mois précédent pour suivre votre progression.",
-    placement: "bottom",
-  },
-  {
-    target: '[data-tour="kpi-staked"]',
-    title: "Mise totale",
-    content: "Total des mises placées sur la période sélectionnée, en euros.",
-    placement: "bottom",
-  },
-  {
-    target: '[data-tour="kpi-tickets"]',
-    title: "Tickets ce mois",
-    content: "Nombre de paris placés ce mois, avec les paris en attente de résultat entre parenthèses.",
-    placement: "bottom",
-  },
-  {
-    target: '[data-tour="kpi-winrate"]',
-    title: "Taux de réussite",
-    content: "Pourcentage de paris gagnés sur la période. Un bon taux se situe entre 55% et 67%.",
-    placement: "bottom",
-  },
-  {
-    target: '[data-tour="roi-chart"]',
-    title: "Graphique ROI",
-    content: "Évolution de votre ROI dans le temps. Survolez les points pour voir les valeurs exactes par date.",
-    placement: "top",
-  },
-  {
-    target: '[data-tour="pnl-card"]',
-    title: "P&L Cumulé",
-    content: "Vos gains ou pertes cumulés en euros avec la courbe de progression. Vert = positif, rouge = négatif.",
-    placement: "top",
-  },
-  {
-    target: '[data-tour="sport-breakdown"]',
-    title: "Performance par sport",
-    content: "Répartition de vos résultats par sport (football, tennis) et statut des paris (gagné, perdu, en attente).",
-    placement: "top",
-  },
-  {
-    target: '[data-tour="recent-bets"]',
-    title: "Tickets récents",
-    content: "Vos 5 derniers paris avec les détails : équipes, cotes, mise et résultat. Cliquez sur 'Voir tout' pour accéder au portfolio.",
-    placement: "top",
   },
 ];
 
@@ -376,7 +340,7 @@ export const TOUR_MAP: Record<string, TourStep[]> = {
 
 /** Map route path → module name */
 export function getModuleFromPath(path: string): string | null {
-  if (path === "/") return "dashboard";
+  if (path === "/" || path === "/dashboard") return "dashboard";
   if (path === "/scanner") return "scanner";
   if (path === "/campaign") return "campaigns";
   if (path.startsWith("/campaign/")) return "campaign-detail";

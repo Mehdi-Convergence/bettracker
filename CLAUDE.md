@@ -21,7 +21,7 @@ Sports betting value bet detection platform. Full-stack: Python 3.12 + FastAPI b
 ### Production (VPS OVH)
 - Services systemd: `bettracker-api`, `bettracker-worker`
 - Reverse proxy: Caddy 2 (natif, SSL auto Let's Encrypt)
-- DB: PostgreSQL 16 (natif), Cache: Redis 7 (natif)
+- DB: SQLite (bettracker.db), Cache: Redis 7 (natif)
 - Deploy: `git push origin main` (GitHub Actions: rsync + uv sync + npm build + systemctl restart)
 
 ## Architecture
@@ -44,7 +44,7 @@ Sports betting value bet detection platform. Full-stack: Python 3.12 + FastAPI b
 - `src/config.py` - Pydantic Settings (env-based config)
 
 ### Frontend (`frontend/src/`)
-- `pages/` - Route pages (Dashboard, Scanner, Campaign, CampaignDetail, Portfolio, Backtest, Settings, Parametres, AIAnalyste, Login, Register, ResetPassword, ForgotPassword)
+- `pages/` - Route pages (DashboardV3, Scanner, Campaign, CampaignDetail, Portfolio, Backtest, Analytics, Settings, Parametres, AIAnalyste, Login, Register, ForgotPassword, ResetPassword, Landing, Admin, MentionsLegales, CGU, ConfidentialitePolicy)
 - `components/` - Reusable components (Layout, TeamAutocomplete, TicketBuilder, TicketDetailDrawer, KanbanBoard, NotificationBell, OnboardingModal, SpotlightTour, AIScanMatchDetailPanel)
 - `components/ui/` - Design system primitives (Button, Input, Card, Badge, Alert, PageHeader, StatCard, Toggle)
 - `contexts/` - React contexts (AuthContext, BreadcrumbContext, TourContext)
@@ -55,7 +55,8 @@ Sports betting value bet detection platform. Full-stack: Python 3.12 + FastAPI b
 - `types/index.ts` - TypeScript interfaces
 
 ### Key patterns
-- Auth: JWT access + refresh tokens, tier-based access (free/pro/premium)
+- Auth: JWT access + refresh tokens, tier-based access (free/pro/premium), trial period (7 days Elite access for free users)
+- Account lifecycle: inactive accounts (soft-delete) return 403 on login, reactivation via Stripe checkout
 - ORM: SQLAlchemy 2.0+ with `Mapped`/`mapped_column`
 - Frontend routing: React Router v6 nested under Layout
 - State: React hooks + contexts (no Redux)

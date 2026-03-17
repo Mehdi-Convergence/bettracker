@@ -135,7 +135,6 @@ export default function Portfolio() {
     if (pref && map[pref]) {
       setViewMode(map[pref]);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefs.default_tickets_view]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");

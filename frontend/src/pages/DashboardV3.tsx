@@ -740,6 +740,7 @@ export default function DashboardV3() {
       )}
 
       {/* ── GRID ── */}
+      <div data-tour="widget-grid">
       <DashboardGrid
         widgets={widgets}
         isEditMode={isEditMode}
@@ -748,6 +749,7 @@ export default function DashboardV3() {
         onConfigureWidget={handleConfigureWidget}
         renderWidget={renderWidget}
       />
+      </div>
 
       {showPicker && (
         <WidgetPicker

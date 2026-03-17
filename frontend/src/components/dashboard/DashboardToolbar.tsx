@@ -127,9 +127,9 @@ export function DashboardToolbar({
   };
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-2 flex-wrap" data-tour="dashboard-toolbar">
       {/* Preset selector */}
-      <div className="relative" ref={menuRef}>
+      <div className="relative" ref={menuRef} data-tour="preset-selector">
         <button
           onClick={() => setShowPresetMenu(!showPresetMenu)}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors min-w-[140px]"
@@ -257,6 +257,7 @@ export function DashboardToolbar({
           <button
             onClick={onAddWidget}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            data-tour="add-widget-btn"
           >
             <Plus className="h-4 w-4" />
             Ajouter
@@ -264,6 +265,7 @@ export function DashboardToolbar({
           <button
             onClick={onResetLayout}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            data-tour="reset-layout-btn"
           >
             <RotateCcw className="h-4 w-4" />
             Reset
@@ -292,6 +294,7 @@ export function DashboardToolbar({
               <button
                 onClick={() => { setIsSavingAsNew(true); setInputValue(""); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
+                data-tour="save-preset-btn"
               >
                 <Save className="h-4 w-4" />
                 Enregistrer sous...
@@ -318,6 +321,7 @@ export function DashboardToolbar({
         <button
           onClick={onToggleEditMode}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          data-tour="edit-mode-btn"
         >
           <Pencil className="h-4 w-4" />
           Personnaliser
