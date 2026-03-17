@@ -496,9 +496,9 @@ export default function DashboardV3() {
       case "bankroll-initial":
         return (
           <div className="h-full flex items-center" data-tour="bankroll">
-            <div className="w-full h-full rounded-xl px-4 py-3 shadow-[0_1px_3px_rgba(16,24,40,0.06)] flex flex-col items-center justify-center text-center" style={{ background: "linear-gradient(90deg, var(--bg-surface) 0%, var(--bg-card) 100%)", border: "1px solid var(--border-color)" }}>
-              <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide">Bankroll initiale</span>
-              <span className="text-[20px] font-extrabold tracking-tight text-[#111318] leading-none mt-1">
+            <div className="w-full h-full rounded-xl px-3 py-2 shadow-[0_1px_3px_rgba(16,24,40,0.06)] flex flex-col items-center justify-center text-center overflow-hidden" style={{ background: "#fff", border: "1px solid #e3e6eb" }}>
+              <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide truncate max-w-full">Bankroll initiale</span>
+              <span className="text-[clamp(14px,2vw,20px)] font-extrabold tracking-tight text-[#111318] leading-none mt-1 truncate max-w-full">
                 {(prefs?.initial_bankroll ?? 0).toLocaleString("fr-FR")}€
               </span>
               <span className="text-[10px] text-[#b0b7c3] mt-0.5">mise de depart</span>
@@ -512,12 +512,12 @@ export default function DashboardV3() {
         const pending = stats?.pending_bets ?? 0;
         return (
           <div className="h-full flex items-center">
-            <div className="w-full h-full rounded-xl px-4 py-3 shadow-[0_1px_3px_rgba(16,24,40,0.06)] flex flex-col items-center justify-center text-center" style={{ background: "linear-gradient(90deg, var(--bg-surface) 0%, var(--bg-card) 100%)", border: "1px solid var(--border-color)" }}>
-              <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide">Solde actuel</span>
-              <span className="text-[20px] font-extrabold tracking-tight leading-none mt-1" style={{ color: pnlVal >= 0 ? "var(--green)" : "var(--red)" }}>
+            <div className="w-full h-full rounded-xl px-3 py-2 shadow-[0_1px_3px_rgba(16,24,40,0.06)] flex flex-col items-center justify-center text-center overflow-hidden" style={{ background: "#fff", border: "1px solid #e3e6eb" }}>
+              <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide truncate max-w-full">Solde actuel</span>
+              <span className="text-[clamp(14px,2vw,20px)] font-extrabold tracking-tight leading-none mt-1 truncate max-w-full" style={{ color: pnlVal >= 0 ? "var(--green)" : "var(--red)" }}>
                 {currentBR.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
               </span>
-              <span className="text-[10px] text-[#b0b7c3] mt-0.5">
+              <span className="text-[10px] text-[#b0b7c3] mt-0.5 truncate max-w-full">
                 {pending > 0 ? `${pending} pari${pending > 1 ? "s" : ""} en cours` : "aucun pari en cours"}
               </span>
             </div>
@@ -531,12 +531,12 @@ export default function DashboardV3() {
         const pnlPos = pnl >= 0;
         return (
           <div className="h-full flex items-center">
-            <div className="w-full h-full rounded-xl px-4 py-3 shadow-[0_1px_3px_rgba(16,24,40,0.06)] flex flex-col items-center justify-center text-center" style={{ background: "linear-gradient(90deg, var(--bg-surface) 0%, var(--bg-card) 100%)", border: "1px solid var(--border-color)" }}>
-              <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide">Variation P&L</span>
-              <span className="text-[20px] font-extrabold tracking-tight leading-none mt-1" style={{ color: pnlPos ? "var(--green)" : "var(--red)" }}>
+            <div className="w-full h-full rounded-xl px-3 py-2 shadow-[0_1px_3px_rgba(16,24,40,0.06)] flex flex-col items-center justify-center text-center overflow-hidden" style={{ background: "#fff", border: "1px solid #e3e6eb" }}>
+              <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide truncate max-w-full">Variation P&L</span>
+              <span className="text-[clamp(14px,2vw,20px)] font-extrabold tracking-tight leading-none mt-1 truncate max-w-full" style={{ color: pnlPos ? "var(--green)" : "var(--red)" }}>
                 {pnlPos ? "+" : ""}{pnl.toFixed(2)}€
               </span>
-              <span className="text-[10px] text-[#b0b7c3] mt-0.5">
+              <span className="text-[10px] text-[#b0b7c3] mt-0.5 truncate max-w-full">
                 {initBR > 0 ? `${pnlPos ? "+" : ""}${((pnl / initBR) * 100).toFixed(1)}% vs initial` : "—"}
               </span>
             </div>
@@ -595,11 +595,11 @@ export default function DashboardV3() {
               </div>
             </div>
             <div className="px-4 pt-3 pb-2 flex-1 flex flex-col min-h-0 overflow-hidden">
-              <div className="shrink-0">
-                <div className="text-[26px] font-extrabold tracking-tight leading-none" style={{ color: (stats?.total_pnl ?? 0) >= 0 ? "var(--green)" : "var(--red)" }}>
+              <div className="shrink-0 overflow-hidden">
+                <div className="text-[clamp(16px,2.5vw,26px)] font-extrabold tracking-tight leading-none truncate" style={{ color: (stats?.total_pnl ?? 0) >= 0 ? "var(--green)" : "var(--red)" }}>
                   {(stats?.total_pnl ?? 0) >= 0 ? "+" : ""}{(stats?.total_pnl ?? 0).toFixed(2)}€
                 </div>
-                <div className="text-[11px] text-[#8a919e] mt-0.5">sur {totalStaked.toLocaleString("fr-FR")}€ misés</div>
+                <div className="text-[11px] text-[#8a919e] mt-0.5 truncate">sur {totalStaked.toLocaleString("fr-FR")}€ misés</div>
               </div>
               {history.length >= 2 && (
                 <div className="flex-1 min-h-0 mt-1">
@@ -638,11 +638,11 @@ export default function DashboardV3() {
                 Performance & Répartition
               </div>
             </div>
-            <div className="p-3 flex-1 flex items-center gap-4 min-w-0 overflow-hidden">
-              <div className="flex-1 min-w-0 overflow-hidden">
+            <div className="p-3 flex-1 flex items-center gap-3 min-w-0 min-h-0 overflow-hidden">
+              <div className="flex-1 min-w-0 overflow-y-auto min-h-0">
                 <SportBarsCompact data={sportBreakdown} />
               </div>
-              <div className="shrink-0">
+              <div className="shrink-0 min-h-0 flex items-center">
                 <DonutMini won={won} lost={lost} pending={pendingBets} total={totalBets} />
               </div>
             </div>
@@ -657,7 +657,7 @@ export default function DashboardV3() {
                 <Trophy size={13} className="text-[#3b5bdb]" /> Streaks & Records
               </div>
             </div>
-            <div className="p-3 flex-1 flex flex-col justify-center gap-1.5">
+            <div className="p-3 flex-1 flex flex-col justify-center gap-1.5 min-h-0 overflow-y-auto">
               <StreakRow icon={<Flame size={13} className="text-[#12b76a]" />} label="Meilleure série" value={`${stats?.longest_winning_streak ?? 0} victoires`} color="var(--green)" />
               <StreakRow icon={<Flame size={13} className="text-[#f04438]" />} label="Pire série" value={`${stats?.longest_losing_streak ?? 0} défaites`} color="var(--red)" />
               <StreakRow icon={<DollarSign size={13} className="text-[#3b5bdb]" />} label="P&L total" value={`${(stats?.total_pnl ?? 0) >= 0 ? "+" : ""}${(stats?.total_pnl ?? 0).toFixed(2)}€`} color={(stats?.total_pnl ?? 0) >= 0 ? "var(--green)" : "var(--red)"} />
@@ -797,13 +797,13 @@ function KPICard({ label, value, valueColor, icon, iconBg, iconColor, delta, del
   label: string; value: string; valueColor?: string; icon: React.ReactNode; iconBg: string; iconColor: string; delta?: string; deltaUp?: boolean; dataTour?: string;
 }) {
   return (
-    <div data-tour={dataTour} className="h-full bg-white border border-[#e3e6eb] rounded-xl p-[14px_16px] shadow-[0_1px_3px_rgba(16,24,40,0.06)] hover:shadow-[0_4px_16px_rgba(16,24,40,0.08)] transition-shadow flex flex-col items-center text-center justify-center gap-1">
-      <div className="w-[28px] h-[28px] rounded-lg flex items-center justify-center" style={{ background: iconBg, color: iconColor }}>{icon}</div>
-      <span className="text-[10px] font-medium text-[#8a919e] uppercase tracking-wide">{label}</span>
-      <div className="text-[26px] font-extrabold tracking-tight leading-none" style={{ color: valueColor || "var(--text-primary)" }}>{value}</div>
+    <div data-tour={dataTour} className="h-full bg-white border border-[#e3e6eb] rounded-xl p-3 shadow-[0_1px_3px_rgba(16,24,40,0.06)] hover:shadow-[0_4px_16px_rgba(16,24,40,0.08)] transition-shadow flex flex-col items-center text-center justify-center gap-0.5 overflow-hidden">
+      <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: iconBg, color: iconColor }}>{icon}</div>
+      <span className="text-[10px] font-medium text-[#8a919e] uppercase tracking-wide truncate max-w-full">{label}</span>
+      <div className="text-[clamp(16px,2.5vw,26px)] font-extrabold tracking-tight leading-none truncate max-w-full" style={{ color: valueColor || "var(--text-primary)" }}>{value}</div>
       {delta && (
-        <div className="flex items-center gap-1 text-[10.5px] font-semibold" style={{ color: deltaUp === false ? "var(--red)" : deltaUp === true ? "var(--green)" : "var(--text-muted)" }}>
-          {deltaUp === true && <ChevronUp size={11} />}{deltaUp === false && <ChevronDown size={11} />}{delta}
+        <div className="flex items-center gap-1 text-[10px] font-semibold truncate max-w-full" style={{ color: deltaUp === false ? "var(--red)" : deltaUp === true ? "var(--green)" : "var(--text-muted)" }}>
+          {deltaUp === true && <ChevronUp size={10} />}{deltaUp === false && <ChevronDown size={10} />}{delta}
         </div>
       )}
     </div>
@@ -946,8 +946,8 @@ function ROIChart({ data }: { data: HistoryPoint[] }) {
   };
 
   return (
-    <div className="relative w-full">
-      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" className="w-full" onMouseMove={handleMouseMove} onMouseLeave={() => setHover(null)}>
+    <div className="relative w-full h-full">
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full h-full" onMouseMove={handleMouseMove} onMouseLeave={() => setHover(null)}>
         {yTicks.map((t) => <line key={t.val} x1={padL} y1={t.y} x2={W - padR} y2={t.y} stroke="#e3e6eb" strokeWidth="0.8" />)}
         {yTicks.map((t) => <text key={`yl-${t.val}`} x={padL - 5} y={t.y + 3} textAnchor="end" className="text-[9px] fill-[#8a919e]">{t.val}%</text>)}
         {xLabels.map((l, i) => <text key={i} x={l.x} y={H - 4} textAnchor="middle" className="text-[9px] fill-[#8a919e]">{l.label}</text>)}
@@ -998,7 +998,7 @@ function PnLSparkline({ data }: { data: HistoryPoint[] }) {
   });
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full">
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full h-full">
       <defs>
         <linearGradient id="pnlFillV3" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.15" />
@@ -1058,8 +1058,8 @@ function DonutMini({ won, lost, pending, total }: { won: number; lost: number; p
   const wonOffset = circ * 0.25, lostOffset = wonOffset - wonLen, pendOffset = lostOffset - lostLen;
 
   return (
-    <div className="flex flex-col items-center gap-1.5">
-      <svg width="90" height="90" viewBox="0 0 90 90">
+    <div className="flex flex-col items-center gap-1.5 h-full justify-center">
+      <svg viewBox="0 0 90 90" className="w-full max-w-[90px] aspect-square">
         <circle cx="45" cy="45" r={r} fill="none" stroke="#f4f5f7" strokeWidth="12" />
         {wonLen > 0 && <circle cx="45" cy="45" r={r} fill="none" stroke="#12b76a" strokeWidth="12" strokeDasharray={`${wonLen} ${circ - wonLen}`} strokeDashoffset={wonOffset} strokeLinecap="round" />}
         {lostLen > 0 && <circle cx="45" cy="45" r={r} fill="none" stroke="#f04438" strokeWidth="12" strokeDasharray={`${lostLen} ${circ - lostLen}`} strokeDashoffset={lostOffset} strokeLinecap="round" />}
@@ -1067,7 +1067,7 @@ function DonutMini({ won, lost, pending, total }: { won: number; lost: number; p
         <text x="45" y="42" textAnchor="middle" className="text-[16px] font-extrabold fill-[#111318]">{total}</text>
         <text x="45" y="54" textAnchor="middle" className="text-[8px] fill-[#8a919e]">tickets</text>
       </svg>
-      <div className="flex gap-3 text-[9px]">
+      <div className="flex gap-3 text-[9px] shrink-0">
         <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#12b76a]" />{won}</span>
         <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#f04438]" />{lost}</span>
         {pending > 0 && <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#f79009]" />{pending}</span>}

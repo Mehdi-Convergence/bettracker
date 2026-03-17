@@ -397,6 +397,19 @@ def get_alerts(
                 }
             )
 
+    # Stripe payment errors
+    stripe_errors = cache_get("stripe:errors_24h") or []
+    if len(stripe_errors) >= 1:
+        alerts.append(
+            {
+                "id": "stripe_errors",
+                "severity": "CRITICAL" if len(stripe_errors) >= 3 else "WARNING",
+                "message": f"{len(stripe_errors)} erreur(s) paiement Stripe en 24h",
+                "sport": None,
+                "timestamp": now_iso,
+            }
+        )
+
     return alerts
 
 
@@ -529,6 +542,70 @@ async def force_scan(
 
 # ---------------------------------------------------------------------------
 # 9. GET /admin/ai — AI Analyste monitoring (conversations, tokens, usage)
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# 9b. GET /admin/stripe — Stripe payment monitoring
+# ---------------------------------------------------------------------------
+
+
+@router.get("/stripe")
+def get_stripe_stats(
+    _user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    from src.models.user import User as UserModel
+
+    # Recent errors from Redis
+    errors_raw = cache_get("stripe:errors_24h") or []
+
+    # Subscription stats
+    total_paying = (
+        db.query(func.count(UserModel.id))
+        .filter(UserModel.tier.in_(["pro", "premium"]))
+        .scalar() or 0
+    )
+    pro_count = (
+        db.query(func.count(UserModel.id))
+        .filter(UserModel.tier == "pro")
+        .scalar() or 0
+    )
+    premium_count = (
+        db.query(func.count(UserModel.id))
+        .filter(UserModel.tier == "premium")
+        .scalar() or 0
+    )
+    free_count = (
+        db.query(func.count(UserModel.id))
+        .filter(UserModel.tier == "free")
+        .scalar() or 0
+    )
+
+    # Check Stripe config
+    has_secret = bool(settings.STRIPE_SECRET_KEY)
+    has_webhook = bool(settings.STRIPE_WEBHOOK_SECRET)
+    has_prices = bool(settings.STRIPE_PRO_PRICE_ID) and bool(settings.STRIPE_PREMIUM_PRICE_ID)
+
+    return {
+        "subscribers": {
+            "total_paying": total_paying,
+            "pro": pro_count,
+            "premium": premium_count,
+            "free": free_count,
+        },
+        "config": {
+            "has_secret_key": has_secret,
+            "has_webhook_secret": has_webhook,
+            "has_price_ids": has_prices,
+        },
+        "errors_24h": errors_raw,
+        "error_count_24h": len(errors_raw),
+    }
+
+
+# ---------------------------------------------------------------------------
+# 10. GET /admin/ai — AI Analyste monitoring (conversations, tokens, usage)
 # ---------------------------------------------------------------------------
 
 

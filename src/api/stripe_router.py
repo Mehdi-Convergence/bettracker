@@ -20,9 +20,26 @@ from src.services.stripe_service import (
     retrieve_checkout_session,
 )
 
+from src.cache import cache_get, cache_set
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["stripe"])
+
+
+def _track_stripe_error(error_type: str, detail: str, user_id: int | None = None) -> None:
+    """Track Stripe payment errors in Redis for admin alerts."""
+    from datetime import datetime, timezone
+
+    errors = cache_get("stripe:errors_24h") or []
+    errors.append({
+        "type": error_type,
+        "detail": detail[:200],
+        "user_id": user_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+    # Keep last 50 errors
+    cache_set("stripe:errors_24h", errors[-50:], ttl=86400)
 
 
 class CheckoutBody(BaseModel):
@@ -72,6 +89,7 @@ def checkout(
         )
     except _stripe_lib.StripeError as exc:
         logger.error("Stripe checkout error: %s", exc)
+        _track_stripe_error("checkout_failed", str(exc), current_user.id)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Erreur Stripe lors de la création de la session",
@@ -226,6 +244,7 @@ def verify_session(
 
     # Verify payment was successful
     if session.get("payment_status") != "paid":
+        _track_stripe_error("payment_not_paid", f"status={session.get('payment_status')}", current_user.id)
         return {"upgraded": False, "tier": current_user.tier, "message": "Paiement non confirme"}
 
     # Extract tier from price

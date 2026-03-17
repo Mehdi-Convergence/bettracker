@@ -340,8 +340,29 @@ export function disable2FA(password: string, code: string): Promise<{ detail: st
   return request("/auth/2fa", { method: "DELETE", body: JSON.stringify({ password, code }) });
 }
 
-export function login2FA(login_token: string, code: string): Promise<{ access_token: string; token_type: string; user: unknown }> {
-  return request("/auth/2fa/login", { method: "POST", body: JSON.stringify({ login_token, code }) });
+export function login2FA(login_token: string, code: string, method: string = "totp"): Promise<{ access_token: string; token_type: string; user: unknown }> {
+  return request("/auth/2fa/login", { method: "POST", body: JSON.stringify({ login_token, code, method }) });
+}
+
+// Email 2FA
+export function setupEmail2FA(): Promise<{ detail: string }> {
+  return request("/auth/2fa/email/setup", { method: "POST" });
+}
+
+export function verifyEmail2FA(code: string): Promise<{ detail: string }> {
+  return request("/auth/2fa/email/verify", { method: "POST", body: JSON.stringify({ code }) });
+}
+
+export function disableEmail2FA(password: string): Promise<{ detail: string }> {
+  return request("/auth/2fa/email", { method: "DELETE", body: JSON.stringify({ password }) });
+}
+
+export function sendEmail2FACode(login_token: string): Promise<{ detail: string }> {
+  return request("/auth/2fa/email/send", { method: "POST", body: JSON.stringify({ login_token }) });
+}
+
+export function setPreferred2FAMethod(method: string): Promise<{ detail: string }> {
+  return request("/auth/2fa/preferred", { method: "PUT", body: JSON.stringify({ method }) });
 }
 
 export function requestEmailCode(email: string) {
@@ -564,6 +585,10 @@ export function forceScan(sport: string) {
 
 export function getAdminAI() {
   return request<import("../types").AdminAIStats>("/admin/ai");
+}
+
+export function getAdminStripe() {
+  return request<import("../types").AdminStripeStats>("/admin/stripe");
 }
 
 // ---- Dashboard V2 ----

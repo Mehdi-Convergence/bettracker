@@ -813,6 +813,29 @@ export interface AdminUserDetail {
   created_at: string | null;
 }
 
+export interface AdminStripeError {
+  type: string;
+  detail: string;
+  user_id: number | null;
+  timestamp: string;
+}
+
+export interface AdminStripeStats {
+  subscribers: {
+    total_paying: number;
+    pro: number;
+    premium: number;
+    free: number;
+  };
+  config: {
+    has_secret_key: boolean;
+    has_webhook_secret: boolean;
+    has_price_ids: boolean;
+  };
+  errors_24h: AdminStripeError[];
+  error_count_24h: number;
+}
+
 export interface AdminAIStats {
   total_conversations: number;
   conversations_7d: number;

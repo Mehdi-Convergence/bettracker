@@ -19,6 +19,7 @@ import {
   Eye,
   EyeOff,
   CheckCheck,
+  CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
@@ -31,6 +32,7 @@ import {
   getAdminErrors,
   getAdminUsers,
   getAdminAI,
+  getAdminStripe,
   forceScan,
 } from "@/services/api";
 import type {
@@ -42,6 +44,7 @@ import type {
   AdminError,
   AdminUserDetail,
   AdminAIStats,
+  AdminStripeStats,
 } from "@/types";
 
 /* ── helpers ── */
@@ -128,6 +131,7 @@ function AdminDashboard() {
   const [errorsExpanded, setErrorsExpanded] = useState(false);
   const [users, setUsers] = useState<AdminUserDetail[]>([]);
   const [aiStats, setAiStats] = useState<AdminAIStats | null>(null);
+  const [stripeStats, setStripeStats] = useState<AdminStripeStats | null>(null);
   const [alertFilter, setAlertFilter] = useState<"ALL" | "CRITICAL" | "WARNING" | "INFO">("ALL");
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [readAlertIds, setReadAlertIds] = useState<Set<string>>(() => {
@@ -159,7 +163,7 @@ function AdminDashboard() {
   }
 
   const load = useCallback(async () => {
-    const [sys, sc, q, an, al, er, us, ai] = await Promise.allSettled([
+    const [sys, sc, q, an, al, er, us, ai, st] = await Promise.allSettled([
       getAdminSystem(),
       getAdminScans(),
       getAdminQuota(),
@@ -168,6 +172,7 @@ function AdminDashboard() {
       getAdminErrors(),
       getAdminUsers(),
       getAdminAI(),
+      getAdminStripe(),
     ]);
     if (sys.status === "fulfilled") setSystem(sys.value);
     if (sc.status === "fulfilled") setScans(sc.value);
@@ -177,6 +182,7 @@ function AdminDashboard() {
     if (er.status === "fulfilled") setErrors(er.value);
     if (us.status === "fulfilled") setUsers(us.value);
     if (ai.status === "fulfilled") setAiStats(ai.value);
+    if (st.status === "fulfilled") setStripeStats(st.value);
     setLoading(false);
     setLastRefresh(new Date());
   }, []);
@@ -604,7 +610,93 @@ function AdminDashboard() {
         )}
       </SectionCard>
 
-      {/* ── Section 7: Alerts ── */}
+      {/* ── Section 7: Stripe Payments ── */}
+      <SectionCard
+        title="Paiements Stripe"
+        icon={<CreditCard size={14} className="text-[#7c3aed]" />}
+        action={
+          stripeStats && stripeStats.error_count_24h > 0 ? (
+            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-[#f04438] text-white">
+              {stripeStats.error_count_24h} erreur{stripeStats.error_count_24h > 1 ? "s" : ""}
+            </span>
+          ) : undefined
+        }
+      >
+        {stripeStats ? (
+          <div className="flex flex-col gap-5">
+            {/* Subscribers KPIs */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: "Abonnes payants", value: String(stripeStats.subscribers.total_paying), color: "#12b76a" },
+                { label: "Pro", value: String(stripeStats.subscribers.pro), color: "#3b5bdb" },
+                { label: "Premium", value: String(stripeStats.subscribers.premium), color: "#7c3aed" },
+                { label: "Free", value: String(stripeStats.subscribers.free), color: "#8a919e" },
+              ].map((kpi) => (
+                <div key={kpi.label} className="flex flex-col gap-1 p-3 rounded-xl border border-[#e3e6eb] bg-[#fafbfc]">
+                  <span className="text-[10.5px] font-semibold text-[#8a919e] uppercase tracking-wide">{kpi.label}</span>
+                  <span className="text-[22px] font-extrabold font-mono" style={{ color: kpi.color }}>{kpi.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Config status */}
+            <div>
+              <p className="text-[11px] font-semibold text-[#8a919e] uppercase tracking-wide mb-2">Configuration</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                {[
+                  { label: "Cle secrete", ok: stripeStats.config.has_secret_key },
+                  { label: "Webhook secret", ok: stripeStats.config.has_webhook_secret },
+                  { label: "Price IDs", ok: stripeStats.config.has_price_ids },
+                ].map((c) => (
+                  <div key={c.label} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-[#fafbfc]">
+                    <StatusDot ok={c.ok} />
+                    <span className="text-[11.5px] font-medium text-[#3c4149]">{c.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Errors 24h */}
+            {stripeStats.errors_24h.length > 0 ? (
+              <div>
+                <p className="text-[11px] font-semibold text-[#f04438] uppercase tracking-wide mb-2">
+                  Erreurs de paiement (24h) — {stripeStats.errors_24h.length}
+                </p>
+                <div className="flex flex-col gap-1.5 max-h-[250px] overflow-y-auto rounded-lg border border-[#f04438]/20 bg-[#f04438]/5 p-3">
+                  {stripeStats.errors_24h.map((err, i) => (
+                    <div key={i} className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-white/80 border border-[#e3e6eb]">
+                      <XCircle size={13} className="text-[#f04438] shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-[#f04438]/10 text-[#f04438]">
+                            {err.type}
+                          </span>
+                          <span className="font-mono text-[10px] text-[#8a919e]">
+                            {fmtTs(err.timestamp)}
+                          </span>
+                          {err.user_id && (
+                            <span className="text-[10px] text-[#8a919e]">User #{err.user_id}</span>
+                          )}
+                        </div>
+                        <p className="text-[11.5px] text-[#3c4149] font-mono break-all leading-snug">{err.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2.5 py-2 text-[12.5px] text-[#12b76a]">
+                <CheckCircle size={15} />
+                Aucune erreur de paiement en 24h
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-[12px] text-[#b0b7c3] text-center py-4">Donnees Stripe indisponibles</p>
+        )}
+      </SectionCard>
+
+      {/* ── Section 8: Alerts ── */}
       {(() => {
         const filteredAlerts = alerts
           .filter((a) => alertFilter === "ALL" || a.severity === alertFilter)
