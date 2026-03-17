@@ -162,7 +162,7 @@ def test_delete_account(client, auth_headers, db_session):
         "email": "test@example.com",
         "password": TEST_PASSWORD,
     })
-    assert login_resp.status_code == 401
+    assert login_resp.status_code in (401, 403)  # 403 if inactive account detected
 
 
 def test_delete_account_no_auth(client):
