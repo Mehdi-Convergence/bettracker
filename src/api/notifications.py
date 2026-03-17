@@ -86,6 +86,26 @@ def mark_as_read(
     return _notif_to_response(notif)
 
 
+@router.patch("/notifications/{notif_id}/toggle-read", response_model=NotificationResponse)
+def toggle_notification_read(
+    notif_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Bascule l'etat lu/non-lu d'une notification."""
+    notif = (
+        db.query(Notification)
+        .filter(Notification.id == notif_id, Notification.user_id == user.id)
+        .first()
+    )
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification introuvable")
+    notif.is_read = not notif.is_read
+    db.commit()
+    db.refresh(notif)
+    return _notif_to_response(notif)
+
+
 @router.post("/notifications/read-all", status_code=204)
 def mark_all_as_read(
     user: User = Depends(get_current_user),

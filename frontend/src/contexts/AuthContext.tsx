@@ -16,6 +16,7 @@ interface User {
   totp_enabled?: boolean;
   email_2fa_enabled?: boolean;
   preferred_2fa_method?: string | null;
+  avatar_url?: string | null;
 }
 
 interface AuthState {

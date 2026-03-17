@@ -294,6 +294,27 @@ export function deleteAccount() {
   return request<{ message: string }>("/auth/me", { method: "DELETE" });
 }
 
+export async function uploadAvatar(file: File): Promise<{ avatar_url: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const token = getAccessToken();
+  const res = await fetch(`${BASE}/auth/avatar`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "include",
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || "Erreur upload avatar");
+  }
+  return res.json();
+}
+
+export function deleteAvatar(): Promise<{ detail: string }> {
+  return request("/auth/avatar", { method: "DELETE" });
+}
+
 export function logoutAll() {
   return request<{ message: string }>("/auth/logout-all", { method: "POST" });
 }
@@ -325,6 +346,10 @@ export function markNotificationRead(id: number) {
 
 export function markAllNotificationsRead() {
   return request<void>("/notifications/read-all", { method: "POST" });
+}
+
+export function toggleNotificationRead(id: number) {
+  return request<import("../types").AppNotification>(`/notifications/${id}/toggle-read`, { method: "PATCH" });
 }
 
 // 2FA (TOTP)

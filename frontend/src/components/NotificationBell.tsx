@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { Bell, AlertTriangle, TrendingDown, Flag, Zap, Target } from "lucide-react";
-import { getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead } from "@/services/api";
+import { Bell, AlertTriangle, TrendingDown, Flag, Zap, Target, Eye, EyeOff } from "lucide-react";
+import { getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead, toggleNotificationRead } from "@/services/api";
 import type { AppNotification } from "@/types";
 
 const ICON_MAP: Record<string, typeof Bell> = {
@@ -79,6 +79,16 @@ export default function NotificationBell() {
     } catch { /* silent */ }
   };
 
+  const handleToggleRead = async (e: React.MouseEvent, notif: AppNotification) => {
+    e.stopPropagation();
+    try {
+      const updated = await toggleNotificationRead(notif.id);
+      setNotifications((prev) => prev.map((n) => (n.id === notif.id ? updated : n)));
+      // Si on vient de marquer comme non-lu : +1, si lu : -1
+      setUnreadCount((c) => updated.is_read ? Math.max(0, c - 1) : c + 1);
+    } catch { /* silent */ }
+  };
+
   const handleMarkAll = async () => {
     try {
       await markAllNotificationsRead();
@@ -136,9 +146,7 @@ export default function NotificationBell() {
                     key={n.id}
                     onClick={() => !n.is_read && handleMarkRead(n.id)}
                     className={`flex gap-3 px-4 py-3 transition-colors ${
-                      n.is_read
-                        ? ""
-                        : "cursor-pointer"
+                      n.is_read ? "" : "cursor-pointer"
                     }`}
                     style={{
                       borderBottom: "1px solid var(--border-light)",
@@ -161,9 +169,20 @@ export default function NotificationBell() {
                         >
                           {n.title}
                         </span>
-                        {!n.is_read && (
-                          <span className="w-2 h-2 rounded-full bg-[#3b5bdb] shrink-0 mt-1.5" />
-                        )}
+                        <button
+                          onClick={(e) => handleToggleRead(e, n)}
+                          title={n.is_read ? "Marquer comme non lu" : "Marquer comme lu"}
+                          className="shrink-0 w-5 h-5 flex items-center justify-center rounded border-none cursor-pointer transition-colors"
+                          style={{
+                            background: "transparent",
+                            color: n.is_read ? "var(--text-muted2)" : "#3b5bdb",
+                            marginTop: "1px",
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = n.is_read ? "var(--text-muted)" : "#2b4bc0"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = n.is_read ? "var(--text-muted2)" : "#3b5bdb"; }}
+                        >
+                          {n.is_read ? <EyeOff size={13} /> : <Eye size={13} />}
+                        </button>
                       </div>
                       <p className="text-[12px] mt-0.5 leading-relaxed line-clamp-2 m-0" style={{ color: "var(--text-muted)" }}>
                         {n.message}

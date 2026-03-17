@@ -1,5 +1,10 @@
+import time
+from contextlib import asynccontextmanager
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse
 
@@ -20,13 +25,25 @@ from src.api.ai_analyste import router as ai_router
 from src.api.admin import router as admin_router
 from src.api.widgets import router as widgets_router
 
+from src.cache import cache_set
 from src.config import settings
 from src.rate_limit import limiter
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Cree le repertoire uploads si necessaire
+    Path("uploads/avatars").mkdir(parents=True, exist_ok=True)
+    # Enregistre le timestamp du dernier demarrage (= dernier deploy)
+    cache_set("deploy:last_timestamp", str(int(time.time())), ttl=86400 * 365)
+    yield
+
 
 app = FastAPI(
     title="BetTracker",
     description="Value bet detection algorithm for European football",
     version="0.2.0",
+    lifespan=lifespan,
 )
 app.state.limiter = limiter
 
@@ -79,3 +96,8 @@ app.include_router(stripe_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(widgets_router, prefix="/api")
+
+# Fichiers statiques — avatars utilisateurs
+_uploads_dir = Path("uploads")
+_uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(_uploads_dir)), name="uploads")

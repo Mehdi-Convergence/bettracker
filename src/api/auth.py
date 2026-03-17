@@ -4,10 +4,13 @@ import logging
 import random
 import secrets
 import threading
+import uuid
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
+from pathlib import Path
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -52,6 +55,10 @@ from src.rate_limit import limiter
 router = APIRouter(tags=["auth"])
 
 _REFRESH_COOKIE_MAX_AGE = 30 * 86400  # 30 jours en secondes
+
+AVATAR_DIR = Path("uploads/avatars")
+AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+MAX_AVATAR_SIZE = 2 * 1024 * 1024  # 2 Mo
 
 
 def _set_refresh_cookie(response: JSONResponse, refresh_token: str) -> None:
@@ -557,6 +564,69 @@ def mark_tour_visited(
     return MessageResponse(message="ok")
 
 
+@router.post("/auth/avatar")
+async def upload_avatar(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Upload or replace the current user's profile picture."""
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Le fichier doit etre une image")
+
+    content = await file.read()
+    if len(content) > MAX_AVATAR_SIZE:
+        raise HTTPException(status_code=400, detail="Image trop volumineuse (max 2 Mo)")
+
+    try:
+        from PIL import Image  # type: ignore[import-untyped]
+
+        img = Image.open(BytesIO(content))
+        img = img.convert("RGB")
+        w, h = img.size
+        size = min(w, h)
+        left = (w - size) // 2
+        top = (h - size) // 2
+        img = img.crop((left, top, left + size, top + size))
+        img = img.resize((200, 200), Image.LANCZOS)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Impossible de traiter l'image")
+
+    filename = f"{user.id}_{uuid.uuid4().hex[:8]}.jpg"
+    filepath = AVATAR_DIR / filename
+
+    try:
+        img.save(filepath, "JPEG", quality=85)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Erreur lors de la sauvegarde de l'image")
+
+    # Supprime l'ancien avatar si existant
+    if user.avatar_url:
+        old_path = Path(user.avatar_url.lstrip("/"))
+        if old_path.exists():
+            old_path.unlink(missing_ok=True)
+
+    user.avatar_url = f"/uploads/avatars/{filename}"
+    db.commit()
+
+    return {"avatar_url": user.avatar_url}
+
+
+@router.delete("/auth/avatar")
+async def delete_avatar(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Remove the current user's profile picture."""
+    if user.avatar_url:
+        old_path = Path(user.avatar_url.lstrip("/"))
+        if old_path.exists():
+            old_path.unlink(missing_ok=True)
+        user.avatar_url = None
+        db.commit()
+    return {"detail": "Avatar supprime"}
+
+
 def _user_to_response(user: User) -> UserResponse:
     visited_str = user.visited_modules or ""
     visited_list = [m for m in visited_str.split(",") if m]
@@ -575,6 +645,7 @@ def _user_to_response(user: User) -> UserResponse:
         totp_enabled=getattr(user, "totp_enabled", False),
         email_2fa_enabled=getattr(user, "email_2fa_enabled", False),
         preferred_2fa_method=getattr(user, "preferred_2fa_method", None),
+        avatar_url=getattr(user, "avatar_url", None),
     )
 
 
@@ -595,6 +666,7 @@ def _user_response_dict(user: User) -> dict:
         "totp_enabled": getattr(user, "totp_enabled", False),
         "email_2fa_enabled": getattr(user, "email_2fa_enabled", False),
         "preferred_2fa_method": getattr(user, "preferred_2fa_method", None),
+        "avatar_url": getattr(user, "avatar_url", None),
     }
 
 

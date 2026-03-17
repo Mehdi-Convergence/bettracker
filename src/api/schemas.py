@@ -52,6 +52,7 @@ class UserResponse(BaseModel):
     totp_enabled: bool = False
     email_2fa_enabled: bool = False
     preferred_2fa_method: str | None = None
+    avatar_url: str | None = None
 
 
 class TwoFactorVerifyRequest(BaseModel):

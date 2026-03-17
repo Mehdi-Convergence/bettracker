@@ -210,6 +210,16 @@ def get_quota_status(
 
     # Monthly usage from real Odds API header (synced by _sync_odds_api_usage)
     used_month = int(cache_get("odds_api_month_used") or 0)
+    if used_month == 0:
+        # Fallback : somme des cles journalieres du mois en cours
+        now = _now_utc()
+        fallback_total = 0
+        for day_offset in range(now.day):
+            d = (now - timedelta(days=day_offset)).strftime("%Y-%m-%d")
+            val = cache_get(f"odds_api_daily:{d}")
+            if val:
+                fallback_total += int(val)
+        used_month = fallback_total
 
     by_sport = [{"sport": k, "calls": int(v)} for k, v in by_sport_raw.items()]
 

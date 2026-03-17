@@ -483,12 +483,20 @@ export default function Layout() {
           {/* User chip */}
           {user && (
             <div className={`flex items-center ${collapsed ? "justify-center" : "gap-[9px]"} ${collapsed ? "px-0" : "px-2.5"} py-[9px] rounded-lg`}>
-              <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
-                style={{ background: "linear-gradient(135deg, #4f8cff, #a78bfa)" }}
-              >
-                {getInitials(user.display_name)}
-              </div>
+              {user.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt="Avatar"
+                  className="w-7 h-7 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+                  style={{ background: "linear-gradient(135deg, #4f8cff, #a78bfa)" }}
+                >
+                  {getInitials(user.display_name)}
+                </div>
+              )}
               {!collapsed && (
                 <div className="min-w-0">
                   <div className="text-[13px] font-semibold" style={{ color: "rgba(255,255,255,0.82)" }}>

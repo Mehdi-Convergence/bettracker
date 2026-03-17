@@ -39,6 +39,9 @@ class User(Base, TimestampMixin):
     email_2fa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     preferred_2fa_method: Mapped[str | None] = mapped_column(String(20), nullable=True, default=None)  # "totp" | "email" | None
 
+    # Avatar
+    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
+
     # Admin
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 

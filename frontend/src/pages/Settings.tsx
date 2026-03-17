@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import confetti from "canvas-confetti";
 import { useNavigate } from "react-router-dom";
 import {
@@ -18,6 +18,8 @@ import {
   CreditCard,
   QrCode,
   CheckCircle,
+  Camera,
+  X as XIcon,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -34,6 +36,8 @@ import {
   verifyEmail2FA,
   disableEmail2FA,
   setPreferred2FAMethod,
+  uploadAvatar,
+  deleteAvatar,
 } from "@/services/api";
 import { Toggle } from "@/components/ui";
 import type { UserStats } from "@/types";
@@ -266,6 +270,41 @@ export default function Settings() {
   const [email2FaError, setEmail2FaError] = useState("");
   const [email2FaSuccess, setEmail2FaSuccess] = useState("");
   const [email2FaLoading, setEmail2FaLoading] = useState(false);
+
+  // Avatar
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarLoading, setAvatarLoading] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarError("");
+    setAvatarLoading(true);
+    try {
+      await uploadAvatar(file);
+      await refreshUser();
+    } catch (err: unknown) {
+      setAvatarError(err instanceof Error ? err.message : "Erreur upload");
+    } finally {
+      setAvatarLoading(false);
+      // Reset input so the same file can be re-selected
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteAvatar = async () => {
+    setAvatarError("");
+    setAvatarLoading(true);
+    try {
+      await deleteAvatar();
+      await refreshUser();
+    } catch (err: unknown) {
+      setAvatarError(err instanceof Error ? err.message : "Erreur suppression");
+    } finally {
+      setAvatarLoading(false);
+    }
+  };
 
   useEffect(() => {
     getUserStats().then(setStats).catch(() => {});
@@ -503,13 +542,62 @@ export default function Settings() {
           <div className="p-5 flex flex-col items-center text-center">
             {/* Avatar */}
             <div className="relative w-20 h-20 mb-3.5">
+              <input
+                type="file"
+                accept="image/*"
+                ref={avatarInputRef}
+                className="hidden"
+                onChange={handleAvatarUpload}
+              />
               <div
-                className="w-20 h-20 rounded-full flex items-center justify-center text-[26px] font-extrabold text-white cursor-pointer"
-                style={{ background: "linear-gradient(135deg, #3b5bdb, #7c3aed)" }}
+                onClick={() => !avatarLoading && avatarInputRef.current?.click()}
+                className="relative w-20 h-20 cursor-pointer group"
               >
-                {initials}
+                {user?.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt="Avatar"
+                    className="w-20 h-20 rounded-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="w-20 h-20 rounded-full flex items-center justify-center text-[26px] font-extrabold text-white"
+                    style={{ background: "linear-gradient(135deg, #3b5bdb, #7c3aed)" }}
+                  >
+                    {avatarLoading ? (
+                      <svg className="animate-spin h-6 w-6 text-white" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    ) : initials}
+                  </div>
+                )}
+                {/* Hover overlay */}
+                <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  {avatarLoading ? (
+                    <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : (
+                    <Camera size={20} className="text-white" />
+                  )}
+                </div>
               </div>
+              {/* Bouton suppression avatar */}
+              {user?.avatar_url && !avatarLoading && (
+                <button
+                  onClick={handleDeleteAvatar}
+                  title="Supprimer l'avatar"
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#f04438] border-2 border-[var(--bg-card)] flex items-center justify-center cursor-pointer z-10"
+                >
+                  <XIcon size={10} className="text-white" />
+                </button>
+              )}
             </div>
+            {avatarError && (
+              <p className="text-[11px] text-[#f04438] mb-1">{avatarError}</p>
+            )}
             <div className="text-[16px] font-extrabold tracking-tight">{user?.display_name}</div>
             <div className="text-[11.5px] text-[var(--accent)] mt-0.5">@{user?.display_name?.replace(/\s+/g, "")}</div>
             <div
