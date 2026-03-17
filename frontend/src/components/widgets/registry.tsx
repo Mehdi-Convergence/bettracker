@@ -22,6 +22,45 @@ export type WidgetType =
 
 export type WidgetCategory = "kpi" | "charts" | "operational" | "betting";
 
+// ---- Widget config types ----
+
+export type MetricKey =
+  | "roi"
+  | "win_rate"
+  | "total_pl"
+  | "total_bets"
+  | "total_staked"
+  | "recent_roi"
+  | "recent_pl"
+  | "recent_bets_count"
+  | "streak";
+
+export type SeriesKey = "cumulative" | "pl";
+
+export type BreakdownKey = "count" | "pl" | "roi" | "win_rate" | "staked";
+
+export type DataSourceKey = "recent_bets" | "campaigns";
+
+export interface WidgetConfigOption {
+  key: string;
+  label: string;
+  type: "select" | "color" | "number" | "text" | "multi-select";
+  options?: { value: string; label: string }[];
+  defaultValue?: string | number | string[];
+}
+
+export interface WidgetConfig {
+  metric?: MetricKey;
+  color?: string;
+  suffix?: string;
+  series?: SeriesKey[];
+  dataKey?: BreakdownKey;
+  dataSource?: DataSourceKey;
+  pageSize?: number;
+}
+
+// ---- Widget definition ----
+
 export interface WidgetDefinition {
   name: string;
   description: string;
@@ -29,7 +68,43 @@ export interface WidgetDefinition {
   category: WidgetCategory;
   defaultSize: { w: number; h: number };
   minSize: { w: number; h: number };
+  configOptions: WidgetConfigOption[];
+  defaultConfig: WidgetConfig;
 }
+
+// ---- Metric options (reused across types) ----
+
+const METRIC_OPTIONS: { value: string; label: string }[] = [
+  { value: "roi", label: "ROI (%)" },
+  { value: "win_rate", label: "Win Rate (%)" },
+  { value: "total_pl", label: "P&L Total" },
+  { value: "total_bets", label: "Nombre de paris" },
+  { value: "total_staked", label: "Total mise" },
+  { value: "recent_roi", label: "ROI recent (30j)" },
+  { value: "recent_pl", label: "P&L recent (30j)" },
+  { value: "recent_bets_count", label: "Paris recents (30j)" },
+  { value: "streak", label: "Serie en cours" },
+];
+
+const COLOR_OPTIONS: { value: string; label: string }[] = [
+  { value: "#3b82f6", label: "Bleu" },
+  { value: "#10b981", label: "Vert" },
+  { value: "#f59e0b", label: "Orange" },
+  { value: "#ef4444", label: "Rouge" },
+  { value: "#8b5cf6", label: "Violet" },
+  { value: "#ec4899", label: "Rose" },
+  { value: "#06b6d4", label: "Cyan" },
+];
+
+const BREAKDOWN_OPTIONS: { value: string; label: string }[] = [
+  { value: "count", label: "Nombre de paris" },
+  { value: "pl", label: "P&L" },
+  { value: "roi", label: "ROI (%)" },
+  { value: "win_rate", label: "Win Rate (%)" },
+  { value: "staked", label: "Total mise" },
+];
+
+// ---- Registry ----
 
 export const widgetRegistry: Record<WidgetType, WidgetDefinition> = {
   "stat-card": {
@@ -39,6 +114,11 @@ export const widgetRegistry: Record<WidgetType, WidgetDefinition> = {
     category: "kpi",
     defaultSize: { w: 3, h: 2 },
     minSize: { w: 2, h: 2 },
+    configOptions: [
+      { key: "metric", label: "Metrique", type: "select", options: METRIC_OPTIONS, defaultValue: "total_bets" },
+      { key: "color", label: "Couleur", type: "select", options: COLOR_OPTIONS, defaultValue: "#3b82f6" },
+    ],
+    defaultConfig: { metric: "total_bets", color: "#3b82f6" },
   },
   "trend-card": {
     name: "Carte Tendance",
@@ -47,6 +127,11 @@ export const widgetRegistry: Record<WidgetType, WidgetDefinition> = {
     category: "kpi",
     defaultSize: { w: 4, h: 3 },
     minSize: { w: 3, h: 3 },
+    configOptions: [
+      { key: "metric", label: "Metrique", type: "select", options: METRIC_OPTIONS, defaultValue: "roi" },
+      { key: "color", label: "Couleur", type: "select", options: COLOR_OPTIONS, defaultValue: "#3b82f6" },
+    ],
+    defaultConfig: { metric: "roi", color: "#3b82f6" },
   },
   gauge: {
     name: "Jauge",
@@ -55,6 +140,13 @@ export const widgetRegistry: Record<WidgetType, WidgetDefinition> = {
     category: "kpi",
     defaultSize: { w: 3, h: 4 },
     minSize: { w: 3, h: 3 },
+    configOptions: [
+      { key: "metric", label: "Metrique", type: "select", options: [
+        { value: "win_rate", label: "Win Rate (%)" },
+        { value: "roi", label: "ROI (%)" },
+      ], defaultValue: "win_rate" },
+    ],
+    defaultConfig: { metric: "win_rate" },
   },
   "line-chart": {
     name: "Graphique Lineaire",
@@ -63,6 +155,13 @@ export const widgetRegistry: Record<WidgetType, WidgetDefinition> = {
     category: "charts",
     defaultSize: { w: 6, h: 4 },
     minSize: { w: 4, h: 3 },
+    configOptions: [
+      { key: "series", label: "Series", type: "multi-select", options: [
+        { value: "cumulative", label: "P&L Cumule" },
+        { value: "pl", label: "P&L Journalier" },
+      ], defaultValue: ["cumulative", "pl"] },
+    ],
+    defaultConfig: { series: ["cumulative", "pl"] },
   },
   "pie-chart": {
     name: "Graphique Circulaire",
@@ -71,6 +170,10 @@ export const widgetRegistry: Record<WidgetType, WidgetDefinition> = {
     category: "charts",
     defaultSize: { w: 6, h: 4 },
     minSize: { w: 4, h: 3 },
+    configOptions: [
+      { key: "dataKey", label: "Donnees", type: "select", options: BREAKDOWN_OPTIONS, defaultValue: "count" },
+    ],
+    defaultConfig: { dataKey: "count" },
   },
   "bar-chart": {
     name: "Graphique a Barres",
@@ -79,6 +182,10 @@ export const widgetRegistry: Record<WidgetType, WidgetDefinition> = {
     category: "charts",
     defaultSize: { w: 6, h: 4 },
     minSize: { w: 4, h: 3 },
+    configOptions: [
+      { key: "dataKey", label: "Donnees", type: "select", options: BREAKDOWN_OPTIONS, defaultValue: "roi" },
+    ],
+    defaultConfig: { dataKey: "roi" },
   },
   "data-table": {
     name: "Table de Donnees",
@@ -87,6 +194,14 @@ export const widgetRegistry: Record<WidgetType, WidgetDefinition> = {
     category: "operational",
     defaultSize: { w: 8, h: 5 },
     minSize: { w: 6, h: 4 },
+    configOptions: [
+      { key: "dataSource", label: "Source", type: "select", options: [
+        { value: "recent_bets", label: "Paris recents" },
+        { value: "campaigns", label: "Campagnes" },
+      ], defaultValue: "recent_bets" },
+      { key: "pageSize", label: "Lignes par page", type: "number", defaultValue: 5 },
+    ],
+    defaultConfig: { dataSource: "recent_bets", pageSize: 5 },
   },
   "activity-feed": {
     name: "Activite Recente",
@@ -95,6 +210,8 @@ export const widgetRegistry: Record<WidgetType, WidgetDefinition> = {
     category: "operational",
     defaultSize: { w: 4, h: 4 },
     minSize: { w: 3, h: 3 },
+    configOptions: [],
+    defaultConfig: {},
   },
   "value-bets": {
     name: "Value Bets",
@@ -103,6 +220,8 @@ export const widgetRegistry: Record<WidgetType, WidgetDefinition> = {
     category: "betting",
     defaultSize: { w: 4, h: 4 },
     minSize: { w: 3, h: 3 },
+    configOptions: [],
+    defaultConfig: {},
   },
 };
 

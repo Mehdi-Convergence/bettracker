@@ -883,3 +883,54 @@ class UserPreferencesUpdateRequest(BaseModel):
     odds_format: str | None = None
     default_tickets_view: str | None = None
     default_campaigns_view: str | None = None
+
+
+# --- Dashboard V2 Presets ---
+
+
+class DashboardWidgetConfig(BaseModel):
+    """Per-widget configuration (metric, color, data source, etc.)."""
+    metric: str | None = None
+    color: str | None = None
+    suffix: str | None = None
+    series: list[str] | None = None
+    dataKey: str | None = None
+    dataSource: str | None = None
+    pageSize: int | None = None
+
+
+class DashboardWidgetSchema(BaseModel):
+    """A single widget in a dashboard preset."""
+    id: str
+    type: str
+    title: str
+    x: int
+    y: int
+    w: int
+    h: int
+    config: DashboardWidgetConfig | None = None
+
+
+class DashboardPresetCreate(BaseModel):
+    """Create a new dashboard preset."""
+    name: str
+    widgets: list[DashboardWidgetSchema]
+
+
+class DashboardPresetUpdate(BaseModel):
+    """Update an existing preset (partial)."""
+    name: str | None = None
+    widgets: list[DashboardWidgetSchema] | None = None
+
+
+class DashboardPresetResponse(BaseModel):
+    """A dashboard preset returned from the API."""
+    id: str
+    name: str
+    widgets: list[DashboardWidgetSchema]
+
+
+class DashboardPresetsListResponse(BaseModel):
+    """All presets + active preset ID."""
+    presets: list[DashboardPresetResponse]
+    active_preset_id: str | None = None

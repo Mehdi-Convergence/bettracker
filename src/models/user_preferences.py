@@ -46,5 +46,9 @@ class UserPreferences(Base, TimestampMixin):
     # -- Dashboard v2 layout (JSON) --
     dashboard_layout: Mapped[str | None] = mapped_column(Text, default=None)
 
+    # -- Dashboard v2 presets (JSON array of {id, name, widgets[]}) --
+    dashboard_presets: Mapped[str | None] = mapped_column(Text, default=None)
+    active_preset_id: Mapped[str | None] = mapped_column(String(50), default=None)
+
     def __repr__(self) -> str:
         return f"<UserPreferences user_id={self.user_id}>"

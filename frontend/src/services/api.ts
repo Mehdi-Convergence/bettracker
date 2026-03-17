@@ -567,3 +567,63 @@ export function saveDashboardLayout(layout: Record<string, unknown>) {
     body: JSON.stringify(layout),
   });
 }
+
+// ---- Dashboard V2 Presets ----
+
+export interface DashboardWidgetDTO {
+  id: string;
+  type: string;
+  title: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  config?: Record<string, unknown> | null;
+}
+
+export interface DashboardPresetDTO {
+  id: string;
+  name: string;
+  widgets: DashboardWidgetDTO[];
+}
+
+export interface DashboardPresetsListDTO {
+  presets: DashboardPresetDTO[];
+  active_preset_id: string | null;
+}
+
+export function listDashboardPresets() {
+  return request<DashboardPresetsListDTO>("/settings/dashboard-presets");
+}
+
+export function createDashboardPreset(data: { name: string; widgets: DashboardWidgetDTO[] }) {
+  return request<DashboardPresetDTO>("/settings/dashboard-presets", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateDashboardPreset(presetId: string, data: { name?: string; widgets?: DashboardWidgetDTO[] }) {
+  return request<DashboardPresetDTO>(`/settings/dashboard-presets/${presetId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteDashboardPreset(presetId: string) {
+  return request<{ ok: boolean }>(`/settings/dashboard-presets/${presetId}`, {
+    method: "DELETE",
+  });
+}
+
+export function activateDashboardPreset(presetId: string) {
+  return request<{ ok: boolean }>(`/settings/dashboard-presets/${presetId}/activate`, {
+    method: "PUT",
+  });
+}
+
+export function duplicateDashboardPreset(presetId: string) {
+  return request<DashboardPresetDTO>(`/settings/dashboard-presets/${presetId}/duplicate`, {
+    method: "POST",
+  });
+}

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import GridLayout, { verticalCompactor } from "react-grid-layout";
 import type { Layout, LayoutItem } from "react-grid-layout";
-import { GripVertical, X } from "lucide-react";
-import { widgetRegistry, type WidgetType } from "../widgets/registry";
+import { GripVertical, X, Settings } from "lucide-react";
+import { widgetRegistry, type WidgetType, type WidgetConfig } from "../widgets/registry";
 import { WidgetErrorBoundary } from "../widgets/WidgetErrorBoundary";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -15,6 +15,7 @@ export interface DashboardWidget {
   y: number;
   w: number;
   h: number;
+  config?: WidgetConfig;
 }
 
 interface DashboardGridProps {
@@ -22,6 +23,7 @@ interface DashboardGridProps {
   isEditMode: boolean;
   onLayoutChange: (widgets: DashboardWidget[]) => void;
   onRemoveWidget: (id: string) => void;
+  onConfigureWidget?: (id: string) => void;
   renderWidget: (widget: DashboardWidget) => React.ReactNode;
 }
 
@@ -34,7 +36,6 @@ function getResponsiveCols(width: number): number {
 
 function adaptLayoutForCols(widgets: DashboardWidget[], cols: number): DashboardWidget[] {
   if (cols >= 12) return widgets;
-  // Re-flow widgets to fit within fewer columns
   return widgets.map((w) => ({
     ...w,
     w: Math.min(w.w, cols),
@@ -47,6 +48,7 @@ export function DashboardGrid({
   isEditMode,
   onLayoutChange,
   onRemoveWidget,
+  onConfigureWidget,
   renderWidget,
 }: DashboardGridProps) {
   const [containerWidth, setContainerWidth] = useState(1200);
@@ -123,6 +125,18 @@ export function DashboardGrid({
             <div className="relative h-full w-full">
               {isEditMode && (
                 <div className="absolute top-2 right-2 z-10 flex gap-1">
+                  {onConfigureWidget && (
+                    <button
+                      className="p-1.5 bg-white rounded shadow-md hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onConfigureWidget(widget.id);
+                      }}
+                      title="Configurer"
+                    >
+                      <Settings className="h-4 w-4 text-gray-600" />
+                    </button>
+                  )}
                   <button
                     className="widget-drag-handle p-1.5 bg-white rounded shadow-md hover:bg-gray-50 cursor-move"
                     title="Deplacer"

@@ -1,10 +1,20 @@
-"""User preferences endpoints (bankroll, notifications, display)."""
+"""User preferences endpoints (bankroll, notifications, display, dashboard presets)."""
 
-from fastapi import APIRouter, Body, Depends
+import json
+import uuid
+
+from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from src.api.deps import get_current_user
-from src.api.schemas import UserPreferencesResponse, UserPreferencesUpdateRequest
+from src.api.schemas import (
+    UserPreferencesResponse,
+    UserPreferencesUpdateRequest,
+    DashboardPresetCreate,
+    DashboardPresetUpdate,
+    DashboardPresetResponse,
+    DashboardPresetsListResponse,
+)
 from src.database import get_db
 from src.models.user import User
 from src.models.user_preferences import UserPreferences
@@ -100,8 +110,182 @@ def update_dashboard_layout(
     db: Session = Depends(get_db),
 ):
     """Save user's dashboard v2 layout."""
-    import json
     prefs = _get_or_create_prefs(user, db)
     prefs.dashboard_layout = json.dumps(layout)
     db.commit()
     return {"ok": True}
+
+
+# ── Dashboard V2 Presets CRUD ──
+
+
+def _load_presets(prefs: UserPreferences) -> list[dict]:
+    """Load presets from JSON text column."""
+    if not prefs.dashboard_presets:
+        return []
+    try:
+        return json.loads(prefs.dashboard_presets)
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+
+def _save_presets(prefs: UserPreferences, presets: list[dict], db: Session) -> None:
+    """Save presets list back to JSON text column."""
+    prefs.dashboard_presets = json.dumps(presets)
+    db.commit()
+
+
+@router.get("/settings/dashboard-presets", response_model=DashboardPresetsListResponse)
+def list_dashboard_presets(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List all dashboard presets for the current user."""
+    prefs = _get_or_create_prefs(user, db)
+    presets = _load_presets(prefs)
+    return DashboardPresetsListResponse(
+        presets=[DashboardPresetResponse(**p) for p in presets],
+        active_preset_id=prefs.active_preset_id,
+    )
+
+
+@router.post("/settings/dashboard-presets", response_model=DashboardPresetResponse, status_code=201)
+def create_dashboard_preset(
+    body: DashboardPresetCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create a new dashboard preset."""
+    prefs = _get_or_create_prefs(user, db)
+    presets = _load_presets(prefs)
+
+    if len(presets) >= 10:
+        raise HTTPException(status_code=400, detail="Maximum 10 presets allowed")
+
+    preset_id = str(uuid.uuid4())[:8]
+    new_preset = {
+        "id": preset_id,
+        "name": body.name,
+        "widgets": [w.model_dump() for w in body.widgets],
+    }
+    presets.append(new_preset)
+    _save_presets(prefs, presets, db)
+
+    # Auto-activate the first preset
+    if len(presets) == 1:
+        prefs.active_preset_id = preset_id
+        db.commit()
+
+    return DashboardPresetResponse(**new_preset)
+
+
+@router.get("/settings/dashboard-presets/{preset_id}", response_model=DashboardPresetResponse)
+def get_dashboard_preset(
+    preset_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get a specific dashboard preset by ID."""
+    prefs = _get_or_create_prefs(user, db)
+    presets = _load_presets(prefs)
+
+    preset = next((p for p in presets if p["id"] == preset_id), None)
+    if not preset:
+        raise HTTPException(status_code=404, detail="Preset not found")
+
+    return DashboardPresetResponse(**preset)
+
+
+@router.put("/settings/dashboard-presets/{preset_id}", response_model=DashboardPresetResponse)
+def update_dashboard_preset(
+    preset_id: str,
+    body: DashboardPresetUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update an existing dashboard preset (name and/or widgets)."""
+    prefs = _get_or_create_prefs(user, db)
+    presets = _load_presets(prefs)
+
+    idx = next((i for i, p in enumerate(presets) if p["id"] == preset_id), None)
+    if idx is None:
+        raise HTTPException(status_code=404, detail="Preset not found")
+
+    if body.name is not None:
+        presets[idx]["name"] = body.name
+    if body.widgets is not None:
+        presets[idx]["widgets"] = [w.model_dump() for w in body.widgets]
+
+    _save_presets(prefs, presets, db)
+    return DashboardPresetResponse(**presets[idx])
+
+
+@router.delete("/settings/dashboard-presets/{preset_id}")
+def delete_dashboard_preset(
+    preset_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a dashboard preset."""
+    prefs = _get_or_create_prefs(user, db)
+    presets = _load_presets(prefs)
+
+    new_presets = [p for p in presets if p["id"] != preset_id]
+    if len(new_presets) == len(presets):
+        raise HTTPException(status_code=404, detail="Preset not found")
+
+    _save_presets(prefs, new_presets, db)
+
+    # Clear active if it was the deleted one
+    if prefs.active_preset_id == preset_id:
+        prefs.active_preset_id = new_presets[0]["id"] if new_presets else None
+        db.commit()
+
+    return {"ok": True}
+
+
+@router.put("/settings/dashboard-presets/{preset_id}/activate")
+def activate_dashboard_preset(
+    preset_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Set a preset as the active dashboard."""
+    prefs = _get_or_create_prefs(user, db)
+    presets = _load_presets(prefs)
+
+    if not any(p["id"] == preset_id for p in presets):
+        raise HTTPException(status_code=404, detail="Preset not found")
+
+    prefs.active_preset_id = preset_id
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/settings/dashboard-presets/{preset_id}/duplicate", response_model=DashboardPresetResponse, status_code=201)
+def duplicate_dashboard_preset(
+    preset_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Duplicate an existing preset."""
+    prefs = _get_or_create_prefs(user, db)
+    presets = _load_presets(prefs)
+
+    source = next((p for p in presets if p["id"] == preset_id), None)
+    if not source:
+        raise HTTPException(status_code=404, detail="Preset not found")
+
+    if len(presets) >= 10:
+        raise HTTPException(status_code=400, detail="Maximum 10 presets allowed")
+
+    new_id = str(uuid.uuid4())[:8]
+    duplicate = {
+        "id": new_id,
+        "name": f"{source['name']} (copie)",
+        "widgets": source["widgets"],
+    }
+    presets.append(duplicate)
+    _save_presets(prefs, presets, db)
+
+    return DashboardPresetResponse(**duplicate)
