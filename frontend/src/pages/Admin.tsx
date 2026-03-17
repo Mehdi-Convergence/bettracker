@@ -577,9 +577,9 @@ function AdminDashboard() {
         title="Alertes actives"
         icon={<AlertTriangle size={14} className="text-[#f79009]" />}
         action={
-          alerts.length > 0 ? (
+          alerts.filter(a => a.severity === "CRITICAL" || a.severity === "WARNING").length > 0 ? (
             <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-[#f04438] text-white">
-              {alerts.length}
+              {alerts.filter(a => a.severity === "CRITICAL" || a.severity === "WARNING").length}
             </span>
           ) : undefined
         }

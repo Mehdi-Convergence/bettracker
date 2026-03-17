@@ -7,6 +7,7 @@ export default function Landing() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [lightbox, setLightbox] = useState<string | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const proPrice = billing === "monthly" ? "29" : "23";
@@ -314,7 +315,7 @@ export default function Landing() {
                 Notre mod&egrave;le ML analyse 100+ ligues (football, tennis ATP) et calcule la probabilit&eacute; r&eacute;elle de chaque issue. Quand cette probabilit&eacute; est sup&eacute;rieure &agrave; celle implicite dans la cote du bookmaker, c&rsquo;est une value bet. Chaque match affiche ses features cl&eacute;s&nbsp;: ELO, forme, H2H, blessures.
               </p>
             </div>
-            <div className="lp-feature-visual">
+            <div className="lp-feature-visual" onClick={() => setLightbox("/screenshots/scanner.png")}>
               <img src="/screenshots/scanner.png" alt="Scanner IA BetTracker" loading="lazy" />
             </div>
           </div>
@@ -333,7 +334,7 @@ export default function Landing() {
                 Testez vos crit&egrave;res (edge min, cote, sport) sur des milliers de matchs historiques avant de risquer votre bankroll. Walk-forward validation, courbe de bankroll, ROI, Sharpe ratio et CLV. 38&nbsp;000+ matchs disponibles.
               </p>
             </div>
-            <div className="lp-feature-visual">
+            <div className="lp-feature-visual" onClick={() => setLightbox("/screenshots/Backtest.png")}>
               <img src="/screenshots/Backtest.png" alt="Backtest historique BetTracker" loading="lazy" />
             </div>
           </div>
@@ -353,7 +354,7 @@ export default function Landing() {
                 D&eacute;finissez vos r&egrave;gles (sport, cote min/max, edge minimum, bankroll) et laissez BetTracker s&eacute;lectionner automatiquement les paris qui correspondent. Suivi complet P&amp;L par campagne, historique de chaque pari.
               </p>
             </div>
-            <div className="lp-feature-visual">
+            <div className="lp-feature-visual" onClick={() => setLightbox("/screenshots/Campagnes.png")}>
               <img src="/screenshots/Campagnes.png" alt="Campagnes automatisees BetTracker" loading="lazy" />
             </div>
           </div>
@@ -373,7 +374,7 @@ export default function Landing() {
                 &laquo;&nbsp;Quelle est ma meilleure strat&eacute;gie ATP&nbsp;?&nbsp;&raquo;, &laquo;&nbsp;Analyse mon ROI ce mois-ci&nbsp;&raquo;. L&rsquo;IA Analyste conna&icirc;t votre historique, vos campagnes et vos r&eacute;sultats pour vous fournir des insights personnalis&eacute;s.
               </p>
             </div>
-            <div className="lp-feature-visual">
+            <div className="lp-feature-visual" onClick={() => setLightbox("/screenshots/ia-analyste.png")}>
               <img src="/screenshots/ia-analyste.png" alt="IA Analyste BetTracker" loading="lazy" />
             </div>
           </div>
@@ -770,6 +771,12 @@ export default function Landing() {
           </div>
         </div>
       </footer>
+
+      {lightbox && (
+        <div className="lp-lightbox-overlay" onClick={() => setLightbox(null)}>
+          <img src={lightbox} alt="Apercu" />
+        </div>
+      )}
     </div>
   );
 }

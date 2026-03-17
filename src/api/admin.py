@@ -382,8 +382,8 @@ def get_alerts(
             alerts.append(
                 {
                     "id": f"no_matches_{sport}",
-                    "severity": "CRITICAL",
-                    "message": f"Scan {sport} a retourne 0 match",
+                    "severity": "INFO",
+                    "message": f"Scan {sport} a retourne 0 match (aucun match programme)",
                     "sport": sport,
                     "timestamp": now_iso,
                 }
@@ -472,7 +472,8 @@ def get_users_details(
 # ---------------------------------------------------------------------------
 
 
-def _trigger_scan(sport: str) -> None:
+async def _trigger_scan(sport: str) -> None:
+    """Invalidate cache AND run a real scan immediately."""
     try:
         from src.cache import cache_delete
 
@@ -480,11 +481,37 @@ def _trigger_scan(sport: str) -> None:
         cache_delete(f"scan:{sport}")
         logger.info("admin force scan: invalidated cache for sport=%s", sport)
     except Exception as exc:
-        logger.error("admin force scan error for sport=%s: %s", sport, exc)
+        logger.error("admin force scan cache error for sport=%s: %s", sport, exc)
+
+    # Run actual scan
+    try:
+        from src.workers.scan_worker import (
+            run_football_scan,
+            run_mlb_scan,
+            run_nba_scan,
+            run_pmu_scan,
+            run_rugby_scan,
+            run_tennis_scan,
+        )
+
+        scan_fns = {
+            "football": run_football_scan,
+            "tennis": run_tennis_scan,
+            "nba": run_nba_scan,
+            "rugby": run_rugby_scan,
+            "mlb": run_mlb_scan,
+            "pmu": run_pmu_scan,
+        }
+        scan_fn = scan_fns.get(sport)
+        if scan_fn:
+            await scan_fn()
+            logger.info("admin force scan: completed for sport=%s", sport)
+    except Exception as exc:
+        logger.error("admin force scan execution error for sport=%s: %s", sport, exc)
 
 
 @router.post("/scan/{sport}/force")
-def force_scan(
+async def force_scan(
     sport: str,
     background_tasks: BackgroundTasks,
     _user: User = Depends(require_admin),
@@ -499,7 +526,7 @@ def force_scan(
 
     return {
         "ok": True,
-        "message": f"Cache {sport} invalide — le worker relancera le scan au prochain cycle",
+        "message": f"Scan {sport} lance en arriere-plan",
     }
 
 
