@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Rocket, Wallet, Check, Loader2, Layers,
   Pause, Play, Plus, Target, Trash2,
@@ -37,6 +37,7 @@ function sportIcon(name: string) {
 // ══════════════════════════════════════════════
 export default function Campaign() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { showTour, completeTour } = useTour("campaigns");
 
   // ── Data ──
@@ -107,6 +108,16 @@ export default function Campaign() {
   // ── Load campaigns ──
   useEffect(() => { loadCampaigns(); }, []);
 
+  // ── Handle duplicate from CampaignDetail navigation ──
+  useEffect(() => {
+    const state = location.state as { duplicateFrom?: CampaignType } | null;
+    if (state?.duplicateFrom) {
+      handleDuplicate(state.duplicateFrom);
+      // Clear state to avoid re-triggering on back navigation
+      window.history.replaceState({}, "");
+    }
+  }, [location.state]);
+
   // ── Load stats for all campaigns ──
   useEffect(() => {
     campaigns.forEach((c) => {
@@ -150,6 +161,27 @@ export default function Campaign() {
     const newStatus = currentStatus === "active" ? "paused" : "active";
     try { await updateCampaign(campaignId, { status: newStatus }); await loadCampaigns(); }
     catch { setError("Impossible de modifier le statut."); }
+    setOpenMenuId(null);
+  }
+
+  function handleDuplicate(campaign: typeof campaigns[0]) {
+    setForm({
+      name: `${campaign.name} (copie)`,
+      initial_bankroll: campaign.initial_bankroll,
+      flat_stake: campaign.flat_stake,
+      min_edge: campaign.min_edge,
+      min_model_prob: campaign.min_model_prob ?? 0.55,
+      min_odds: campaign.min_odds ?? null,
+      max_odds: campaign.max_odds ?? null,
+      combo_mode: campaign.combo_mode ?? false,
+      combo_max_legs: campaign.combo_max_legs ?? 2,
+      combo_min_odds: campaign.combo_min_odds ?? 1.8,
+      combo_max_odds: campaign.combo_max_odds ?? 3.0,
+      combo_top_n: campaign.combo_top_n ?? 2,
+      target_bankroll: campaign.target_bankroll ?? null,
+    });
+    setStepperStep(0);
+    setShowCreateModal(true);
     setOpenMenuId(null);
   }
 
@@ -310,7 +342,7 @@ export default function Campaign() {
                         <div className="absolute right-0 top-8 w-44 bg-white rounded-lg border border-[#e3e6eb] py-1 z-50"
                           style={{ boxShadow: "0 4px 16px rgba(16,24,40,.1)" }}
                           onClick={(e) => e.stopPropagation()}>
-                          <MenuBtn icon={<Copy size={14} />} label="Dupliquer" onClick={() => setOpenMenuId(null)} />
+                          <MenuBtn icon={<Copy size={14} />} label="Dupliquer" onClick={() => handleDuplicate(campaign)} />
                           <MenuBtn icon={campaign.status === "active" ? <Pause size={14} /> : <Play size={14} />}
                             label={campaign.status === "active" ? "Mettre en pause" : "Reprendre"}
                             onClick={() => handleTogglePause(campaign.id, campaign.status)} />

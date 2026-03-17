@@ -326,7 +326,10 @@ export default function CampaignDetail() {
               {showMenu && (
                 <div className="absolute right-0 top-10 w-44 rounded-lg border py-1 z-50"
                   style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 4px 16px rgba(16,24,40,.1)" }}>
-                  <MenuBtn icon={<Copy size={14} />} label="Dupliquer" onClick={() => setShowMenu(false)} />
+                  <MenuBtn icon={<Copy size={14} />} label="Dupliquer" onClick={() => {
+                    setShowMenu(false);
+                    navigate("/campaign", { state: { duplicateFrom: detail?.campaign } });
+                  }} />
                   <MenuBtn icon={<Archive size={14} />} label="Archiver" onClick={handleArchive} />
                   <div className="border-t my-1" style={{ borderColor: "var(--border-color)" }} />
                   <MenuBtn icon={<Trash2 size={14} />} label="Supprimer" onClick={() => setShowMenu(false)} danger />
