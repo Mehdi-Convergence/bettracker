@@ -16,6 +16,22 @@ import { GREEN, RED, STATUS_CFG } from "@/utils/campaign";
 import { useTour } from "@/hooks/useTour";
 import SpotlightTour from "@/components/SpotlightTour";
 import { campaignsTour } from "@/tours/index";
+import { usePreview } from "@/contexts/PreviewContext";
+
+// ── Demo data for preview mode ──
+const DEMO_CAMPAIGNS: CampaignType[] = [
+  { id: 1, name: "Value Bets Ligue 1", status: "active", initial_bankroll: 500, flat_stake: 0.05, min_edge: 0.03, min_model_prob: 0.55, min_odds: 1.5, max_odds: 3.5, allowed_outcomes: null, excluded_leagues: null, combo_mode: false, combo_max_legs: 2, combo_min_odds: 1.8, combo_max_odds: 3.0, combo_top_n: 2, target_bankroll: 1000, created_at: "2026-01-15T10:00:00Z" },
+  { id: 2, name: "Over 2.5 Premier League", status: "active", initial_bankroll: 300, flat_stake: 0.04, min_edge: 0.025, min_model_prob: 0.52, min_odds: 1.6, max_odds: 2.8, allowed_outcomes: null, excluded_leagues: null, combo_mode: false, combo_max_legs: 2, combo_min_odds: 1.8, combo_max_odds: 3.0, combo_top_n: 2, target_bankroll: null, created_at: "2026-02-01T14:30:00Z" },
+  { id: 3, name: "BTTS Bundesliga", status: "active", initial_bankroll: 400, flat_stake: 0.06, min_edge: 0.035, min_model_prob: 0.58, min_odds: 1.7, max_odds: 2.5, allowed_outcomes: null, excluded_leagues: null, combo_mode: false, combo_max_legs: 2, combo_min_odds: 1.8, combo_max_odds: 3.0, combo_top_n: 2, target_bankroll: 800, created_at: "2026-02-10T09:00:00Z" },
+  { id: 4, name: "Asian Handicap Serie A", status: "paused", initial_bankroll: 250, flat_stake: 0.03, min_edge: 0.02, min_model_prob: 0.50, min_odds: 1.4, max_odds: 4.0, allowed_outcomes: null, excluded_leagues: null, combo_mode: false, combo_max_legs: 2, combo_min_odds: 1.8, combo_max_odds: 3.0, combo_top_n: 2, target_bankroll: null, created_at: "2026-03-01T16:00:00Z" },
+];
+
+const DEMO_STATS: Record<number, import("@/types").CampaignStats> = {
+  1: { total_bets: 47, pending_bets: 3, won: 28, lost: 16, win_rate: 63.6, total_staked: 1175, total_pnl: 184.5, roi_pct: 15.7, current_bankroll: 684.5, longest_winning_streak: 7, longest_losing_streak: 3, avg_clv: 2.1, max_drawdown_pct: 8.2, max_drawdown_amount: 41, ev_expected: 165, algo_stats: null, manual_stats: null },
+  2: { total_bets: 32, pending_bets: 2, won: 18, lost: 12, win_rate: 60.0, total_staked: 384, total_pnl: 96.2, roi_pct: 25.1, current_bankroll: 396.2, longest_winning_streak: 5, longest_losing_streak: 4, avg_clv: 1.8, max_drawdown_pct: 12.1, max_drawdown_amount: 36.3, ev_expected: 88, algo_stats: null, manual_stats: null },
+  3: { total_bets: 28, pending_bets: 1, won: 18, lost: 9, win_rate: 66.7, total_staked: 672, total_pnl: 210.8, roi_pct: 31.4, current_bankroll: 610.8, longest_winning_streak: 8, longest_losing_streak: 2, avg_clv: 3.2, max_drawdown_pct: 5.6, max_drawdown_amount: 22.4, ev_expected: 195, algo_stats: null, manual_stats: null },
+  4: { total_bets: 19, pending_bets: 0, won: 9, lost: 10, win_rate: 47.4, total_staked: 142.5, total_pnl: -18.3, roi_pct: -12.8, current_bankroll: 231.7, longest_winning_streak: 3, longest_losing_streak: 5, avg_clv: -0.8, max_drawdown_pct: 18.4, max_drawdown_amount: 46, ev_expected: -12, algo_stats: null, manual_stats: null },
+};
 
 // ── Design tokens ──
 const ACCENT = "#3b5bdb";
@@ -39,6 +55,7 @@ export default function Campaign() {
   const navigate = useNavigate();
   const location = useLocation();
   const { showTour, completeTour } = useTour("campaigns");
+  const { isPreview } = usePreview();
 
   // ── Data ──
   const [campaigns, setCampaigns] = useState<CampaignType[]>([]);
@@ -106,10 +123,19 @@ export default function Campaign() {
   const [campaignStats, setCampaignStats] = useState<Record<number, import("@/types").CampaignStats>>({});
 
   // ── Load campaigns ──
-  useEffect(() => { loadCampaigns(); }, []);
+  useEffect(() => {
+    if (isPreview) {
+      setCampaigns(DEMO_CAMPAIGNS);
+      setCampaignStats(DEMO_STATS);
+      setLoading(false);
+      return;
+    }
+    loadCampaigns();
+  }, [isPreview]);
 
   // ── Handle duplicate from CampaignDetail navigation ──
   useEffect(() => {
+    if (isPreview) return;
     const state = location.state as { duplicateFrom?: CampaignType } | null;
     if (state?.duplicateFrom) {
       handleDuplicate(state.duplicateFrom);
@@ -120,6 +146,7 @@ export default function Campaign() {
 
   // ── Load stats for all campaigns ──
   useEffect(() => {
+    if (isPreview) return;
     campaigns.forEach((c) => {
       if (!campaignStats[c.id]) {
         getCampaignDetail(c.id).then((d) =>
@@ -222,9 +249,10 @@ export default function Campaign() {
           <h1 className="text-2xl font-bold text-[#111318]">Campagnes</h1>
           <p className="text-sm text-[#8a919e] mt-0.5">Gérez vos stratégies de paris automatisées</p>
         </div>
-        <button data-tour="create-btn" onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors cursor-pointer hover:opacity-90"
-          style={{ backgroundColor: ACCENT }}>
+        <button data-tour="create-btn" onClick={() => !isPreview && setShowCreateModal(true)}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors ${isPreview ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:opacity-90"}`}
+          style={{ backgroundColor: ACCENT }}
+          disabled={isPreview}>
           <Plus size={16} />
           Créer une campagne
         </button>
@@ -298,33 +326,46 @@ export default function Campaign() {
             const cStats = campaignStats[campaign.id];
             const accent = CARD_ACCENTS[idx % CARD_ACCENTS.length];
 
+            const winRate = cStats ? cStats.win_rate : 0;
+            const isPositive = cStats ? cStats.total_pnl >= 0 : true;
+
             return (
               <div key={campaign.id}
                 {...(idx === 0 ? { "data-tour": "campaign-card" } : {})}
-                className="group bg-white rounded-xl border border-[#e3e6eb] overflow-hidden hover:border-[#3b5bdb]/30 transition-all cursor-pointer"
-                style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)", animation: `fadeUp 0.4s ease both ${idx * 0.05}s` }}
-                onClick={() => navigate(`/campaign/${campaign.id}`)}>
-                {/* Accent top bar */}
-                <div className="h-1" style={{ backgroundColor: accent }} />
+                className="group relative rounded-2xl overflow-hidden cursor-pointer transition-all duration-300"
+                style={{
+                  background: "linear-gradient(135deg, #fff 0%, #fafbff 100%)",
+                  boxShadow: "0 1px 3px rgba(16,24,40,.04), 0 4px 12px rgba(16,24,40,.03)",
+                  border: "1px solid #e8eaef",
+                  animation: `fadeUp 0.4s ease both ${idx * 0.05}s`,
+                }}
+                onClick={() => !isPreview && navigate(`/campaign/${campaign.id}`)}>
 
-                <div className="p-4">
-                  {/* Header: icon + name + status + menu */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0"
-                        style={{ backgroundColor: `${accent}15` }}>
+                {/* Accent gradient top */}
+                <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${accent}, ${accent}88)` }} />
+
+                {/* Glow on hover */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
+                  style={{ boxShadow: `0 0 0 1px ${accent}30, 0 8px 32px ${accent}12` }} />
+
+                <div className="p-5">
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 shadow-sm"
+                        style={{ background: `linear-gradient(135deg, ${accent}18, ${accent}08)`, border: `1px solid ${accent}15` }}>
                         {sportIcon(campaign.name)}
                       </div>
                       <div className="min-w-0">
-                        <h3 className="text-sm font-semibold text-[#111318] truncate">{campaign.name}</h3>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${statusCfg.bg} ${statusCfg.text}`}>
+                        <h3 className="text-[15px] font-bold text-[#111318] truncate leading-tight">{campaign.name}</h3>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusCfg.bg} ${statusCfg.text}`}>
                             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusCfg.dot,
                               ...(campaign.status === "active" ? { animation: "pulse 2s infinite" } : {}) }} />
                             {statusCfg.label}
                           </span>
                           {campaign.combo_mode && (
-                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 text-purple-600">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 text-purple-600">
                               Combis
                             </span>
                           )}
@@ -332,15 +373,15 @@ export default function Campaign() {
                       </div>
                     </div>
 
-                    {/* Menu ⋮ */}
+                    {/* Menu */}
                     <div className="relative" ref={openMenuId === campaign.id ? menuRef : undefined}>
                       <button {...(idx === 0 ? { "data-tour": "campaign-menu" } : {})} onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === campaign.id ? null : campaign.id); }}
-                        className="p-1 rounded-md text-[#8a919e] hover:bg-slate-100 transition-colors cursor-pointer opacity-0 group-hover:opacity-100">
+                        className="p-1.5 rounded-lg text-[#b0b7c3] hover:bg-[#f4f5f7] hover:text-[#8a919e] transition-all cursor-pointer opacity-0 group-hover:opacity-100">
                         <MoreVertical size={16} />
                       </button>
                       {openMenuId === campaign.id && (
-                        <div className="absolute right-0 top-8 w-44 bg-white rounded-lg border border-[#e3e6eb] py-1 z-50"
-                          style={{ boxShadow: "0 4px 16px rgba(16,24,40,.1)" }}
+                        <div className="absolute right-0 top-9 w-44 bg-white rounded-xl border border-[#e3e6eb] py-1 z-50"
+                          style={{ boxShadow: "0 8px 24px rgba(16,24,40,.12)" }}
                           onClick={(e) => e.stopPropagation()}>
                           <MenuBtn icon={<Copy size={14} />} label="Dupliquer" onClick={() => handleDuplicate(campaign)} />
                           <MenuBtn icon={campaign.status === "active" ? <Pause size={14} /> : <Play size={14} />}
@@ -355,27 +396,57 @@ export default function Campaign() {
                   </div>
 
                   {/* Config tags */}
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    <ConfigTag label={`Mise ${(campaign.flat_stake * 100).toFixed(0)}%`} />
-                    <ConfigTag label={`Edge \u2265 ${(campaign.min_edge * 100).toFixed(0)}%`} />
-                    {campaign.min_model_prob && <ConfigTag label={`Conf. \u2265 ${(campaign.min_model_prob * 100).toFixed(0)}%`} />}
-                    {campaign.min_odds && <ConfigTag label={`Cote \u2265 ${campaign.min_odds.toFixed(1)}`} />}
-                    {campaign.max_odds && <ConfigTag label={`Cote \u2264 ${campaign.max_odds.toFixed(1)}`} />}
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    <ConfigTag label={`Mise ${(campaign.flat_stake * 100).toFixed(0)}%`} accent={accent} />
+                    <ConfigTag label={`Edge \u2265 ${(campaign.min_edge * 100).toFixed(0)}%`} accent={accent} />
+                    {campaign.min_model_prob && <ConfigTag label={`Conf. \u2265 ${(campaign.min_model_prob * 100).toFixed(0)}%`} accent={accent} />}
+                    {campaign.min_odds && <ConfigTag label={`Cote \u2265 ${campaign.min_odds.toFixed(1)}`} accent={accent} />}
+                    {campaign.max_odds && <ConfigTag label={`Cote \u2264 ${campaign.max_odds.toFixed(1)}`} accent={accent} />}
                   </div>
 
-                  {/* KPI row */}
+                  {/* KPIs */}
                   {cStats ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-3 border-t border-[#e3e6eb]">
-                      <KpiCell label="ROI" value={`${cStats.roi_pct >= 0 ? "+" : ""}${cStats.roi_pct.toFixed(1)}%`}
-                        color={cStats.roi_pct >= 0 ? GREEN : RED} />
-                      <KpiCell label="Paris" value={`${cStats.total_bets}`} />
-                      <KpiCell label="P&L" value={`${cStats.total_pnl >= 0 ? "+" : ""}${cStats.total_pnl.toFixed(0)}€`}
-                        color={cStats.total_pnl >= 0 ? GREEN : RED} />
+                    <div className="rounded-xl p-3.5" style={{ background: "linear-gradient(135deg, #f8f9fc, #f4f5f7)" }}>
+                      {/* Win rate bar */}
+                      <div className="flex items-center justify-between mb-2.5">
+                        <span className="text-[10px] font-semibold text-[#8a919e] uppercase tracking-wider">Win rate</span>
+                        <span className="text-[11px] font-bold" style={{ color: winRate >= 55 ? GREEN : winRate >= 45 ? "#f79009" : RED }}>
+                          {winRate.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-[#e8eaef] mb-3.5 overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${Math.min(winRate, 100)}%`,
+                            background: winRate >= 55 ? `linear-gradient(90deg, ${GREEN}, ${GREEN}cc)` : winRate >= 45 ? "linear-gradient(90deg, #f79009, #fbbf24)" : `linear-gradient(90deg, ${RED}, ${RED}cc)`,
+                          }} />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <div className="text-[17px] font-extrabold font-[var(--font-mono)] leading-none" style={{ color: isPositive ? GREEN : RED }}>
+                            {cStats.roi_pct >= 0 ? "+" : ""}{cStats.roi_pct.toFixed(1)}%
+                          </div>
+                          <div className="text-[10px] font-medium text-[#8a919e] mt-1">ROI</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-[17px] font-extrabold font-[var(--font-mono)] leading-none text-[#111318]">
+                            {cStats.total_bets}
+                          </div>
+                          <div className="text-[10px] font-medium text-[#8a919e] mt-1">Paris</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[17px] font-extrabold font-[var(--font-mono)] leading-none" style={{ color: isPositive ? GREEN : RED }}>
+                            {cStats.total_pnl >= 0 ? "+" : ""}{cStats.total_pnl.toFixed(0)}&euro;
+                          </div>
+                          <div className="text-[10px] font-medium text-[#8a919e] mt-1">P&amp;L</div>
+                        </div>
+                      </div>
                     </div>
                   ) : (
-                    <div className="pt-3 border-t border-[#e3e6eb]">
-                      <div className="h-8 flex items-center justify-center">
-                        <Loader2 size={14} className="animate-spin text-[#8a919e]" />
+                    <div className="rounded-xl p-4" style={{ background: "linear-gradient(135deg, #f8f9fc, #f4f5f7)" }}>
+                      <div className="h-12 flex items-center justify-center">
+                        <Loader2 size={16} className="animate-spin text-[#b0b7c3]" />
                       </div>
                     </div>
                   )}
@@ -385,7 +456,7 @@ export default function Campaign() {
           })}
 
           {/* CTA Card — Create */}
-          <div onClick={() => setShowCreateModal(true)}
+          {!isPreview && <div onClick={() => setShowCreateModal(true)}
             className="rounded-xl border-2 border-dashed border-[#e3e6eb] hover:border-[#3b5bdb]/40 flex flex-col items-center justify-center py-10 cursor-pointer transition-all group"
             style={{ minHeight: 200 }}>
             <div className="w-12 h-12 rounded-xl bg-[#f4f5f7] group-hover:bg-[#3b5bdb]/10 flex items-center justify-center transition-colors mb-3">
@@ -397,7 +468,7 @@ export default function Campaign() {
             <span className="text-xs text-[#8a919e] mt-1">
               {5 - activeCampaignCount} emplacement{5 - activeCampaignCount > 1 ? "s" : ""} disponible{5 - activeCampaignCount > 1 ? "s" : ""}
             </span>
-          </div>
+          </div>}
         </div>
       )}
 
@@ -406,7 +477,7 @@ export default function Campaign() {
         <CampaignKanban
           campaigns={filteredCampaigns}
           campaignStats={campaignStats}
-          onSelectCampaign={(id) => navigate(`/campaign/${id}`)}
+          onSelectCampaign={(id) => !isPreview && navigate(`/campaign/${id}`)}
         />
       )}
 
@@ -537,9 +608,14 @@ function CampaignKanban({ campaigns, campaignStats, onSelectCampaign }: {
   );
 }
 
-function ConfigTag({ label }: { label: string }) {
+function ConfigTag({ label, accent }: { label: string; accent?: string }) {
   return (
-    <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#f4f5f7] text-[#8a919e] border border-[#e3e6eb]">
+    <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold"
+      style={{
+        background: accent ? `${accent}08` : "#f4f5f7",
+        color: accent ? `${accent}cc` : "#8a919e",
+        border: `1px solid ${accent ? `${accent}15` : "#e3e6eb"}`,
+      }}>
       {label}
     </span>
   );
