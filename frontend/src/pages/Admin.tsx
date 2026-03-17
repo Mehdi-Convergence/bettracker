@@ -16,6 +16,9 @@ import {
   ChevronDown,
   ChevronUp,
   MessageCircle,
+  Eye,
+  EyeOff,
+  CheckCheck,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
@@ -125,6 +128,35 @@ function AdminDashboard() {
   const [errorsExpanded, setErrorsExpanded] = useState(false);
   const [users, setUsers] = useState<AdminUserDetail[]>([]);
   const [aiStats, setAiStats] = useState<AdminAIStats | null>(null);
+  const [alertFilter, setAlertFilter] = useState<"ALL" | "CRITICAL" | "WARNING" | "INFO">("ALL");
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [readAlertIds, setReadAlertIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem("admin_read_alerts");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  function markAllAlertsRead() {
+    setReadAlertIds(() => {
+      const next = new Set(alerts.map((a) => a.id));
+      localStorage.setItem("admin_read_alerts", JSON.stringify([...next]));
+      return next;
+    });
+  }
+
+  function toggleAlertRead(id: string) {
+    setReadAlertIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      localStorage.setItem("admin_read_alerts", JSON.stringify([...next]));
+      return next;
+    });
+  }
 
   const load = useCallback(async () => {
     const [sys, sc, q, an, al, er, us, ai] = await Promise.allSettled([
@@ -573,55 +605,177 @@ function AdminDashboard() {
       </SectionCard>
 
       {/* ── Section 7: Alerts ── */}
-      <SectionCard
-        title="Alertes actives"
-        icon={<AlertTriangle size={14} className="text-[#f79009]" />}
-        action={
-          alerts.filter(a => a.severity === "CRITICAL" || a.severity === "WARNING").length > 0 ? (
-            <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-[#f04438] text-white">
-              {alerts.filter(a => a.severity === "CRITICAL" || a.severity === "WARNING").length}
-            </span>
-          ) : undefined
-        }
-      >
-        {alerts.length === 0 ? (
-          <div className="flex items-center gap-2.5 py-3 text-[12.5px] text-[#12b76a]">
-            <CheckCircle size={15} />
-            Aucune alerte active — tout fonctionne normalement
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {alerts.map((alert) => {
-              const cfg = alertSeverityConfig(alert.severity);
-              const Icon = alert.severity === "CRITICAL" ? XCircle : AlertCircle;
-              return (
-                <div
-                  key={alert.id}
-                  className="flex items-start gap-3 p-3 rounded-xl border"
-                  style={{ background: cfg.bg, borderColor: `${cfg.text}22` }}
-                >
-                  <Icon size={14} style={{ color: cfg.text }} className="shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span
-                        className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                        style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.text}33` }}
+      {(() => {
+        const filteredAlerts = alerts
+          .filter((a) => alertFilter === "ALL" || a.severity === alertFilter)
+          .filter((a) => !showUnreadOnly || !readAlertIds.has(a.id));
+        const unreadCount = alerts.filter((a) => !readAlertIds.has(a.id)).length;
+        const unreadCritical = alerts.filter((a) => !readAlertIds.has(a.id) && (a.severity === "CRITICAL" || a.severity === "WARNING")).length;
+
+        return (
+          <SectionCard
+            title="Alertes actives"
+            icon={<AlertTriangle size={14} className="text-[#f79009]" />}
+            action={
+              <div className="flex items-center gap-2">
+                {unreadCritical > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-[#f04438] text-white">
+                    {unreadCritical}
+                  </span>
+                )}
+                {unreadCount > 0 && unreadCount !== unreadCritical && (
+                  <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-[#f79009] text-white">
+                    {unreadCount} non lue{unreadCount > 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+            }
+          >
+            {alerts.length === 0 ? (
+              <div className="flex items-center gap-2.5 py-3 text-[12.5px] text-[#12b76a]">
+                <CheckCircle size={15} />
+                Aucune alerte active — tout fonctionne normalement
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {/* Filters bar */}
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-1.5">
+                    {([
+                      { key: "ALL" as const, label: "Tous", count: alerts.length },
+                      { key: "CRITICAL" as const, label: "Critique", count: alerts.filter((a) => a.severity === "CRITICAL").length },
+                      { key: "WARNING" as const, label: "Alerte", count: alerts.filter((a) => a.severity === "WARNING").length },
+                      { key: "INFO" as const, label: "Info", count: alerts.filter((a) => a.severity === "INFO").length },
+                    ]).map((f) => {
+                      const isActive = alertFilter === f.key;
+                      const colorMap = { ALL: "#3b5bdb", CRITICAL: "#f04438", WARNING: "#f79009", INFO: "#3b5bdb" };
+                      const color = colorMap[f.key];
+                      return (
+                        <button
+                          key={f.key}
+                          onClick={() => setAlertFilter(f.key)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11.5px] font-semibold border transition-all cursor-pointer"
+                          style={{
+                            background: isActive ? `${color}12` : "transparent",
+                            borderColor: isActive ? `${color}33` : "#e3e6eb",
+                            color: isActive ? color : "#8a919e",
+                          }}
+                        >
+                          {f.label}
+                          <span
+                            className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold"
+                            style={{
+                              background: isActive ? `${color}20` : "#f4f5f7",
+                              color: isActive ? color : "#8a919e",
+                            }}
+                          >
+                            {f.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Toggle unread only */}
+                    <button
+                      onClick={() => setShowUnreadOnly((v) => !v)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer"
+                      style={{
+                        background: showUnreadOnly ? "#3b5bdb12" : "transparent",
+                        borderColor: showUnreadOnly ? "#3b5bdb33" : "#e3e6eb",
+                        color: showUnreadOnly ? "#3b5bdb" : "#8a919e",
+                      }}
+                    >
+                      {showUnreadOnly ? <EyeOff size={12} /> : <Eye size={12} />}
+                      {showUnreadOnly ? "Non lues" : "Toutes"}
+                    </button>
+
+                    {/* Mark all as read */}
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllAlertsRead}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-[#e3e6eb] text-[#8a919e] hover:text-[#3b5bdb] hover:border-[#3b5bdb33] transition-all cursor-pointer bg-transparent"
                       >
-                        {cfg.label}
-                      </span>
-                      {alert.sport && (
-                        <span className="text-[10px] text-[#8a919e] capitalize">{alert.sport}</span>
-                      )}
-                      <span className="text-[10px] text-[#b0b7c3] ml-auto shrink-0">{fmtTs(alert.timestamp)}</span>
-                    </div>
-                    <p className="text-[12px] text-[#3c4149] leading-snug">{alert.message}</p>
+                        <CheckCheck size={12} />
+                        Tout marquer lu
+                      </button>
+                    )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </SectionCard>
+
+                {/* Alert list */}
+                {filteredAlerts.length === 0 ? (
+                  <div className="flex items-center gap-2.5 py-4 text-[12.5px] text-[#8a919e] justify-center">
+                    <CheckCircle size={15} />
+                    Aucune alerte pour ce filtre
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {filteredAlerts.map((alert) => {
+                      const cfg = alertSeverityConfig(alert.severity);
+                      const Icon = alert.severity === "CRITICAL" ? XCircle : AlertCircle;
+                      const isRead = readAlertIds.has(alert.id);
+                      return (
+                        <div
+                          key={alert.id}
+                          className="flex items-start gap-3 p-3 rounded-xl border transition-all"
+                          style={{
+                            background: isRead ? "var(--bg-surface)" : cfg.bg,
+                            borderColor: isRead ? "#e3e6eb" : `${cfg.text}22`,
+                            opacity: isRead ? 0.6 : 1,
+                          }}
+                        >
+                          {/* Unread dot */}
+                          <div className="flex flex-col items-center gap-1.5 shrink-0 mt-0.5">
+                            <Icon size={14} style={{ color: isRead ? "#b0b7c3" : cfg.text }} />
+                            {!isRead && (
+                              <span className="w-2 h-2 rounded-full bg-[#3b5bdb] shrink-0" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span
+                                className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                style={{
+                                  background: isRead ? "#f4f5f7" : cfg.bg,
+                                  color: isRead ? "#8a919e" : cfg.text,
+                                  border: `1px solid ${isRead ? "#e3e6eb" : cfg.text + "33"}`,
+                                }}
+                              >
+                                {cfg.label}
+                              </span>
+                              {alert.sport && (
+                                <span className="text-[10px] text-[#8a919e] capitalize">{alert.sport}</span>
+                              )}
+                              <span className="text-[10px] text-[#b0b7c3] ml-auto shrink-0">{fmtTs(alert.timestamp)}</span>
+                            </div>
+                            <p className="text-[12px] leading-snug" style={{ color: isRead ? "#8a919e" : "#3c4149" }}>
+                              {alert.message}
+                            </p>
+                          </div>
+                          {/* Toggle read/unread button */}
+                          <button
+                            onClick={() => toggleAlertRead(alert.id)}
+                            className="shrink-0 mt-0.5 p-1.5 rounded-lg border border-transparent hover:border-[#e3e6eb] hover:bg-[#f4f5f7] transition-all cursor-pointer bg-transparent"
+                            title={isRead ? "Marquer non lu" : "Marquer lu"}
+                          >
+                            {isRead ? (
+                              <EyeOff size={12} className="text-[#b0b7c3]" />
+                            ) : (
+                              <Eye size={12} className="text-[#8a919e]" />
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </SectionCard>
+        );
+      })()}
 
       {/* ── Section 6: Recent Errors ── */}
       <SectionCard
