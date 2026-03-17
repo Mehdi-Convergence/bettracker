@@ -7,7 +7,6 @@ import Layout from "./components/Layout";
 import Landing from "./pages/Landing";
 
 // Lazy-loaded pages for code-splitting
-const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Scanner = lazy(() => import("./pages/Scanner"));
 const Backtest = lazy(() => import("./pages/Backtest"));
 const Campaign = lazy(() => import("./pages/Campaign"));
@@ -22,7 +21,6 @@ const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Admin = lazy(() => import("./pages/Admin"));
-const DashboardV2 = lazy(() => import("./pages/DashboardV2"));
 const DashboardV3 = lazy(() => import("./pages/DashboardV3"));
 const MentionsLegales = lazy(() => import("./pages/MentionsLegales"));
 const CGU = lazy(() => import("./pages/CGU"));
@@ -83,8 +81,6 @@ export default function App() {
               <Route path="parametres" element={<Parametres />} />
               <Route path="analytics" element={<TierGuard minTier="pro"><Analytics /></TierGuard>} />
               <Route path="admin" element={<Admin />} />
-              <Route path="dashboard-v1" element={<Dashboard />} />
-              <Route path="dashboard-v2" element={<DashboardV2 />} />
             </Route>
           </Routes>
         </Suspense>
