@@ -315,10 +315,7 @@ export default function Landing() {
               </p>
             </div>
             <div className="lp-feature-visual">
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="32" height="32">
-                <rect x="2" y="2" width="20" height="20" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
-              </svg>
-              <span>Capture du scanner</span>
+              <img src="/screenshots/scanner.png" alt="Scanner IA BetTracker" loading="lazy" />
             </div>
           </div>
 
@@ -337,10 +334,7 @@ export default function Landing() {
               </p>
             </div>
             <div className="lp-feature-visual">
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="32" height="32">
-                <rect x="2" y="2" width="20" height="20" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
-              </svg>
-              <span>Capture du backtest</span>
+              <img src="/screenshots/Backtest.png" alt="Backtest historique BetTracker" loading="lazy" />
             </div>
           </div>
 
@@ -360,10 +354,7 @@ export default function Landing() {
               </p>
             </div>
             <div className="lp-feature-visual">
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="32" height="32">
-                <rect x="2" y="2" width="20" height="20" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
-              </svg>
-              <span>Capture des campagnes</span>
+              <img src="/screenshots/Campagnes.png" alt="Campagnes automatisees BetTracker" loading="lazy" />
             </div>
           </div>
 
@@ -383,10 +374,7 @@ export default function Landing() {
               </p>
             </div>
             <div className="lp-feature-visual">
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="32" height="32">
-                <rect x="2" y="2" width="20" height="20" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
-              </svg>
-              <span>Capture de l&rsquo;IA Analyste</span>
+              <img src="/screenshots/ia-analyste.png" alt="IA Analyste BetTracker" loading="lazy" />
             </div>
           </div>
         </div>
