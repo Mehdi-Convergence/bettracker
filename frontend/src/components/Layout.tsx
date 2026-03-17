@@ -18,6 +18,7 @@ import {
   Menu,
   BarChart2,
   ShieldAlert,
+  Lock,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { BreadcrumbProvider, useBreadcrumb } from "@/contexts/BreadcrumbContext";
@@ -25,6 +26,7 @@ import NotificationBell from "@/components/NotificationBell";
 import OnboardingModal from "@/components/OnboardingModal";
 import { TourProvider, useTourContext } from "@/contexts/TourContext";
 import { sendFeedback } from "@/services/api";
+import { userHasTier } from "@/components/TierGuard";
 
 /* ── Sidebar colors ── */
 const SB = {
@@ -41,22 +43,22 @@ const NAV_SECTIONS = [
   {
     label: "Analyse",
     items: [
-      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { to: "/scanner", label: "Scan matchs", icon: ScanSearch },
+      { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, minTier: undefined },
+      { to: "/scanner", label: "Scan matchs", icon: ScanSearch, minTier: "pro" as const },
     ],
   },
   {
     label: "Paris",
     items: [
-      { to: "/campaign", label: "Campagnes", icon: Flag },
-      { to: "/portfolio", label: "Portfolio", icon: Layers },
+      { to: "/campaign", label: "Campagnes", icon: Flag, minTier: "premium" as const },
+      { to: "/portfolio", label: "Portfolio", icon: Layers, minTier: "pro" as const },
     ],
   },
   {
     label: "Suivi",
     items: [
-      { to: "/analytics", label: "Analytique", icon: BarChart2 },
-      { to: "/backtest", label: "Backtest", icon: FlaskConical },
+      { to: "/analytics", label: "Analytique", icon: BarChart2, minTier: "pro" as const },
+      { to: "/backtest", label: "Backtest", icon: FlaskConical, minTier: "pro" as const },
     ],
   },
 ];
@@ -310,6 +312,30 @@ export default function Layout() {
               {collapsed && <div className="h-1.5" />}
               {section.items.map((item) => {
                 const Icon = item.icon;
+                const hasAccess = !item.minTier || userHasTier(user?.tier ?? "free", item.minTier, user?.trial_ends_at ?? null);
+                if (!hasAccess) {
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      title={collapsed ? `${item.label} (verrouille)` : undefined}
+                      className={`flex items-center ${collapsed ? "justify-center" : "gap-[9px]"} ${collapsed ? "px-0 py-2" : "px-2.5 py-2"} rounded-lg text-[13.5px] transition-all duration-100 no-underline font-normal opacity-40`}
+                      style={{ color: SB.text, background: "transparent" }}
+                    >
+                      <Icon
+                        size={collapsed ? 18 : 16}
+                        className="shrink-0"
+                        style={{ opacity: 0.45 }}
+                      />
+                      {!collapsed && (
+                        <>
+                          {item.label}
+                          <Lock size={11} className="ml-auto shrink-0 opacity-60" />
+                        </>
+                      )}
+                    </NavLink>
+                  );
+                }
                 return (
                   <NavLink
                     key={item.to}

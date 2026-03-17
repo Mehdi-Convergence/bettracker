@@ -205,7 +205,7 @@ export default function Campaign() {
           <span className="text-sm text-[#111318]">
             <strong>{activeCampaignCount}</strong> / 5 campagnes actives
           </span>
-          <span className="text-xs text-[#8a919e]">Plan Pro</span>
+          <span className="text-xs text-[#8a919e]">Plan Elite</span>
         </div>
         <div className="w-32 h-1.5 bg-[#e3e6eb] rounded-full overflow-hidden">
           <div className="h-full rounded-full transition-all" style={{

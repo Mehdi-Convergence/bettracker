@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { PreferencesProvider } from "./contexts/PreferencesContext";
+import { TierGuard } from "./components/TierGuard";
 import Layout from "./components/Layout";
 import Landing from "./pages/Landing";
 
@@ -71,15 +72,15 @@ export default function App() {
             <Route path="/confidentialite" element={<ConfidentialitePolicy />} />
             <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route path="dashboard" element={<Dashboard />} />
-              <Route path="scanner" element={<Scanner />} />
-              <Route path="backtest" element={<Backtest />} />
-              <Route path="campaign" element={<Campaign />} />
-              <Route path="campaign/:id" element={<CampaignDetail />} />
-              <Route path="portfolio" element={<Portfolio />} />
-              <Route path="ai-analyst" element={<AIAnalyste />} />
+              <Route path="scanner" element={<TierGuard minTier="pro"><Scanner /></TierGuard>} />
+              <Route path="backtest" element={<TierGuard minTier="pro"><Backtest /></TierGuard>} />
+              <Route path="campaign" element={<TierGuard minTier="premium"><Campaign /></TierGuard>} />
+              <Route path="campaign/:id" element={<TierGuard minTier="premium"><CampaignDetail /></TierGuard>} />
+              <Route path="portfolio" element={<TierGuard minTier="pro"><Portfolio /></TierGuard>} />
+              <Route path="ai-analyst" element={<TierGuard minTier="premium"><AIAnalyste /></TierGuard>} />
               <Route path="settings" element={<Settings />} />
               <Route path="parametres" element={<Parametres />} />
-              <Route path="analytics" element={<Analytics />} />
+              <Route path="analytics" element={<TierGuard minTier="pro"><Analytics /></TierGuard>} />
               <Route path="admin" element={<Admin />} />
               <Route path="dashboard-v2" element={<DashboardV2 />} />
             </Route>
