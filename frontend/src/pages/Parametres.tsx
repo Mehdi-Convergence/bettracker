@@ -686,20 +686,6 @@ export default function Parametres() {
                     <option value="campaign">Par campagne</option>
                   </select>
                 </div>
-                <div className={rowCls}>
-                  <div className="flex-1 pr-5">
-                    <div className="text-[13.5px] font-medium text-[var(--text-primary)]">Vue par défaut : Campagnes</div>
-                    <div className="text-[12px] text-[var(--text-muted)] mt-0.5">Vue affichée à l'ouverture du module Campagnes</div>
-                  </div>
-                  <select
-                    value={getVal("default_campaigns_view") ?? "grid"}
-                    onChange={(e) => setVal("default_campaigns_view", e.target.value)}
-                    className={selectCls + " !w-auto"}
-                  >
-                    <option value="grid">Grille</option>
-                    <option value="kanban">Kanban</option>
-                  </select>
-                </div>
               </div>
               <SaveBtn section="display" />
             </div>

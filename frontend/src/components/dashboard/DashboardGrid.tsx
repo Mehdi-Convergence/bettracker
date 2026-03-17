@@ -83,7 +83,7 @@ export function DashboardGrid({
   );
 
   return (
-    <div className="dashboard-grid-container">
+    <div className="dashboard-grid-container overflow-x-hidden">
       <GridLayout
         className={`layout ${!isEditMode ? "dashboard-read-only" : ""}`}
         layout={adaptedWidgets.map((w) => {

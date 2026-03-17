@@ -77,7 +77,7 @@ export default function App() {
               <Route path="campaign" element={<TierGuard minTier="premium"><Campaign /></TierGuard>} />
               <Route path="campaign/:id" element={<TierGuard minTier="premium"><CampaignDetail /></TierGuard>} />
               <Route path="portfolio" element={<TierGuard minTier="pro"><Portfolio /></TierGuard>} />
-              <Route path="ai-analyst" element={<TierGuard minTier="premium"><AIAnalyste /></TierGuard>} />
+              <Route path="ai-analyst" element={<AIAnalyste />} />
               <Route path="settings" element={<Settings />} />
               <Route path="parametres" element={<Parametres />} />
               <Route path="analytics" element={<TierGuard minTier="pro"><Analytics /></TierGuard>} />

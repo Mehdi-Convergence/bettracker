@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePreview } from "@/contexts/PreviewContext";
 import {
   aiChatStream,
   getAIConversations,
@@ -461,8 +462,16 @@ function WelcomeScreen({ onSend }: { onSend: (text: string) => void }) {
    MAIN COMPONENT
    ================================================================ */
 
+const DEMO_MESSAGES: ChatMessage[] = [
+  { id: "d1", role: "user", content: "Analyse les value bets detectes ce week-end en Ligue 1", time: "14:32" },
+  { id: "d2", role: "assistant", content: "J'ai identifie 3 opportunites interessantes pour ce week-end en Ligue 1 :\n\n1. **PSG vs Lyon** — Over 2.5 buts @ 1.87 (edge: +4.2%)\n   L'historique recente montre 8/10 matchs avec 3+ buts\n\n2. **Marseille vs Monaco** — BTTS @ 1.92 (edge: +3.8%)\n   Les deux equipes marquent dans 75% des confrontations\n\n3. **Lille vs Lens** — 1X @ 1.45 (edge: +2.1%)\n   Lille invaincu a domicile cette saison (12V 3N)", time: "14:32" },
+  { id: "d3", role: "user", content: "Quelle mise optimale selon le critere de Kelly ?", time: "14:35" },
+  { id: "d4", role: "assistant", content: "Voici les mises Kelly recommandees (bankroll: 1000 EUR) :\n\n| Match | Mise Kelly | Mise conservatrice (1/4 Kelly) |\n|---|---|---|\n| PSG vs Lyon | 42 EUR | 10.5 EUR |\n| OM vs Monaco | 38 EUR | 9.5 EUR |\n| Lille vs Lens | 28 EUR | 7 EUR |\n\n**Total recommande : 27 EUR** (2.7% de la bankroll)\n\nLa strategie 1/4 Kelly est plus prudente et recommandee pour limiter la variance.", time: "14:35" },
+];
+
 export default function AIAnalyste() {
   const { user } = useAuth();
+  const { isPreview } = usePreview();
 
   const userInitials = useMemo(() => {
     if (!user?.display_name) return "U";
@@ -511,11 +520,15 @@ export default function AIAnalyste() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showHistory]);
 
-  // Load context + conversations on mount
+  // Load context + conversations on mount (skip in preview)
   useEffect(() => {
+    if (isPreview) {
+      setMessages(DEMO_MESSAGES);
+      return;
+    }
     loadConversations();
     loadContext();
-  }, []);
+  }, [isPreview]);
 
   async function loadConversations() {
     try {
@@ -593,6 +606,7 @@ export default function AIAnalyste() {
   }
 
   const handleSend = useCallback(async (text?: string) => {
+    if (isPreview) return;
     const msg = text || input.trim();
     if (!msg || isStreaming) return;
 
@@ -668,11 +682,6 @@ export default function AIAnalyste() {
       e.preventDefault();
       handleSend();
     }
-  }
-
-  // Admin only for now
-  if (user && !user.is_admin) {
-    return <Navigate to="/dashboard" replace />;
   }
 
   /* ── Render ── */

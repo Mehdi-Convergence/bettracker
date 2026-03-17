@@ -448,13 +448,13 @@ export default function DashboardV2() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <LayoutDashboard className="h-6 w-6 text-blue-600" />
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">Dashboard V2</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <LayoutDashboard className="h-6 w-6 text-blue-600 shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-slate-900 truncate">Dashboard</h1>
             <p className="text-sm text-slate-500">Dashboard personnalisable</p>
           </div>
         </div>

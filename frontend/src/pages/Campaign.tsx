@@ -308,7 +308,7 @@ export default function Campaign() {
                   border: "1px solid #e8eaef",
                   animation: `fadeUp 0.4s ease both ${idx * 0.05}s`,
                 }}
-                onClick={() => navigate(`/campaign/${campaign.id}`)}>
+                onClick={() => !isPreview && navigate(`/campaign/${campaign.id}`)}>
 
                 {/* Accent gradient top */}
                 <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${accent}, ${accent}88)` }} />

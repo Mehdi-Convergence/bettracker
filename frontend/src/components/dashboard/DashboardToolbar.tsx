@@ -110,7 +110,7 @@ export function DashboardToolbar({
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 flex-wrap">
       {/* Preset selector */}
       <div className="relative" ref={menuRef}>
         <button

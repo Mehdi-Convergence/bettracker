@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Plus, X, Loader2, Search, Layers, Download, Clock, CheckCircle2,
-  XCircle, AlertCircle,
+  AlertCircle,
   Trash2, ChevronDown, ChevronUp, SlidersHorizontal,
 } from "lucide-react";
 import {
@@ -37,7 +37,7 @@ const C = {
 const SH_SM = "0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04)";
 
 type ViewMode = "kanban" | "list" | "camp";
-type StatusFilter = "all" | "en_cours" | "proposes" | "resolus" | "ignores" | "expires";
+type StatusFilter = "all" | "en_cours" | "proposes" | "resolus";
 type PeriodFilter = "7d" | "30d" | "90d" | "custom";
 type SortDir = "asc" | "desc";
 
@@ -623,8 +623,6 @@ export default function Portfolio() {
               { id: "en_cours" as const, label: "En cours" },
               { id: "proposes" as const, label: "Proposés" },
               { id: "resolus" as const, label: "Résolus" },
-              { id: "ignores" as const, label: "Ignorés" },
-              { id: "expires" as const, label: "Expirés" },
             ] as const).map((pill) => (
               <button key={pill.id} onClick={() => setStatusFilter(pill.id)}
                 className={`px-2 md:px-2.5 py-1 rounded-md text-[11px] md:text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
@@ -1271,14 +1269,9 @@ const TICKET_KANBAN_COLUMNS: KanbanColumn[] = [
     emptyText: "Aucun ticket en cours",
   },
   {
-    id: "resolved", title: "Résolus aujourd'hui",
+    id: "resolved", title: "Terminés",
     icon: <CheckCircle2 size={11} />, color: "#12b76a",
     emptyText: "Aucun résultat aujourd'hui",
-  },
-  {
-    id: "ignored", title: "Ignorés / Expirés",
-    icon: <XCircle size={11} />, color: "#8a919e",
-    emptyText: "Aucun ticket ignoré",
   },
 ];
 
@@ -1322,15 +1315,11 @@ function TicketsKanban({
     bets.forEach((b) => {
       let col = "";
       if (b.result === "pending") col = "en_cours";
-      else if ((b.result === "won" || b.result === "lost") && b.match_date.startsWith(today)) col = "resolved";
-      else if (b.result === "ignored" || b.result === "expired") col = "ignored";
-      else if (b.result === "won" || b.result === "lost") return; // older settled → not shown in kanban
+      else if (b.result === "won" || b.result === "lost") col = "resolved";
       else return;
 
       if (statusFilter === "en_cours" && col !== "en_cours") return;
       if (statusFilter === "resolus" && col !== "resolved") return;
-      if (statusFilter === "ignores" && col !== "ignored") return;
-      if (statusFilter === "expires" && b.result !== "expired") return;
 
       result.push({
         id: `bet-${b.id}`,

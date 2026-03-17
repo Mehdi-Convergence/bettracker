@@ -477,7 +477,7 @@ export default function Settings() {
         {/* ── RIGHT: Tabs Card ── */}
         <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-sm overflow-hidden animate-fade-up" style={{ animationDelay: "0.05s" }}>
           {/* Tab bar */}
-          <div className="flex border-b border-[var(--border-color)] px-1.5 overflow-x-auto">
+          <div className="flex border-b border-[var(--border-color)] px-1.5 overflow-x-auto scrollbar-none" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
             {TABS.map((t) => {
               const tourMap: Record<string, string> = {
                 compte: "tab-account",
