@@ -64,7 +64,6 @@ export default function Landing() {
 
           <div className="lp-navbar-actions">
             <Link to="/login" className="lp-navbar-login">Se connecter</Link>
-            <Link to="/login" className="lp-navbar-register">Commencer gratuitement</Link>
 
             <div className="lp-navbar-hamburger" ref={popoverRef}>
               <button
@@ -92,9 +91,6 @@ export default function Landing() {
                 <div className="lp-navbar-popover-actions">
                   <Link to="/login" onClick={() => setMenuOpen(false)} className="lp-navbar-popover-login">
                     Se connecter
-                  </Link>
-                  <Link to="/login" onClick={() => setMenuOpen(false)} className="lp-navbar-popover-register">
-                    Commencer gratuitement
                   </Link>
                 </div>
               </div>

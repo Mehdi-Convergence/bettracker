@@ -110,19 +110,17 @@
   display: none;
   font-size: 14px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: #fff;
   padding: 7px 15px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: transparent;
+  border: none;
+  background: var(--accent);
   text-decoration: none;
-  transition: color 150ms, background 150ms, border-color 150ms;
+  transition: background 150ms;
 }
 
 .landing-page .lp-navbar-login:hover {
-  border-color: var(--accent);
-  background: rgba(59, 91, 219, 0.15);
-  color: #fff;
+  background: var(--accent-hover);
 }
 
 .landing-page .lp-navbar-register {
@@ -143,8 +141,7 @@
 }
 
 @media (min-width: 640px) {
-  .landing-page .lp-navbar-login,
-  .landing-page .lp-navbar-register {
+  .landing-page .lp-navbar-login {
     display: inline-flex;
   }
 }
@@ -286,17 +283,16 @@
   padding: 8px 16px;
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: none;
   border-radius: 8px;
+  background: var(--accent);
   text-decoration: none;
-  transition: color 150ms, background 150ms, border-color 150ms;
+  transition: background 150ms;
 }
 
 .landing-page .lp-navbar-popover-login:hover {
-  border-color: var(--accent);
-  background: rgba(59, 91, 219, 0.15);
-  color: #fff;
+  background: var(--accent-hover);
 }
 
 .landing-page .lp-navbar-popover-register {
