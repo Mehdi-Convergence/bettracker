@@ -2,15 +2,13 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Rocket, Wallet, Check, Loader2, Layers,
-  Pause, Play, Plus, Target, Trash2,
-  Search, LayoutGrid, Columns3, MoreVertical, Copy, Archive,
-  Zap, X, Shield, SlidersHorizontal, Calendar, Bell,
+  Pause, Play, Plus, Trash2,
+  Search, MoreVertical, Copy, Archive,
+  X, Shield, SlidersHorizontal, Calendar, Bell,
 } from "lucide-react";
 import {
   getCampaigns, createCampaign, getCampaignDetail, updateCampaign,
 } from "@/services/api";
-import KanbanBoard from "@/components/KanbanBoard";
-import type { KanbanColumn, KanbanCardData } from "@/components/KanbanBoard";
 import type { Campaign as CampaignType } from "@/types";
 import { GREEN, RED, STATUS_CFG } from "@/utils/campaign";
 import { useTour } from "@/hooks/useTour";
@@ -66,7 +64,6 @@ export default function Campaign() {
   const [creating, setCreating] = useState(false);
 
   // ── Views ──
-  const [viewMode, setViewMode] = useState<"grid" | "kanban">("grid");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -258,22 +255,6 @@ export default function Campaign() {
         </button>
       </div>
 
-      {/* ── Quota banner ── */}
-      <div data-tour="quota-bar" className="bg-gradient-to-r from-[#3b5bdb]/5 to-[#7c3aed]/5 rounded-xl border border-[#3b5bdb]/15 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Zap size={16} style={{ color: ACCENT }} />
-          <span className="text-sm text-[#111318]">
-            <strong>{activeCampaignCount}</strong> / 5 campagnes actives
-          </span>
-          <span className="text-xs text-[#8a919e]">Plan Elite</span>
-        </div>
-        <div className="w-32 h-1.5 bg-[#e3e6eb] rounded-full overflow-hidden">
-          <div className="h-full rounded-full transition-all" style={{
-            width: `${Math.min(100, (activeCampaignCount / 5) * 100)}%`,
-            backgroundColor: activeCampaignCount >= 5 ? RED : ACCENT,
-          }} />
-        </div>
-      </div>
 
       {/* ── Search + Filter + View Toggle ── */}
       <div className="flex items-center justify-between gap-4">
@@ -305,22 +286,10 @@ export default function Campaign() {
           ))}
         </div>
 
-        {/* View toggle */}
-        <div data-tour="view-toggle" className="flex items-center bg-[#f4f5f7] rounded-lg p-0.5">
-          <button onClick={() => setViewMode("grid")}
-            className={`p-1.5 rounded-md transition-all cursor-pointer ${viewMode === "grid" ? "bg-white shadow-sm text-[#3b5bdb]" : "text-[#8a919e] hover:text-[#111318]"}`}>
-            <LayoutGrid size={16} />
-          </button>
-          <button onClick={() => setViewMode("kanban")}
-            className={`p-1.5 rounded-md transition-all cursor-pointer ${viewMode === "kanban" ? "bg-white shadow-sm text-[#3b5bdb]" : "text-[#8a919e] hover:text-[#111318]"}`}>
-            <Columns3 size={16} />
-          </button>
-        </div>
       </div>
 
       {/* ── Grid ── */}
-      {viewMode === "grid" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredCampaigns.map((campaign, idx) => {
             const statusCfg = STATUS_CFG[campaign.status] || STATUS_CFG.active;
             const cStats = campaignStats[campaign.id];
@@ -339,7 +308,7 @@ export default function Campaign() {
                   border: "1px solid #e8eaef",
                   animation: `fadeUp 0.4s ease both ${idx * 0.05}s`,
                 }}
-                onClick={() => !isPreview && navigate(`/campaign/${campaign.id}`)}>
+                onClick={() => navigate(`/campaign/${campaign.id}`)}>
 
                 {/* Accent gradient top */}
                 <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${accent}, ${accent}88)` }} />
@@ -470,16 +439,6 @@ export default function Campaign() {
             </span>
           </div>}
         </div>
-      )}
-
-      {/* ── Kanban view ── */}
-      {viewMode === "kanban" && (
-        <CampaignKanban
-          campaigns={filteredCampaigns}
-          campaignStats={campaignStats}
-          onSelectCampaign={(id) => !isPreview && navigate(`/campaign/${id}`)}
-        />
-      )}
 
       {/* ══════════════════════════════════════════════ */}
       {/* CREATE MODAL — 4-STEP STEPPER */}
@@ -513,100 +472,7 @@ export default function Campaign() {
 // SUB-COMPONENTS
 // ══════════════════════════════════════════════
 
-// ══════════════════════════════════════════════
-// CAMPAIGN KANBAN
-// ══════════════════════════════════════════════
 
-interface CampaignKanbanCard extends KanbanCardData {
-  campaign: CampaignType;
-  stats?: import("@/types").CampaignStats;
-}
-
-const KANBAN_COLUMNS: KanbanColumn[] = [
-  {
-    id: "proposed",
-    title: "Proposés",
-    icon: <Target size={16} />,
-    color: ACCENT,
-    emptyText: "Aucune recommandation en attente",
-  },
-  {
-    id: "active",
-    title: "En cours",
-    icon: <Play size={16} />,
-    color: GREEN,
-    emptyText: "Aucun pari en cours",
-  },
-  {
-    id: "resolved",
-    title: "Résolus",
-    icon: <Check size={16} />,
-    color: "#8a919e",
-    emptyText: "Aucun pari résolu",
-  },
-];
-
-function CampaignKanban({ campaigns, campaignStats, onSelectCampaign }: {
-  campaigns: CampaignType[];
-  campaignStats: Record<number, import("@/types").CampaignStats>;
-  onSelectCampaign: (id: number) => void;
-}) {
-  // Map campaigns into kanban cards based on status
-  const kanbanCards: CampaignKanbanCard[] = campaigns.map((c) => {
-    let columnId = "active";
-    if (c.status === "paused") columnId = "proposed";
-    else if (c.status === "archived") columnId = "resolved";
-    return { id: String(c.id), columnId, campaign: c, stats: campaignStats[c.id] };
-  });
-
-  return (
-    <KanbanBoard<CampaignKanbanCard>
-      columns={KANBAN_COLUMNS}
-      cards={kanbanCards}
-      renderCard={(card) => {
-        const c = card.campaign;
-        const s = card.stats;
-        const statusCfg = STATUS_CFG[c.status] || STATUS_CFG.active;
-
-        return (
-          <div onClick={() => onSelectCampaign(c.id)}
-            className="bg-white rounded-xl border border-[#e3e6eb] p-3 hover:border-[#3b5bdb]/30 transition-all cursor-pointer"
-            style={{ boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-lg">{sportIcon(c.name)}</span>
-                <span className="text-sm font-semibold text-[#111318] truncate">{c.name}</span>
-              </div>
-              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${statusCfg.bg} ${statusCfg.text}`}>
-                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusCfg.dot }} />
-                {statusCfg.label}
-              </span>
-            </div>
-
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              <ConfigTag label={`Mise ${(c.flat_stake * 100).toFixed(0)}%`} />
-              <ConfigTag label={`Edge \u2265 ${(c.min_edge * 100).toFixed(0)}%`} />
-            </div>
-
-            {s ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 pt-2 border-t border-[#e3e6eb]">
-                <KpiCell label="ROI" value={`${s.roi_pct >= 0 ? "+" : ""}${s.roi_pct.toFixed(1)}%`}
-                  color={s.roi_pct >= 0 ? GREEN : RED} />
-                <KpiCell label="Paris" value={`${s.total_bets}`} />
-                <KpiCell label="P&L" value={`${s.total_pnl >= 0 ? "+" : ""}${s.total_pnl.toFixed(0)}€`}
-                  color={s.total_pnl >= 0 ? GREEN : RED} />
-              </div>
-            ) : (
-              <div className="pt-2 border-t border-[#e3e6eb] flex justify-center">
-                <Loader2 size={12} className="animate-spin text-[#8a919e]" />
-              </div>
-            )}
-          </div>
-        );
-      }}
-    />
-  );
-}
 
 function ConfigTag({ label, accent }: { label: string; accent?: string }) {
   return (
@@ -621,14 +487,6 @@ function ConfigTag({ label, accent }: { label: string; accent?: string }) {
   );
 }
 
-function KpiCell({ label, value, color = "#111318" }: { label: string; value: string; color?: string }) {
-  return (
-    <div className="text-center">
-      <div className="text-sm font-bold font-[var(--font-mono)]" style={{ color }}>{value}</div>
-      <div className="text-[10px] text-[#8a919e]">{label}</div>
-    </div>
-  );
-}
 
 function MenuBtn({ icon, label, onClick, danger = false }: {
   icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean;
