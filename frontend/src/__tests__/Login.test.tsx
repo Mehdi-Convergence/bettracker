@@ -16,6 +16,7 @@ vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({
     login: mockLogin,
     register: mockRegister,
+    login2FAVerify: vi.fn(),
     user: null,
     token: null,
     loading: false,
@@ -24,6 +25,11 @@ vi.mock('../contexts/AuthContext', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Mock fetch for the pre-check (returns 200 = not inactive)
+  global.fetch = vi.fn().mockResolvedValue({
+    status: 200,
+    json: () => Promise.resolve({}),
+  }) as unknown as typeof fetch
 })
 
 describe('Login page — branding panel', () => {
@@ -67,7 +73,7 @@ describe('Login page — formulaire connexion', () => {
     expect(screen.getByRole('heading', { name: 'Créez votre compte' })).toBeInTheDocument()
   })
 
-  it('appelle login et redirige vers / en cas de succès', async () => {
+  it('appelle login et redirige vers /dashboard en cas de succès', async () => {
     mockLogin.mockResolvedValueOnce(undefined)
     renderWithRouter(<Login />)
     fireEvent.change(screen.getByPlaceholderText('votre@email.com'), { target: { value: 'test@test.com' } })
@@ -86,7 +92,7 @@ describe('Login page — formulaire connexion', () => {
     fireEvent.change(screen.getByPlaceholderText('Votre mot de passe'), { target: { value: 'wrongpass' } })
     fireEvent.click(screen.getByRole('button', { name: /Se connecter/ }))
     await waitFor(() => {
-      expect(screen.getByText('Identifiants invalides')).toBeInTheDocument()
+      expect(screen.getByText(/Identifiants invalides/)).toBeInTheDocument()
     })
   })
 })
@@ -112,7 +118,7 @@ describe('Login page — formulaire inscription', () => {
     expect(mockRegister).not.toHaveBeenCalled()
   })
 
-  it('appelle register et redirige vers / en cas de succès', async () => {
+  it('appelle register et redirige vers /dashboard en cas de succès', async () => {
     mockRegister.mockResolvedValueOnce(undefined)
     fireEvent.change(screen.getByPlaceholderText('ex: ValueBettor_99'), { target: { value: 'TestUser' } })
     fireEvent.change(screen.getAllByPlaceholderText('votre@email.com')[0], { target: { value: 'new@test.com' } })
