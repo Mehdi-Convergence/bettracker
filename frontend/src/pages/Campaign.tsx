@@ -993,25 +993,11 @@ function CreateStepperModal({ step, setStep, form, setForm, extForm, setExtForm,
                   <Bell size={14} style={{ color: ACCENT }} />
                   <span className="text-sm font-semibold text-[#111318]">Alertes</span>
                 </div>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 text-sm text-[#111318] cursor-pointer">
-                    <input type="checkbox" checked={extForm.alert_email}
-                      onChange={(e) => setExtForm({ ...extForm, alert_email: e.target.checked })}
-                      className="rounded border-[#e3e6eb] text-[#3b5bdb] focus:ring-[#3b5bdb]" />
-                    Email
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-[#111318] cursor-pointer">
-                    <input type="checkbox" checked={extForm.alert_push}
-                      onChange={(e) => setExtForm({ ...extForm, alert_push: e.target.checked })}
-                      className="rounded border-[#e3e6eb] text-[#3b5bdb] focus:ring-[#3b5bdb]" />
-                    Push
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-[#111318] cursor-pointer">
-                    <input type="checkbox" checked={extForm.alert_sms}
-                      onChange={(e) => setExtForm({ ...extForm, alert_sms: e.target.checked })}
-                      className="rounded border-[#e3e6eb] text-[#3b5bdb] focus:ring-[#3b5bdb]" />
-                    SMS
-                  </label>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600">
+                    <Bell size={12} /> In-app
+                  </span>
+                  <span className="text-xs text-slate-400">Stop-loss, bankroll basse, smart stop</span>
                 </div>
               </div>
 
