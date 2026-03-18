@@ -65,7 +65,13 @@ class TennisClient:
         """Fetch active tennis sport keys from The Odds API.
 
         Returns list of sport dicts with keys: key, title, description, active.
+        Cached for 6 hours — tournament list changes infrequently.
         """
+        # Cache 6h — tournaments don't change often
+        cached = cache_get("odds:tennis:active_tournaments")
+        if cached is not None:
+            return cached
+
         if not self.api_key:
             logger.warning("No ODDS_API_KEY configured")
             return []
@@ -90,6 +96,9 @@ class TennisClient:
             s for s in sports
             if s.get("key", "").startswith("tennis_") and s.get("active")
         ]
+
+        # Cache result for 6 hours
+        _cache_set_global("odds:tennis:active_tournaments", active, ttl=21600)
         logger.info("Active tennis tournaments: %d", len(active))
         return active
 
@@ -98,7 +107,7 @@ class TennisClient:
         timeframe: str = "48h",
         force: bool = False,
         markets: str = "h2h",
-        regions: str = "eu,uk,us,us2,au",
+        regions: str = "eu,uk,us",
     ) -> dict:
         """Return normalized tennis matches dict with odds.
 

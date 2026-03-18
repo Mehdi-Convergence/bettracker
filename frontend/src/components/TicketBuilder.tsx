@@ -263,9 +263,9 @@ export default function TicketBuilder({
                     </div>
                     <button
                       onClick={() => onRemoveLeg(activeTicketIdx, leg.id)}
-                      className="text-slate-300 hover:text-red-400 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="text-slate-400 hover:text-red-500 shrink-0 p-0.5 rounded hover:bg-red-50 transition-colors"
                     >
-                      <X size={12} />
+                      <X size={14} />
                     </button>
                   </div>
 

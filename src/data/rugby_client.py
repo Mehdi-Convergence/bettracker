@@ -63,7 +63,7 @@ class RugbyClient:
         self,
         timeframe: str = "48h",
         markets: str = "h2h,totals",
-        regions: str = "eu,uk,us,us2,au",
+        regions: str = "eu,uk",
     ) -> list[dict]:
         """Return rugby matches with multi-bookmaker odds for the specified timeframe.
 

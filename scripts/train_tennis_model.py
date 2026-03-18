@@ -4,11 +4,16 @@ Steps:
   1. Load all tennis matches from DB
   2. Build features with TennisFeatureBuilder (chronological, no look-ahead)
   3. Walk-forward evaluation (2019-2023 train / 2024-2025 test) — for reporting
-  4. Train production model on ALL available data
-  5. Export player stats snapshot to models/tennis/player_stats.json
-  6. Save model to models/tennis/model.joblib + metadata.json
+  4. (Optional) Optuna hyperparameter search — set RUN_OPTUNA = True or pass --optimize
+  5. Train production model on ALL available data
+  6. Export player stats snapshot to models/tennis/player_stats.json
+  7. Save model to models/tennis/model.joblib + metadata.json
+
+Optuna usage:
+    uv run python scripts/train_tennis_model.py --optimize --trials 100
 """
 
+import argparse
 import json
 import sys
 from collections import defaultdict
@@ -18,6 +23,10 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Set to True to always run Optuna (or pass --optimize flag at CLI)
+RUN_OPTUNA = False
+OPTUNA_N_TRIALS = 100
 
 from src.backtest.tennis_engine import TRAIN_YEARS, TEST_YEARS
 from src.database import SessionLocal
@@ -68,7 +77,109 @@ def _nan_fill(X: np.ndarray, medians: np.ndarray) -> np.ndarray:
     return out
 
 
+def run_optuna(X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarray, y_test: np.ndarray, n_trials: int) -> dict:
+    """Run Optuna hyperparameter search for XGBoost and LightGBM.
+
+    Objective: minimize log_loss on test set (2024-2025).
+    Returns dict with best params for XGBoost and LightGBM.
+    """
+    try:
+        import optuna
+    except ImportError:
+        print("Optuna not installed. Run: uv add optuna")
+        return {}
+
+    from sklearn.metrics import log_loss
+    from xgboost import XGBClassifier
+    from lightgbm import LGBMClassifier
+
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+    # ------------------------------------------------------------------
+    # XGBoost objective
+    # ------------------------------------------------------------------
+    def xgb_objective(trial: "optuna.Trial") -> float:
+        params = {
+            "objective": "binary:logistic",
+            "eval_metric": "logloss",
+            "verbosity": 0,
+            "n_estimators": trial.suggest_int("n_estimators", 100, 500),
+            "max_depth": trial.suggest_int("max_depth", 3, 8),
+            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.2, log=True),
+            "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+            "min_child_weight": trial.suggest_int("min_child_weight", 1, 15),
+            "gamma": trial.suggest_float("gamma", 0.0, 2.0),
+            "reg_alpha": trial.suggest_float("reg_alpha", 0.0, 2.0),
+            "reg_lambda": trial.suggest_float("reg_lambda", 0.5, 3.0),
+        }
+        model = XGBClassifier(**params)
+        model.fit(X_train, y_train)
+        proba = model.predict_proba(X_test)
+        return log_loss(y_test, proba)
+
+    # ------------------------------------------------------------------
+    # LightGBM objective
+    # ------------------------------------------------------------------
+    def lgb_objective(trial: "optuna.Trial") -> float:
+        params = {
+            "objective": "binary",
+            "verbose": -1,
+            "n_estimators": trial.suggest_int("n_estimators", 100, 500),
+            "num_leaves": trial.suggest_int("num_leaves", 15, 63),
+            "max_depth": trial.suggest_int("max_depth", 3, 8),
+            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.2, log=True),
+            "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+            "min_child_samples": trial.suggest_int("min_child_samples", 5, 30),
+            "reg_alpha": trial.suggest_float("reg_alpha", 0.0, 2.0),
+            "reg_lambda": trial.suggest_float("reg_lambda", 0.5, 3.0),
+        }
+        model = LGBMClassifier(**params)
+        model.fit(X_train, y_train)
+        proba = model.predict_proba(X_test)
+        return log_loss(y_test, proba)
+
+    print(f"\n--- Optuna: XGBoost ({n_trials} trials) ---")
+    xgb_study = optuna.create_study(direction="minimize", study_name="tennis_xgb")
+    xgb_study.optimize(xgb_objective, n_trials=n_trials, show_progress_bar=True)
+    print(f"  Best XGBoost log_loss: {xgb_study.best_value:.4f}")
+    for k, v in xgb_study.best_params.items():
+        print(f"    {k}: {v}")
+
+    print(f"\n--- Optuna: LightGBM ({n_trials} trials) ---")
+    lgb_study = optuna.create_study(direction="minimize", study_name="tennis_lgb")
+    lgb_study.optimize(lgb_objective, n_trials=n_trials, show_progress_bar=True)
+    print(f"  Best LightGBM log_loss: {lgb_study.best_value:.4f}")
+    for k, v in lgb_study.best_params.items():
+        print(f"    {k}: {v}")
+
+    best_params = {
+        "xgb": xgb_study.best_params,
+        "xgb_log_loss": float(xgb_study.best_value),
+        "lgb": lgb_study.best_params,
+        "lgb_log_loss": float(lgb_study.best_value),
+    }
+
+    # Save to disk
+    output_path = Path("models/tennis/best_params.json")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w") as f:
+        json.dump(best_params, f, indent=2)
+    print(f"\nBest params saved to {output_path}")
+    print("Paste these into src/ml/tennis_model.py (TennisModel.__init__).")
+
+    return best_params
+
+
 def main():
+    parser = argparse.ArgumentParser(description="Train tennis model (+ optional Optuna tuning)")
+    parser.add_argument("--optimize", action="store_true", help="Run Optuna hyperparameter search before training")
+    parser.add_argument("--trials", type=int, default=OPTUNA_N_TRIALS, help=f"Number of Optuna trials per model (default: {OPTUNA_N_TRIALS})")
+    args = parser.parse_args()
+
+    run_optimization = RUN_OPTUNA or args.optimize
+
     print("Loading tennis matches from DB...")
     raw_df = load_matches()
     print(f"  Loaded {len(raw_df)} matches")
@@ -152,6 +263,35 @@ def main():
     print(f"  Log loss: {ll:.4f}")
     print(f"  ROC AUC: {auc:.4f}")
 
+    # ------------------------------------------------------------------
+    # Optional: Optuna hyperparameter search
+    # ------------------------------------------------------------------
+    if run_optimization:
+        print(f"\nRunning Optuna ({args.trials} trials per model)...")
+        best_params = run_optuna(X_train_f, y_train, X_test_f, y_test, n_trials=args.trials)
+        if best_params:
+            # Apply best XGBoost params to prod model
+            from xgboost import XGBClassifier
+            from lightgbm import LGBMClassifier
+            xgb_params = {
+                "objective": "binary:logistic",
+                "eval_metric": "logloss",
+                "verbosity": 0,
+                **best_params["xgb"],
+            }
+            lgb_params = {
+                "objective": "binary",
+                "verbose": -1,
+                **best_params["lgb"],
+            }
+            print("\nApplying Optuna best params to production model...")
+        else:
+            xgb_params = None
+            lgb_params = None
+    else:
+        xgb_params = None
+        lgb_params = None
+
     # Production model: train on ALL data
     print("\nTraining production model on ALL data...")
     X_all = features_df[TENNIS_FEATURE_COLUMNS].values
@@ -160,6 +300,12 @@ def main():
     X_all_f = _nan_fill(X_all, col_medians_all)
 
     prod_model = TennisModel()
+    if xgb_params is not None:
+        from xgboost import XGBClassifier
+        prod_model.base_model = XGBClassifier(**xgb_params)
+    if lgb_params is not None:
+        from lightgbm import LGBMClassifier
+        prod_model.lgb_model = LGBMClassifier(**lgb_params)
     prod_model.train(X_all_f, y_all)
 
     metadata = {

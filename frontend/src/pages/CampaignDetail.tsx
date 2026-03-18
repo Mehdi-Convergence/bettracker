@@ -23,6 +23,8 @@ import type {
   CampaignRecommendation, CampaignRecommendationsResponse, BankrollPoint, Bet,
 } from "@/types";
 import { useBreadcrumb } from "@/contexts/BreadcrumbContext";
+import { usePreferences } from "@/contexts/PreferencesContext";
+import { getCurrencySymbol } from "@/utils/currency";
 import { GREEN, RED, AMBER, STATUS_CFG, outcomeLabel, outcomeBadgeVariant } from "@/utils/campaign";
 import { useTour } from "@/hooks/useTour";
 import SpotlightTour from "@/components/SpotlightTour";
@@ -42,6 +44,8 @@ export default function CampaignDetail() {
   const campaignId = Number(id);
   const { setLabel } = useBreadcrumb();
   const { showTour, completeTour } = useTour("campaign-detail");
+  const { prefs } = usePreferences();
+  const currencySymbol = getCurrencySymbol(prefs.currency);
 
   // ── Data ──
   const [detail, setDetail] = useState<CampaignDetailType | null>(null);
@@ -77,6 +81,7 @@ export default function CampaignDetail() {
   // ── Load all data ──
   useEffect(() => {
     if (!campaignId) return;
+    let cancelled = false;
     setLoading(true);
     Promise.all([
       getCampaignDetail(campaignId),
@@ -84,12 +89,14 @@ export default function CampaignDetail() {
       getCampaignHistory(campaignId),
       getCampaignBets(campaignId),
     ]).then(([d, r, h, b]) => {
+      if (cancelled) return;
       setDetail(d);
       setRecos(r);
       setHistory(h);
       setBets(b);
-    }).catch(() => setError("Impossible de charger la campagne."))
-      .finally(() => setLoading(false));
+    }).catch(() => { if (!cancelled) setError("Impossible de charger la campagne."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [campaignId]);
 
   // ── Actions ──
@@ -306,7 +313,7 @@ export default function CampaignDetail() {
           </div>
           <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
             Football · Edge {"\u2265"} {(campaign.min_edge * 100).toFixed(0)}% · Mise {(campaign.flat_stake * 100).toFixed(0)}%
-            {campaign.target_bankroll && ` · Objectif ${campaign.target_bankroll}€`}
+            {campaign.target_bankroll && ` · Objectif ${campaign.target_bankroll}${currencySymbol}`}
           </p>
         </div>
         {!isArchived && (
@@ -354,19 +361,19 @@ export default function CampaignDetail() {
           value={stats.won + stats.lost > 0 ? `${(stats.win_rate * 100).toFixed(1)}%` : "\u2014"}
           color={ACCENT} />
         <KpiCard label="Mise totale"
-          value={`${stats.total_staked.toFixed(0)}€`}
+          value={`${stats.total_staked.toFixed(0)}${currencySymbol}`}
           color="var(--text-primary)" />
         <KpiCard label="Gain net"
-          value={`${stats.total_pnl >= 0 ? "+" : ""}${stats.total_pnl.toFixed(2)}€`}
+          value={`${stats.total_pnl >= 0 ? "+" : ""}${stats.total_pnl.toFixed(2)}${currencySymbol}`}
           color={stats.total_pnl >= 0 ? GREEN : RED} />
         <KpiCard label="BK courante"
-          value={`${stats.current_bankroll.toFixed(0)}€`}
+          value={`${stats.current_bankroll.toFixed(0)}${currencySymbol}`}
           color={AMBER} />
         <KpiCard label="Drawdown max"
           value={stats.max_drawdown_pct > 0 ? `-${stats.max_drawdown_pct.toFixed(1)}%` : "0%"}
           color={stats.max_drawdown_pct > 5 ? RED : "var(--text-primary)"} />
         <KpiCard label="EV attendu"
-          value={`${stats.ev_expected >= 0 ? "+" : ""}${stats.ev_expected.toFixed(2)}€`}
+          value={`${stats.ev_expected >= 0 ? "+" : ""}${stats.ev_expected.toFixed(2)}${currencySymbol}`}
           color={stats.ev_expected >= 0 ? GREEN : RED} />
       </div>
 
@@ -421,8 +428,8 @@ export default function CampaignDetail() {
             <div className="rounded-xl border p-4" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: "0 1px 3px rgba(16,24,40,.06)" }}>
               <h3 className="font-semibold text-sm mb-3" style={{ color: "var(--text-primary)" }}>Algo vs Manuel</h3>
               <div className="grid grid-cols-2 gap-4">
-                <SourceBlock label="Algo" color={ACCENT} stats={stats.algo_stats} />
-                <SourceBlock label="Manuel" color={PURPLE} stats={stats.manual_stats} />
+                <SourceBlock label="Algo" color={ACCENT} stats={stats.algo_stats} currencySymbol={currencySymbol} />
+                <SourceBlock label="Manuel" color={PURPLE} stats={stats.manual_stats} currencySymbol={currencySymbol} />
               </div>
             </div>
           )}
@@ -473,7 +480,7 @@ export default function CampaignDetail() {
                 {recos.recommendations.map((reco, idx) => (
                   <RecoRow key={`${reco.home_team}-${reco.away_team}-${idx}`}
                     reco={reco} idx={idx} accepting={acceptingIdx === idx}
-                    onAccept={handleAccept} onSkip={handleSkip} />
+                    onAccept={handleAccept} onSkip={handleSkip} currencySymbol={currencySymbol} />
                 ))}
               </div>
             </div>
@@ -555,6 +562,7 @@ export default function CampaignDetail() {
                     onSkip={handleSkip}
                     onUpdateBet={handleUpdateBet}
                     onDeleteBet={handleDeleteBet}
+                    currencySymbol={currencySymbol}
                   />
                 </div>
               ) : (
@@ -565,6 +573,7 @@ export default function CampaignDetail() {
                   deletingBetId={deletingBetId}
                   onUpdateBet={handleUpdateBet}
                   onDeleteBet={handleDeleteBet}
+                  currencySymbol={currencySymbol}
                 />
               )}
             </div>
@@ -590,9 +599,9 @@ export default function CampaignDetail() {
                 <ParamRow label="Statut" value={statusCfg.label} />
               </ParamBlock>
               <ParamBlock title="Bankroll & Mise">
-                <ParamRow label="Bankroll initiale" value={`${campaign.initial_bankroll}€`} />
+                <ParamRow label="Bankroll initiale" value={`${campaign.initial_bankroll}${currencySymbol}`} />
                 <ParamRow label="Mise" value={`${(campaign.flat_stake * 100).toFixed(0)}% BK`} />
-                {campaign.target_bankroll && <ParamRow label="Objectif" value={`${campaign.target_bankroll}€`} />}
+                {campaign.target_bankroll && <ParamRow label="Objectif" value={`${campaign.target_bankroll}${currencySymbol}`} />}
               </ParamBlock>
               <ParamBlock title="Filtres">
                 <ParamRow label="Edge min" value={`${(campaign.min_edge * 100).toFixed(0)}%`} />
@@ -650,8 +659,8 @@ function KpiCard({ label, value, color }: { label: string; value: string; color:
   );
 }
 
-function SourceBlock({ label, color, stats }: {
-  label: string; color: string; stats: import("@/types").SourceSubStats | null;
+function SourceBlock({ label, color, stats, currencySymbol }: {
+  label: string; color: string; stats: import("@/types").SourceSubStats | null; currencySymbol: string;
 }) {
   if (!stats || stats.total_bets === 0) {
     return (
@@ -669,7 +678,7 @@ function SourceBlock({ label, color, stats }: {
         <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Tickets</span><span className="font-semibold">{stats.total_bets}</span></div>
         <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Réussite</span><span className="font-semibold">{(stats.win_rate * 100).toFixed(0)}%</span></div>
         <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>CLV moy.</span><span className="font-semibold font-[var(--font-mono)]">{stats.avg_clv != null ? `${stats.avg_clv >= 0 ? "+" : ""}${stats.avg_clv.toFixed(1)}%` : "\u2014"}</span></div>
-        <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Mise tot.</span><span className="font-semibold font-[var(--font-mono)]">{stats.total_staked.toFixed(0)}€</span></div>
+        <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Mise tot.</span><span className="font-semibold font-[var(--font-mono)]">{stats.total_staked.toFixed(0)}{currencySymbol}</span></div>
       </div>
     </div>
   );
@@ -721,10 +730,11 @@ function MenuBtn({ icon, label, onClick, danger = false }: {
   );
 }
 
-function RecoRow({ reco, idx, accepting, onAccept, onSkip }: {
+function RecoRow({ reco, idx, accepting, onAccept, onSkip, currencySymbol }: {
   reco: CampaignRecommendation; idx: number; accepting: boolean;
   onAccept: (r: CampaignRecommendation, i: number) => void;
   onSkip: (i: number) => void;
+  currencySymbol: string;
 }) {
   const info = LEAGUE_INFO[reco.league];
   const fmtDate = reco.date.includes("T")
@@ -744,7 +754,7 @@ function RecoRow({ reco, idx, accepting, onAccept, onSkip }: {
       <div className="flex items-center gap-3 shrink-0">
         <span className="font-bold font-[var(--font-mono)]" style={{ color: AMBER }}>{reco.best_odds.toFixed(2)}</span>
         <span className="text-xs font-semibold font-[var(--font-mono)]" style={{ color: GREEN }}>+{(reco.edge * 100).toFixed(1)}%</span>
-        <span className="text-xs font-semibold font-[var(--font-mono)]">{reco.suggested_stake.toFixed(2)}€</span>
+        <span className="text-xs font-semibold font-[var(--font-mono)]">{reco.suggested_stake.toFixed(2)}{currencySymbol}</span>
         <button onClick={() => onAccept(reco, idx)} disabled={accepting}
           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-white transition-colors cursor-pointer disabled:opacity-60"
           style={{ backgroundColor: ACCENT }}
@@ -777,7 +787,7 @@ const TICKET_COLUMNS: KanbanColumn[] = [
   { id: "resolved", title: "Résolus", icon: <Check size={16} />, color: GREEN, emptyText: "Aucun pari résolu" },
 ];
 
-function TicketKanban({ bets, recos, isArchived, acceptingIdx, updatingBetId, deletingBetId, onAccept, onSkip, onUpdateBet, onDeleteBet }: {
+function TicketKanban({ bets, recos, isArchived, acceptingIdx, updatingBetId, deletingBetId, onAccept, onSkip, onUpdateBet, onDeleteBet, currencySymbol }: {
   bets: Bet[];
   recos: CampaignRecommendation[];
   isArchived: boolean;
@@ -788,6 +798,7 @@ function TicketKanban({ bets, recos, isArchived, acceptingIdx, updatingBetId, de
   onSkip: (i: number) => void;
   onUpdateBet: (id: number, result: string) => void;
   onDeleteBet: (id: number) => void;
+  currencySymbol: string;
 }) {
   const cards: TicketCard[] = [
     // Recommendations → proposed
@@ -828,7 +839,7 @@ function TicketKanban({ bets, recos, isArchived, acceptingIdx, updatingBetId, de
               <div className="flex items-center gap-2 mb-2">
                 <span className="font-bold text-sm font-[var(--font-mono)]" style={{ color: AMBER }}>{reco.best_odds.toFixed(2)}</span>
                 <span className="text-[10px] font-semibold font-[var(--font-mono)]" style={{ color: GREEN }}>+{(reco.edge * 100).toFixed(1)}%</span>
-                <span className="text-[10px] font-[var(--font-mono)]" style={{ color: "var(--text-muted)" }}>{reco.suggested_stake.toFixed(2)}€</span>
+                <span className="text-[10px] font-[var(--font-mono)]" style={{ color: "var(--text-muted)" }}>{reco.suggested_stake.toFixed(2)}{currencySymbol}</span>
               </div>
               {!isArchived && (
                 <div className="flex gap-1.5">
@@ -923,13 +934,14 @@ function TicketKanban({ bets, recos, isArchived, acceptingIdx, updatingBetId, de
 // TICKET TABLE
 // ══════════════════════════════════════════════
 
-function TicketTable({ bets, isArchived, updatingBetId, deletingBetId, onUpdateBet, onDeleteBet }: {
+function TicketTable({ bets, isArchived, updatingBetId, deletingBetId, onUpdateBet, onDeleteBet, currencySymbol }: {
   bets: Bet[];
   isArchived: boolean;
   updatingBetId: number | null;
   deletingBetId: number | null;
   onUpdateBet: (id: number, result: string) => void;
   onDeleteBet: (id: number) => void;
+  currencySymbol: string;
 }) {
   if (bets.length === 0) {
     return <div className="p-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>Aucun ticket.</div>;
@@ -975,7 +987,7 @@ function TicketTable({ bets, isArchived, updatingBetId, deletingBetId, onUpdateB
                 <td className="px-3 py-2.5 text-right font-[var(--font-mono)] font-semibold" style={{ color: AMBER }}>
                   {bet.odds_at_bet.toFixed(2)}
                 </td>
-                <td className="px-3 py-2.5 text-right font-[var(--font-mono)]">{bet.stake.toFixed(2)}€</td>
+                <td className="px-3 py-2.5 text-right font-[var(--font-mono)]">{bet.stake.toFixed(2)}{currencySymbol}</td>
                 <td className="px-3 py-2.5">
                   {isPending ? (
                     isUpdating ? (

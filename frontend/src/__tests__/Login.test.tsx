@@ -12,16 +12,20 @@ vi.mock('react-router-dom', async (importOriginal) => {
   return { ...actual, useNavigate: () => mockNavigate }
 })
 
-vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({
-    login: mockLogin,
-    register: mockRegister,
-    login2FAVerify: vi.fn(),
-    user: null,
-    token: null,
-    loading: false,
-  }),
-}))
+vi.mock('../contexts/AuthContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../contexts/AuthContext')>()
+  return {
+    ...actual,
+    useAuth: () => ({
+      login: mockLogin,
+      register: mockRegister,
+      login2FAVerify: vi.fn(),
+      user: null,
+      token: null,
+      loading: false,
+    }),
+  }
+})
 
 beforeEach(() => {
   vi.clearAllMocks()

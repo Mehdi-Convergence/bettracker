@@ -21,6 +21,7 @@ from src.services.stripe_service import (
 )
 
 from src.cache import cache_get, cache_set
+from src.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +103,9 @@ def checkout(
 
 
 @router.post("/stripe/reactivate-checkout")
+@limiter.limit("3/minute")
 def reactivate_checkout(
+    request: Request,
     body: ReactivateCheckoutBody,
     db: Session = Depends(get_db),
 ) -> dict:

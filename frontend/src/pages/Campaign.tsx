@@ -127,7 +127,19 @@ export default function Campaign() {
       setLoading(false);
       return;
     }
-    loadCampaigns();
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      try {
+        const data = await getCampaigns();
+        if (!cancelled) setCampaigns(data);
+      } catch {
+        if (!cancelled) setError("Impossible de charger les campagnes.");
+      }
+      if (!cancelled) setLoading(false);
+    };
+    run();
+    return () => { cancelled = true; };
   }, [isPreview]);
 
   // ── Handle duplicate from CampaignDetail navigation ──
@@ -144,13 +156,15 @@ export default function Campaign() {
   // ── Load stats for all campaigns ──
   useEffect(() => {
     if (isPreview) return;
+    let cancelled = false;
     campaigns.forEach((c) => {
       if (!campaignStats[c.id]) {
-        getCampaignDetail(c.id).then((d) =>
-          setCampaignStats((prev) => ({ ...prev, [c.id]: d.stats }))
-        ).catch(() => {});
+        getCampaignDetail(c.id).then((d) => {
+          if (!cancelled) setCampaignStats((prev) => ({ ...prev, [c.id]: d.stats }));
+        }).catch(() => {});
       }
     });
+    return () => { cancelled = true; };
   }, [campaigns]);
 
   // ── Close menu on outside click ──

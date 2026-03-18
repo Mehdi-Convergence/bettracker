@@ -79,7 +79,7 @@ class MLBClient:
         self,
         timeframe: str = "48h",
         markets: str = "h2h,totals,spreads",
-        regions: str = "eu,uk,us,us2,au",
+        regions: str = "eu,uk",
     ) -> list[dict]:
         """Return MLB games with multi-bookmaker odds for the next timeframe.
 

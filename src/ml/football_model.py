@@ -31,6 +31,16 @@ XG_FEATURES = [f for f in FEATURE_COLUMNS if "xg" in f]
 # Legacy mode: features without xG (used when xG data unavailable)
 MODEL_FEATURES_NO_XG = [f for f in FEATURE_COLUMNS if "xg" not in f]
 
+# Clean feature set: excludes features that are always NaN in football-data.co.uk CSVs.
+# Use this for the NEXT full re-training to avoid feeding constant-NaN columns to the model.
+# Do NOT swap MODEL_FEATURES for this in production until the model is retrained with it.
+#
+# Always-NaN features excluded:
+#   - home_possession, away_possession (not in football-data.co.uk CSVs)
+_ALWAYS_NAN_FEATURES = {"home_possession", "away_possession"}
+MODEL_FEATURES_CLEAN = [f for f in FEATURE_COLUMNS if f not in _ALWAYS_NAN_FEATURES]
+MODEL_FEATURES_CLEAN_NO_XG = [f for f in MODEL_FEATURES_NO_XG if f not in _ALWAYS_NAN_FEATURES]
+
 # Ensemble weight: XGBoost vs LightGBM (sum must = 1.0)
 XGB_WEIGHT = 0.80
 LGB_WEIGHT = 0.20
@@ -144,13 +154,23 @@ class FootballModel:
             return [f for f in MODEL_FEATURES_NO_XG if f in df.columns]
 
     def walk_forward_train(self, df: pd.DataFrame) -> dict:
-        """Full walk-forward training with per-fold metrics."""
+        """Full walk-forward training with per-fold metrics.
+
+        If ``self.active_features`` is already set before this call (e.g. by
+        ``train_and_backtest.py`` when USE_CLEAN_FEATURES=True), that feature
+        list is used as-is instead of being derived from ``select_features()``.
+        """
         splitter = WalkForwardSplitter(min_train_seasons=2)
         fold_results = []
 
-        active_features = self.select_features(df)
-        # Store on instance so save() can persist the feature list
-        self.active_features = active_features
+        # Honour pre-set active_features (e.g. clean feature override).
+        # Otherwise auto-detect via select_features().
+        if hasattr(self, "active_features") and self.active_features:
+            active_features = self.active_features
+        else:
+            active_features = self.select_features(df)
+            # Store on instance so save() can persist the feature list
+            self.active_features = active_features
         X = df[active_features].values
         y = df["ftr"].map(LABEL_MAP).values
 

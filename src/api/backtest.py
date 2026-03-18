@@ -143,8 +143,10 @@ def _run_tennis_backtest(request: BacktestRequest) -> dict:
     from src.backtest.tennis_engine import TennisBacktestEngine
 
     db = SessionLocal()
-    rows = db.query(TennisMatch).all()
-    db.close()
+    try:
+        rows = db.query(TennisMatch).all()
+    finally:
+        db.close()
 
     if not rows:
         raise HTTPException(status_code=503, detail="Aucune donnée tennis. Relancez la collecte tennis.")
@@ -185,8 +187,10 @@ def _run_nba_backtest(request: BacktestRequest) -> dict:
     from src.backtest.nba_engine import NBABacktestEngine
 
     db = SessionLocal()
-    rows = db.query(NBAGame).filter(NBAGame.home_score.isnot(None)).all()
-    db.close()
+    try:
+        rows = db.query(NBAGame).filter(NBAGame.home_score.isnot(None)).all()
+    finally:
+        db.close()
 
     if not rows:
         raise HTTPException(status_code=503, detail="Aucune donnee NBA. Lancez la collecte NBA d'abord.")
@@ -238,8 +242,10 @@ def _run_rugby_backtest(request: BacktestRequest) -> dict:
     from src.backtest.rugby_engine import RugbyBacktestEngine
 
     db = SessionLocal()
-    rows = db.query(RugbyMatch).filter(RugbyMatch.home_score.isnot(None)).all()
-    db.close()
+    try:
+        rows = db.query(RugbyMatch).filter(RugbyMatch.home_score.isnot(None)).all()
+    finally:
+        db.close()
 
     if not rows:
         raise HTTPException(status_code=503, detail="Aucune donnee rugby. Lancez la collecte rugby d'abord.")
@@ -291,8 +297,10 @@ def _run_mlb_backtest(request: BacktestRequest) -> dict:
     from src.backtest.mlb_engine import MLBBacktestEngine
 
     db = SessionLocal()
-    rows = db.query(MLBGame).filter(MLBGame.home_score.isnot(None)).all()
-    db.close()
+    try:
+        rows = db.query(MLBGame).filter(MLBGame.home_score.isnot(None)).all()
+    finally:
+        db.close()
 
     if not rows:
         raise HTTPException(status_code=503, detail="Aucune donnee MLB. Lancez la collecte MLB d'abord.")
@@ -341,9 +349,11 @@ def _run_pmu_backtest(request: BacktestRequest) -> dict:
     from src.backtest.pmu_engine import PMUBacktestEngine
 
     db = SessionLocal()
-    races = db.query(PMURace).all()
-    runners = db.query(PMURunner).filter(PMURunner.finish_position.isnot(None)).all()
-    db.close()
+    try:
+        races = db.query(PMURace).all()
+        runners = db.query(PMURunner).filter(PMURunner.finish_position.isnot(None)).all()
+    finally:
+        db.close()
 
     if not races:
         raise HTTPException(status_code=503, detail="Aucune donnee PMU. Lancez la collecte PMU d'abord.")
@@ -404,21 +414,23 @@ def _run_pmu_backtest(request: BacktestRequest) -> dict:
 
 
 @router.post("/backtest/save", response_model=SavedBacktestSummary)
+@limiter.limit("10/minute")
 def save_backtest(
-    request: SaveBacktestRequest,
+    request: Request,
+    body: SaveBacktestRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Save a backtest result for later retrieval."""
     saved = SavedBacktest(
         user_id=user.id,
-        name=request.name,
-        sport=request.sport,
-        params=json.dumps(request.params),
-        metrics=json.dumps(request.metrics),
-        bets=json.dumps(request.bets),
-        bankroll_curve=json.dumps(request.bankroll_curve),
-        config=json.dumps(request.config),
+        name=body.name,
+        sport=body.sport,
+        params=json.dumps(body.params),
+        metrics=json.dumps(body.metrics),
+        bets=json.dumps(body.bets),
+        bankroll_curve=json.dumps(body.bankroll_curve),
+        config=json.dumps(body.config),
     )
     db.add(saved)
     db.commit()
@@ -428,8 +440,8 @@ def save_backtest(
         id=saved.id,
         name=saved.name,
         sport=saved.sport,
-        roi_pct=request.metrics.get("roi_pct", 0.0),
-        total_bets=request.metrics.get("total_bets", 0),
+        roi_pct=body.metrics.get("roi_pct", 0.0),
+        total_bets=body.metrics.get("total_bets", 0),
         created_at=str(saved.created_at),
     )
 

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.base import Base, TimestampMixin
@@ -9,6 +9,12 @@ from src.models.base import Base, TimestampMixin
 
 class Bet(Base, TimestampMixin):
     __tablename__ = "bets"
+    __table_args__ = (
+        Index("idx_bet_user_backtest", "user_id", "is_backtest"),
+        Index("idx_bet_campaign", "campaign_id"),
+        Index("idx_bet_result", "result"),
+        Index("idx_bet_match_date", "match_date"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), index=True)

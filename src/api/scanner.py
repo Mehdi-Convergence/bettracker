@@ -6,6 +6,7 @@ import logging
 import time as _time
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +21,30 @@ from src.api.schemas import (
     PMURaceCard,
     PMUScanResponse,
 )
-from src.cache import cache_get
+from src.cache import cache_get, cache_set, cache_exists
 
 router = APIRouter(tags=["scanner"], dependencies=[Depends(require_tier("pro"))])
+
+# ---------------------------------------------------------------------------
+# Scan mutex — prevents concurrent force-refresh scans for the same sport
+# ---------------------------------------------------------------------------
+
+_SCAN_LOCK_TTL = 300  # 5 minutes max lock
+
+
+def _acquire_scan_lock(sport: str) -> bool:
+    """Try to acquire a scan lock. Returns True if acquired, False if already running."""
+    lock_key = f"scan:{sport}:running"
+    if cache_exists(lock_key):
+        return False
+    cache_set(lock_key, True, ttl=_SCAN_LOCK_TTL)
+    return True
+
+
+def _release_scan_lock(sport: str) -> None:
+    """Release the scan lock."""
+    from src.cache import cache_delete
+    cache_delete(f"scan:{sport}:running")
 
 # File fallback directory (same as worker writes to)
 _AF_CACHE_DIR = Path("data/cache/api_football")
@@ -77,7 +99,7 @@ def _filter_matches(
 @limiter.limit("30/minute")
 async def ai_scan(
     request: Request,
-    sport: str = Query(default="football", description="football or tennis"),
+    sport: Literal["football", "tennis", "nba", "rugby", "mlb", "pmu"] = Query(default="football", description="Sport to scan"),
     leagues: str = Query(default="", description="Comma-separated league codes"),
     timeframe: str = Query(default="48h", description="24h, 48h, 72h, or 1w"),
     force: bool = Query(default=False, description="Force refresh — triggers worker re-scan"),
@@ -88,52 +110,62 @@ async def ai_scan(
 
     if sport == "tennis":
         cached_tennis = cache_get("scan:tennis:all")
-        if cached_tennis is None and force:
+        if cached_tennis is None and force and _acquire_scan_lock("tennis"):
             try:
                 from src.workers.scan_worker import run_tennis_scan
                 await run_tennis_scan()
             except Exception as exc:
                 logger.error("Inline tennis scan failed: %s", exc)
+            finally:
+                _release_scan_lock("tennis")
         return _read_tennis_scan()
 
     if sport == "nba":
         cached_nba = cache_get("scan:nba:all")
-        if cached_nba is None and force:
+        if cached_nba is None and force and _acquire_scan_lock("nba"):
             try:
                 from src.workers.scan_worker import run_nba_scan
                 await run_nba_scan()
             except Exception as exc:
                 logger.error("Inline NBA scan failed: %s", exc)
+            finally:
+                _release_scan_lock("nba")
         return _read_nba_scan()
 
     if sport == "rugby":
         cached_rugby = cache_get("scan:rugby:all")
-        if cached_rugby is None and force:
+        if cached_rugby is None and force and _acquire_scan_lock("rugby"):
             try:
                 from src.workers.scan_worker import run_rugby_scan
                 await run_rugby_scan()
             except Exception as exc:
                 logger.error("Inline rugby scan failed: %s", exc)
+            finally:
+                _release_scan_lock("rugby")
         return _read_rugby_scan()
 
     if sport == "mlb":
         cached_mlb = cache_get("scan:mlb:all")
-        if cached_mlb is None and force:
+        if cached_mlb is None and force and _acquire_scan_lock("mlb"):
             try:
                 from src.workers.scan_worker import run_mlb_scan
                 await run_mlb_scan()
             except Exception as exc:
                 logger.error("Inline MLB scan failed: %s", exc)
+            finally:
+                _release_scan_lock("mlb")
         return _read_mlb_scan()
 
     if sport == "pmu":
         cached_pmu = cache_get("scan:pmu:all")
-        if cached_pmu is None and force:
+        if cached_pmu is None and force and _acquire_scan_lock("pmu"):
             try:
                 from src.workers.scan_worker import run_pmu_scan
                 await run_pmu_scan()
             except Exception as exc:
                 logger.error("Inline PMU scan failed: %s", exc)
+            finally:
+                _release_scan_lock("pmu")
         return _read_pmu_scan()  # type: ignore[return-value]
 
     # --- Football: read from cache ---
@@ -147,13 +179,15 @@ async def ai_scan(
     cached = _read_cached_scan(cache_redis_key, file_pattern)
 
     # If force=True and no cache, trigger worker scan inline (fallback)
-    if cached is None and force:
+    if cached is None and force and _acquire_scan_lock("football"):
         try:
             from src.workers.scan_worker import run_football_scan
             await run_football_scan()
             cached = _read_cached_scan(cache_redis_key, file_pattern)
         except Exception as exc:
             logger.error("Inline football scan failed: %s", exc)
+        finally:
+            _release_scan_lock("football")
 
     if cached is None:
         return AIScanResponse(
@@ -397,12 +431,14 @@ async def pmu_scan(
     force: bool = Query(default=False, description="Force refresh depuis l'API PMU"),
 ):
     """Retourne les courses PMU du jour avec probas et edges pre-calcules."""
-    if force:
+    if force and _acquire_scan_lock("pmu"):
         try:
             from src.workers.scan_worker import run_pmu_scan
             await run_pmu_scan()
         except Exception as exc:
             logger.error("Inline PMU scan failed: %s", exc)
+        finally:
+            _release_scan_lock("pmu")
     return _read_pmu_scan()
 
 

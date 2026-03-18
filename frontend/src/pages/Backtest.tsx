@@ -157,9 +157,9 @@ function mergeBacktestResults(res1: BacktestResponse, res2: BacktestResponse, in
 }
 
 // ── Shared styles ──
-const cardCls = "bg-white border-[1.5px] border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,.06),0_1px_2px_rgba(16,24,40,.04)]";
-const labelCls = "block text-xs font-semibold text-[#3c4149] mb-1.5";
-const inputCls = "w-full px-3 py-2 border-[1.5px] border-[#e3e6eb] rounded-lg text-[13.5px] text-[#111318] bg-[#f4f5f7] outline-none transition-all focus:border-[#3b5bdb] focus:bg-white focus:ring-[3px] focus:ring-[#3b5bdb]/7 font-[Plus_Jakarta_Sans,sans-serif]";
+const cardCls = "bg-[var(--bg-card)] border-[1.5px] border-[var(--border-color)] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,.06),0_1px_2px_rgba(16,24,40,.04)]";
+const labelCls = "block text-xs font-semibold text-[var(--text-secondary)] mb-1.5";
+const inputCls = "w-full px-3 py-2 border-[1.5px] border-[var(--border-color)] rounded-lg text-[13.5px] text-[var(--text-primary)] bg-[var(--bg-surface)] outline-none transition-all focus:border-[#3b5bdb] focus:bg-[var(--bg-card)] focus:ring-[3px] focus:ring-[#3b5bdb]/7 font-[Plus_Jakarta_Sans,sans-serif]";
 const selectCls = inputCls;
 
 // ── Strategy result type ──
@@ -207,7 +207,9 @@ export default function Backtest() {
 
   // Load saved on mount
   useEffect(() => {
-    getSavedBacktests().then(setSavedList).catch(() => {});
+    let cancelled = false;
+    getSavedBacktests().then((data) => { if (!cancelled) setSavedList(data); }).catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   // ── Run backtest ──
@@ -384,16 +386,16 @@ export default function Backtest() {
       {/* ── Header ── */}
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-xl font-extrabold text-[#111318] tracking-tight">Backtest</h1>
-          <p className="text-[12.5px] text-[#8a919e] mt-0.5">
+          <h1 className="text-xl font-extrabold text-[var(--text-primary)] tracking-tight">Backtest</h1>
+          <p className="text-[12.5px] text-[var(--text-muted)] mt-0.5">
             Simulez vos stratégies sur 1 à 3 saisons de données historiques réelles
           </p>
         </div>
-        <div className="flex bg-white border-[1.5px] border-[#e3e6eb] rounded-[9px] p-[3px] gap-[2px]">
+        <div className="flex bg-[var(--bg-card)] border-[1.5px] border-[var(--border-color)] rounded-[9px] p-[3px] gap-[2px]">
           <button
             onClick={() => setMode("quick")}
             className={`flex items-center gap-1.5 px-4 py-1.5 rounded-[7px] text-[13px] font-medium transition-all cursor-pointer ${
-              mode === "quick" ? "bg-[#3b5bdb] text-white font-semibold" : "text-[#8a919e] hover:text-[#3c4149]"
+              mode === "quick" ? "bg-[#3b5bdb] text-white font-semibold" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
             <Zap size={13} /> Mode rapide
@@ -401,7 +403,7 @@ export default function Backtest() {
           <button
             onClick={() => setMode("adv")}
             className={`flex items-center gap-1.5 px-4 py-1.5 rounded-[7px] text-[13px] font-medium transition-all cursor-pointer ${
-              mode === "adv" ? "bg-[#3b5bdb] text-white font-semibold" : "text-[#8a919e] hover:text-[#3c4149]"
+              mode === "adv" ? "bg-[#3b5bdb] text-white font-semibold" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
             <SlidersHorizontal size={13} /> Mode avancé
@@ -411,26 +413,26 @@ export default function Backtest() {
 
       {/* ── Params Card ── */}
       <div className={cardCls} data-tour="params-card">
-        <div className="px-5 py-3.5 border-b border-[#e3e6eb] flex flex-wrap items-center justify-between gap-2">
+        <div className="px-5 py-3.5 border-b border-[var(--border-color)] flex flex-wrap items-center justify-between gap-2">
           <div className="text-[13.5px] font-bold flex items-center gap-2">
             <FlaskConical size={15} style={{ color: ACCENT }} />
             Paramètres de simulation
             <button onClick={() => setFiltersCollapsed(!filtersCollapsed)}
-              className="md:hidden flex items-center gap-1 px-2 py-0.5 rounded-md border border-[#e3e6eb] bg-white text-[11px] text-[#8a919e] font-medium cursor-pointer ml-1">
+              className="md:hidden flex items-center gap-1 px-2 py-0.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] text-[11px] text-[var(--text-muted)] font-medium cursor-pointer ml-1">
               {filtersCollapsed ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
               {filtersCollapsed ? "Afficher" : "Masquer"}
             </button>
           </div>
           {results.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-[#8a919e]">Stratégies :</span>
+              <span className="text-xs text-[var(--text-muted)]">Stratégies :</span>
               {results.map((r, i) => (
                 <button key={r.id} onClick={() => setActiveStrat(i)}
                   className="flex items-center gap-1.5 px-3 py-1 rounded-[7px] text-[12.5px] font-semibold border-[1.5px] transition-all cursor-pointer"
                   style={{
                     color: STRAT_COLORS[i],
                     background: `${STRAT_COLORS[i]}10`,
-                    borderColor: i === activeStrat ? `${STRAT_COLORS[i]}40` : "#e3e6eb",
+                    borderColor: i === activeStrat ? `${STRAT_COLORS[i]}40` : "var(--border-color)",
                   }}
                 >
                   <span className="w-2 h-2 rounded-full" style={{ background: STRAT_COLORS[i] }} />
@@ -439,7 +441,7 @@ export default function Backtest() {
               ))}
               {results.length < 3 && (
                 <button onClick={handleRun} disabled={loading}
-                  className="text-xs text-[#8a919e] px-2.5 py-1 rounded-[7px] border-[1.5px] border-dashed border-[#cdd1d9] hover:border-[#3b5bdb]/30 hover:text-[#3b5bdb] hover:bg-[#3b5bdb]/5 transition-all cursor-pointer"
+                  className="text-xs text-[var(--text-muted)] px-2.5 py-1 rounded-[7px] border-[1.5px] border-dashed border-[var(--border-strong)] hover:border-[#3b5bdb]/30 hover:text-[#3b5bdb] hover:bg-[#3b5bdb]/5 transition-all cursor-pointer"
                 >
                   + Comparer
                 </button>
@@ -459,7 +461,7 @@ export default function Backtest() {
                     {(["football", "tennis", "nba", "rugby", "pmu", "mlb"] as const).map(s => (
                       <button key={s} onClick={() => toggleSportBt(s)}
                         className={`flex-1 py-2 px-1 rounded-lg border-2 text-[13px] font-semibold text-center transition-all cursor-pointer min-w-[70px] ${
-                          sports.has(s) ? "border-[#3b5bdb] bg-[#3b5bdb]/7 text-[#3b5bdb]" : "border-[#e3e6eb] text-[#3c4149] hover:border-[#3b5bdb]/30"
+                          sports.has(s) ? "border-[#3b5bdb] bg-[#3b5bdb]/7 text-[#3b5bdb]" : "border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[#3b5bdb]/30"
                         }`}>
                         {s === "football" ? "⚽ Football" : s === "tennis" ? "🎾 Tennis" : s === "nba" ? "🏀 NBA" : s === "rugby" ? "🏉 Rugby" : s === "pmu" ? "🐎 PMU" : "⚾ MLB"}
                       </button>
@@ -468,7 +470,7 @@ export default function Backtest() {
                 </div>
                 <div>
                   <label className={labelCls}>Période historique</label>
-                  <div className={`${inputCls} bg-[#f4f5f7] text-[#8a919e] cursor-not-allowed`}>
+                  <div className={`${inputCls} bg-[var(--bg-surface)] text-[var(--text-muted)] cursor-not-allowed`}>
                     {periodLabel(sports)}
                   </div>
                 </div>
@@ -486,10 +488,10 @@ export default function Backtest() {
                     {EDGE_PRESETS.map((ep) => (
                       <button key={ep.value} onClick={() => set({ min_edge: ep.value })}
                         className={`flex-1 border-2 rounded-lg py-2 px-1 text-center transition-all cursor-pointer ${
-                          p.min_edge === ep.value ? "border-[#3b5bdb] bg-[#3b5bdb]/7" : "border-[#e3e6eb] hover:border-[#3b5bdb]/30"
+                          p.min_edge === ep.value ? "border-[#3b5bdb] bg-[#3b5bdb]/7" : "border-[var(--border-color)] hover:border-[#3b5bdb]/30"
                         }`}>
                         <div className={`text-[15px] font-extrabold font-mono ${p.min_edge === ep.value ? "text-[#3b5bdb]" : ""}`}>{ep.label}</div>
-                        <div className="text-[10.5px] text-[#8a919e] mt-0.5">{ep.desc}</div>
+                        <div className="text-[10.5px] text-[var(--text-muted)] mt-0.5">{ep.desc}</div>
                       </button>
                     ))}
                   </div>
@@ -500,17 +502,17 @@ export default function Backtest() {
                     {STAKING_OPTIONS.map((so) => (
                       <button key={so.key} onClick={() => set({ staking_strategy: so.key })}
                         className={`border-2 rounded-lg py-2 px-1 text-center transition-all cursor-pointer ${
-                          p.staking_strategy === so.key ? "border-[#3b5bdb] bg-[#3b5bdb]/7" : "border-[#e3e6eb] hover:border-[#3b5bdb]/30"
+                          p.staking_strategy === so.key ? "border-[#3b5bdb] bg-[#3b5bdb]/7" : "border-[var(--border-color)] hover:border-[#3b5bdb]/30"
                         }`}>
                         <div className={`text-[12.5px] font-bold ${p.staking_strategy === so.key ? "text-[#3b5bdb]" : ""}`}>{so.name}</div>
-                        <div className="text-[11px] text-[#8a919e] mt-0.5">{so.desc}</div>
+                        <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{so.desc}</div>
                       </button>
                     ))}
                   </div>
                 </div>
                 <div data-tour="combo-toggle">
                   <label className={labelCls}>Mode Combis</label>
-                  <div className="flex items-center gap-2.5 px-3 py-2.5 bg-[#f4f5f7] border-[1.5px] border-[#e3e6eb] rounded-lg h-[72px]">
+                  <div className="flex items-center gap-2.5 px-3 py-2.5 bg-[var(--bg-surface)] border-[1.5px] border-[var(--border-color)] rounded-lg h-[72px]">
                     <label className="relative w-[38px] h-[21px] shrink-0 cursor-pointer">
                       <input type="checkbox" checked={p.combo_mode}
                         onChange={(e) => set({ combo_mode: e.target.checked })} className="sr-only peer" />
@@ -519,7 +521,7 @@ export default function Backtest() {
                     </label>
                     <div>
                       <div className="text-[13px] font-medium">{p.combo_mode ? "Combis activés" : "Simples uniquement"}</div>
-                      {p.combo_mode && <div className="text-[11.5px] text-[#8a919e] mt-0.5">2–4 sélections max</div>}
+                      {p.combo_mode && <div className="text-[11.5px] text-[var(--text-muted)] mt-0.5">2–4 sélections max</div>}
                     </div>
                   </div>
                 </div>
@@ -531,13 +533,13 @@ export default function Backtest() {
           {mode === "adv" && (
             <div className="space-y-2.5">
               {/* Filtres */}
-              <div className="border border-[#e3e6eb] rounded-[10px] overflow-hidden">
+              <div className="border border-[var(--border-color)] rounded-[10px] overflow-hidden">
                 <button onClick={() => toggleSection("filters")}
-                  className="w-full px-4 py-3 bg-[#f4f5f7] flex items-center justify-between cursor-pointer">
-                  <span className="text-[13px] font-semibold text-[#3c4149] flex items-center gap-2">
-                    <SlidersHorizontal size={14} className="text-[#8a919e]" /> Filtres de sélection
+                  className="w-full px-4 py-3 bg-[var(--bg-surface)] flex items-center justify-between cursor-pointer">
+                  <span className="text-[13px] font-semibold text-[var(--text-secondary)] flex items-center gap-2">
+                    <SlidersHorizontal size={14} className="text-[var(--text-muted)]" /> Filtres de sélection
                   </span>
-                  <ChevronDown size={13} className={`text-[#8a919e] transition-transform ${openSections.filters ? "rotate-180" : ""}`} />
+                  <ChevronDown size={13} className={`text-[var(--text-muted)] transition-transform ${openSections.filters ? "rotate-180" : ""}`} />
                 </button>
                 {openSections.filters && (
                   <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -581,7 +583,7 @@ export default function Backtest() {
                         {(["football", "tennis", "nba", "rugby", "pmu", "mlb"] as const).map(s => (
                           <button key={s} onClick={() => toggleSportBt(s)}
                             className={`flex-1 py-2 px-1 rounded-lg border-2 text-[13px] font-semibold text-center transition-all cursor-pointer min-w-[70px] ${
-                              sports.has(s) ? "border-[#3b5bdb] bg-[#3b5bdb]/7 text-[#3b5bdb]" : "border-[#e3e6eb] text-[#3c4149] hover:border-[#3b5bdb]/30"
+                              sports.has(s) ? "border-[#3b5bdb] bg-[#3b5bdb]/7 text-[#3b5bdb]" : "border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[#3b5bdb]/30"
                             }`}>
                             {s === "football" ? "⚽ Football" : s === "tennis" ? "🎾 Tennis" : s === "nba" ? "🏀 NBA" : s === "rugby" ? "🏉 Rugby" : s === "pmu" ? "🐎 PMU" : "⚾ MLB"}
                           </button>
@@ -590,7 +592,7 @@ export default function Backtest() {
                     </div>
                     <div>
                       <label className={labelCls}>Période</label>
-                      <div className={`${inputCls} bg-[#f4f5f7] text-[#8a919e] cursor-not-allowed`}>
+                      <div className={`${inputCls} bg-[var(--bg-surface)] text-[var(--text-muted)] cursor-not-allowed`}>
                         {periodLabel(sports)}
                       </div>
                     </div>
@@ -599,13 +601,13 @@ export default function Backtest() {
               </div>
 
               {/* Bankroll & Mise */}
-              <div className="border border-[#e3e6eb] rounded-[10px] overflow-hidden">
+              <div className="border border-[var(--border-color)] rounded-[10px] overflow-hidden">
                 <button onClick={() => toggleSection("bankroll")}
-                  className="w-full px-4 py-3 bg-[#f4f5f7] flex items-center justify-between cursor-pointer">
-                  <span className="text-[13px] font-semibold text-[#3c4149] flex items-center gap-2">
-                    <Trophy size={14} className="text-[#8a919e]" /> Bankroll & Mise
+                  className="w-full px-4 py-3 bg-[var(--bg-surface)] flex items-center justify-between cursor-pointer">
+                  <span className="text-[13px] font-semibold text-[var(--text-secondary)] flex items-center gap-2">
+                    <Trophy size={14} className="text-[var(--text-muted)]" /> Bankroll & Mise
                   </span>
-                  <ChevronDown size={13} className={`text-[#8a919e] transition-transform ${openSections.bankroll ? "rotate-180" : ""}`} />
+                  <ChevronDown size={13} className={`text-[var(--text-muted)] transition-transform ${openSections.bankroll ? "rotate-180" : ""}`} />
                 </button>
                 {openSections.bankroll && (
                   <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -657,13 +659,13 @@ export default function Backtest() {
               </div>
 
               {/* Combis */}
-              <div className="border border-[#e3e6eb] rounded-[10px] overflow-hidden">
+              <div className="border border-[var(--border-color)] rounded-[10px] overflow-hidden">
                 <button onClick={() => toggleSection("combis")}
-                  className="w-full px-4 py-3 bg-[#f4f5f7] flex items-center justify-between cursor-pointer">
-                  <span className="text-[13px] font-semibold text-[#3c4149] flex items-center gap-2">
-                    <Plus size={14} className="text-[#8a919e]" /> Combis
+                  className="w-full px-4 py-3 bg-[var(--bg-surface)] flex items-center justify-between cursor-pointer">
+                  <span className="text-[13px] font-semibold text-[var(--text-secondary)] flex items-center gap-2">
+                    <Plus size={14} className="text-[var(--text-muted)]" /> Combis
                   </span>
-                  <ChevronDown size={13} className={`text-[#8a919e] transition-transform ${openSections.combis ? "rotate-180" : ""}`} />
+                  <ChevronDown size={13} className={`text-[var(--text-muted)] transition-transform ${openSections.combis ? "rotate-180" : ""}`} />
                 </button>
                 {openSections.combis && (
                   <div className="p-4" data-tour="combo-toggle">
@@ -701,8 +703,8 @@ export default function Backtest() {
           )}
 
           {/* ── Launch bar ── */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-[#e3e6eb] mt-4">
-            <div className="text-xs text-[#8a919e] flex flex-wrap gap-x-3 gap-y-0.5">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-[var(--border-color)] mt-4">
+            <div className="text-xs text-[var(--text-muted)] flex flex-wrap gap-x-3 gap-y-0.5">
               {[...sports].map((s) => {
                 const cfg: Record<string, { emoji: string; label: string; train: string; test: string }> = {
                   football: { emoji: "⚽", label: "Football", train: "2018–2023 (5 saisons)", test: "2023–2025 (2 saisons)" },
@@ -716,15 +718,15 @@ export default function Backtest() {
                 if (!c) return null;
                 return (
                   <span key={s}>
-                    <strong className="text-[#3c4149]">{c.emoji} {c.label}</strong>
-                    {" — "}train : {c.train} · test : <strong className="text-[#3c4149]">{c.test}</strong>
+                    <strong className="text-[var(--text-secondary)]">{c.emoji} {c.label}</strong>
+                    {" — "}train : {c.train} · test : <strong className="text-[var(--text-secondary)]">{c.test}</strong>
                   </span>
                 );
               })}
             </div>
             <div className="flex gap-2">
               <button onClick={() => { setParams({ ...DEFAULT_PARAMS }); setResults([]); }}
-                className="px-4 py-2 rounded-lg border border-[#e3e6eb] text-[13px] font-medium text-[#8a919e] hover:text-[#3c4149] hover:border-[#cdd1d9] transition-all cursor-pointer flex items-center gap-1.5">
+                className="px-4 py-2 rounded-lg border border-[var(--border-color)] text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--border-strong)] transition-all cursor-pointer flex items-center gap-1.5">
                 <RotateCcw size={13} /> Réinitialiser
               </button>
               <button data-tour="run-btn" onClick={handleRun} disabled={loading}
@@ -764,7 +766,7 @@ export default function Backtest() {
             ].map((k) => (
               <div key={k.label} className={`${cardCls} px-3.5 py-3`}>
                 <div className="text-lg font-extrabold font-mono tracking-tight" style={k.color ? { color: k.color } : undefined}>{k.val}</div>
-                <div className="text-[10.5px] text-[#8a919e] mt-1">{k.label}</div>
+                <div className="text-[10.5px] text-[var(--text-muted)] mt-1">{k.label}</div>
               </div>
             ))}
           </div>
@@ -777,11 +779,11 @@ export default function Backtest() {
             <div className="h-[140px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e3e6eb" />
-                  <XAxis dataKey="bet" stroke="#8a919e" tick={{ fontSize: 10 }} />
-                  <YAxis stroke="#8a919e" tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${v.toFixed(0)}€`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                  <XAxis dataKey="bet" stroke="var(--text-muted)" tick={{ fontSize: 10 }} />
+                  <YAxis stroke="var(--text-muted)" tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${v.toFixed(0)}€`} />
                   <Tooltip
-                    contentStyle={{ background: "#fff", border: "1px solid #e3e6eb", borderRadius: 8, boxShadow: "0 4px 16px rgba(16,24,40,.08)", fontSize: 12 }}
+                    contentStyle={{ background: "var(--bg-elevated)", border: "1px solid var(--border-color)", borderRadius: 8, boxShadow: "0 4px 16px rgba(16,24,40,.08)", fontSize: 12, color: "var(--text-primary)" }}
                     formatter={(v: number | undefined, name: string | undefined) => [`${(v ?? 0).toFixed(2)}€`, results[Number((name ?? "").replace("s", ""))]?.label || name || ""]}
                   />
                   {results.map((_, i) => (
@@ -797,7 +799,7 @@ export default function Backtest() {
                 </LineChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex gap-4 mt-2.5 text-[11px] text-[#8a919e]">
+            <div className="flex gap-4 mt-2.5 text-[11px] text-[var(--text-muted)]">
               {results.map((r, i) => (
                 <span key={i} className="flex items-center gap-1.5">
                   <span className="w-4 h-[2.5px] rounded-sm" style={{ background: STRAT_COLORS[i] }} />
@@ -812,11 +814,11 @@ export default function Backtest() {
           {/* Comparison Table */}
           {results.length > 1 && (
             <div className={`${cardCls} overflow-hidden`}>
-              <div className="px-4 py-3 border-b border-[#e3e6eb] text-[13px] font-bold">Comparaison des stratégies</div>
+              <div className="px-4 py-3 border-b border-[var(--border-color)] text-[13px] font-bold">Comparaison des stratégies</div>
               <table className="w-full text-[13px]">
                 <thead>
-                  <tr className="bg-[#f4f5f7] border-b-[1.5px] border-[#e3e6eb]">
-                    <th className="px-3.5 py-2.5 text-left text-[10.5px] font-bold text-[#b0b7c3] uppercase tracking-wider">Métrique</th>
+                  <tr className="bg-[var(--bg-surface)] border-b-[1.5px] border-[var(--border-color)]">
+                    <th className="px-3.5 py-2.5 text-left text-[10.5px] font-bold text-[var(--text-muted2)] uppercase tracking-wider">Métrique</th>
                     {results.map((r, i) => (
                       <th key={i} className="px-3.5 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wider" style={{ color: STRAT_COLORS[i] }}>
                         {r.label} : {stakingLabel(r.params.staking_strategy)} · Edge {(r.params.min_edge * 100).toFixed(0)}%
@@ -826,7 +828,7 @@ export default function Backtest() {
                 </thead>
                 <tbody>
                   {(["ROI simulé", "Taux réussite", "Drawdown max", "Paris générés", "Gain net", "EV moyen / pari"] as const).map((metric) => (
-                    <tr key={metric} className="border-b border-[#e3e6eb] last:border-b-0 hover:bg-[#f4f5f7]">
+                    <tr key={metric} className="border-b border-[var(--border-color)] last:border-b-0 hover:bg-[var(--bg-surface)]">
                       <td className="px-3.5 py-2.5">{metric}</td>
                       {results.map((r, i) => {
                         const m = r.response.metrics;
@@ -851,13 +853,13 @@ export default function Backtest() {
 
           {/* Bets Table */}
           <div className={`${cardCls} overflow-hidden`}>
-            <div className="px-4 py-3 border-b border-[#e3e6eb] flex flex-wrap items-center justify-between gap-2">
+            <div className="px-4 py-3 border-b border-[var(--border-color)] flex flex-wrap items-center justify-between gap-2">
               <div className="text-[13px] font-bold">
                 Paris simulés : {results[activeStrat]?.label}{" "}
-                <span className="text-[12px] text-[#8a919e] font-normal">({activeResult.metrics.total_bets} total)</span>
+                <span className="text-[12px] text-[var(--text-muted)] font-normal">({activeResult.metrics.total_bets} total)</span>
               </div>
               <div className="flex gap-2 items-center">
-                <div className="flex bg-[#f4f5f7] border border-[#e3e6eb] rounded-[7px] p-[3px] gap-px">
+                <div className="flex bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-[7px] p-[3px] gap-px">
                   {([["all", "Tous"], ["won", "Gagnés"], ["lost", "Perdus"]] as const).map(([k, l]) => (
                     <button key={k} onClick={() => { setBetsFilter(k); setBetsPage(0); }}
                       className={`px-2.5 py-1 rounded-[5px] text-xs font-medium transition-all cursor-pointer ${
@@ -866,16 +868,16 @@ export default function Backtest() {
                   ))}
                 </div>
                 <button onClick={handleExportCSV}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] text-xs font-medium text-[#3c4149] hover:bg-[#f4f5f7] transition-all cursor-pointer">
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border-color)] text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] transition-all cursor-pointer">
                   <Download size={12} /> Export CSV
                 </button>
               </div>
             </div>
             <table className="w-full text-[12.5px]">
               <thead>
-                <tr className="bg-[#f4f5f7] border-b-[1.5px] border-[#e3e6eb]">
+                <tr className="bg-[var(--bg-surface)] border-b-[1.5px] border-[var(--border-color)]">
                   {["Date", "Match", "Issue", "Cote", "Mise sim.", "Résultat", "Gain/Perte", "Edge", "CLV"].map((h, i) => (
-                    <th key={h} className={`px-3.5 py-2.5 text-[10.5px] font-bold text-[#b0b7c3] uppercase tracking-wider ${
+                    <th key={h} className={`px-3.5 py-2.5 text-[10.5px] font-bold text-[var(--text-muted2)] uppercase tracking-wider ${
                       i >= 3 && i <= 4 ? "text-right" : i === 5 ? "text-center" : i >= 6 ? "text-right" : "text-left"
                     }`}>{h}</th>
                   ))}
@@ -883,12 +885,12 @@ export default function Backtest() {
               </thead>
               <tbody>
                 {pageBets.map((b: BacktestBet, i: number) => (
-                  <tr key={i} className="border-b border-[#e3e6eb] last:border-b-0 hover:bg-[#f4f5f7]">
-                    <td className="px-3.5 py-2.5 text-[#8a919e] font-mono">{b.date.replace(/-/g, "/").slice(5)}</td>
+                  <tr key={i} className="border-b border-[var(--border-color)] last:border-b-0 hover:bg-[var(--bg-surface)]">
+                    <td className="px-3.5 py-2.5 text-[var(--text-muted)] font-mono">{b.date.replace(/-/g, "/").slice(5)}</td>
                     <td className="px-3.5 py-2.5 font-semibold">{b.match.length > 35 ? b.match.substring(0, 35) + "…" : b.match}</td>
                     <td className="px-3.5 py-2.5">{b.outcome_bet === "H" ? "Dom" : b.outcome_bet === "A" ? "Ext" : b.outcome_bet}</td>
                     <td className="px-3.5 py-2.5 text-right font-mono font-semibold">{b.odds.toFixed(2)}</td>
-                    <td className="px-3.5 py-2.5 text-right text-[#8a919e] font-mono">{b.stake.toFixed(0)}€</td>
+                    <td className="px-3.5 py-2.5 text-right text-[var(--text-muted)] font-mono">{b.stake.toFixed(0)}€</td>
                     <td className="px-3.5 py-2.5 text-center">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold font-mono ${
                         b.won ? "bg-[#12b76a]/8 text-[#12b76a]" : "bg-[#f04438]/7 text-[#f04438]"
@@ -903,13 +905,13 @@ export default function Backtest() {
                         <span className={`text-[10.5px] px-1.5 py-0.5 rounded font-mono font-semibold ${
                           b.clv >= 0 ? "bg-[#12b76a]/8 text-[#12b76a]" : "bg-[#f04438]/7 text-[#f04438]"
                         }`}>{b.clv >= 0 ? "+" : ""}{(b.clv * 100).toFixed(1)}%</span>
-                      ) : <span className="text-[#8a919e]">—</span>}
+                      ) : <span className="text-[var(--text-muted)]">—</span>}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className="flex items-center justify-between px-4 py-2.5 border-t border-[#e3e6eb] text-xs text-[#8a919e]">
+            <div className="flex items-center justify-between px-4 py-2.5 border-t border-[var(--border-color)] text-xs text-[var(--text-muted)]">
               <span>{filteredBets.length} paris · page {betsPage + 1} / {Math.max(1, totalPages)}</span>
               <div className="flex gap-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -917,7 +919,7 @@ export default function Backtest() {
                   return (
                     <button key={page} onClick={() => setBetsPage(page)}
                       className={`w-[26px] h-[26px] rounded-[5px] border text-xs cursor-pointer ${
-                        page === betsPage ? "bg-[#3b5bdb] text-white border-[#3b5bdb]" : "border-[#e3e6eb] text-[#3c4149]"
+                        page === betsPage ? "bg-[#3b5bdb] text-white border-[#3b5bdb]" : "border-[var(--border-color)] text-[var(--text-secondary)]"
                       }`}>{page + 1}</button>
                   );
                 })}
@@ -929,11 +931,11 @@ export default function Backtest() {
           <div className={`${cardCls} px-5 py-4 flex flex-wrap items-center justify-between gap-3`} style={{ borderColor: `${ACCENT}30` }}>
             <div>
               <div className="text-[13.5px] font-bold">Vous aimez ces résultats ?</div>
-              <div className="text-xs text-[#8a919e] mt-0.5">Créez une campagne avec exactement ces paramètres, pré-remplie automatiquement.</div>
+              <div className="text-xs text-[var(--text-muted)] mt-0.5">Créez une campagne avec exactement ces paramètres, pré-remplie automatiquement.</div>
             </div>
             <div className="flex gap-2">
               <button onClick={() => setShowSaveModal(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#e3e6eb] text-[12.5px] font-medium text-[#3c4149] hover:bg-[#f4f5f7] transition-all cursor-pointer">
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[var(--border-color)] text-[12.5px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] transition-all cursor-pointer">
                 <Save size={13} /> Sauvegarder
               </button>
               <button onClick={handleCreateCampaign}
@@ -943,7 +945,7 @@ export default function Backtest() {
             </div>
           </div>
 
-          <p className="text-[11px] text-[#b0b7c3] text-center">
+          <p className="text-[11px] text-[var(--text-muted2)] text-center">
             Les résultats de simulation ne garantissent pas les performances futures. Les données historiques reflètent des conditions passées du marché.
           </p>
         </div>
@@ -958,15 +960,15 @@ export default function Backtest() {
               <div key={s.id} className={`${cardCls} flex items-center gap-3 px-4 py-3 hover:border-[#3b5bdb]/30 hover:bg-[#3b5bdb]/3 transition-all cursor-pointer`}>
                 <span className="text-base">{s.sport === "football" ? "⚽" : s.sport === "tennis" ? "🎾" : s.sport === "nba" ? "🏀" : s.sport === "rugby" ? "🏉" : s.sport === "pmu" ? "🐎" : s.sport === "mlb" ? "⚾" : "⚽+🎾"}</span>
                 <span className="text-[13px] font-semibold flex-1">{s.name}</span>
-                <span className="text-[11px] text-[#8a919e] font-mono flex items-center gap-1">
+                <span className="text-[11px] text-[var(--text-muted)] font-mono flex items-center gap-1">
                   <Clock size={11} /> {new Date(s.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
                 </span>
                 <span className="text-[13px] font-extrabold font-mono" style={{ color: s.roi_pct >= 0 ? GREEN : RED }}>
                   {formatPct(s.roi_pct)}
                 </span>
-                <span className="text-[11px] text-[#8a919e]">{s.total_bets} paris</span>
+                <span className="text-[11px] text-[var(--text-muted)]">{s.total_bets} paris</span>
                 <button onClick={(e) => { e.stopPropagation(); handleDeleteSaved(s.id); }}
-                  className="text-[#8a919e] hover:text-[#f04438] transition-colors cursor-pointer p-1">
+                  className="text-[var(--text-muted)] hover:text-[#f04438] transition-colors cursor-pointer p-1">
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -978,7 +980,7 @@ export default function Backtest() {
       {/* ── Save Modal ── */}
       {showSaveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowSaveModal(false)}>
-          <div className="bg-white rounded-xl p-6 w-[calc(100vw-2rem)] max-w-[400px] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[var(--bg-card)] rounded-xl p-6 w-[calc(100vw-2rem)] max-w-[400px] shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[15px] font-bold mb-3">Sauvegarder ce backtest</h3>
             <input type="text" className={inputCls}
               placeholder="Nom du backtest (ex: Football Edge 5% · ½ Kelly)"
@@ -986,7 +988,7 @@ export default function Backtest() {
               onKeyDown={(e) => e.key === "Enter" && handleSave()} />
             <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => setShowSaveModal(false)}
-                className="px-4 py-2 rounded-lg border border-[#e3e6eb] text-[13px] text-[#8a919e] cursor-pointer">Annuler</button>
+                className="px-4 py-2 rounded-lg border border-[var(--border-color)] text-[13px] text-[var(--text-muted)] cursor-pointer">Annuler</button>
               <button onClick={handleSave} disabled={!saveName.trim()}
                 className="px-4 py-2 rounded-lg bg-[#3b5bdb] text-white text-[13px] font-semibold cursor-pointer disabled:opacity-50">Sauvegarder</button>
             </div>

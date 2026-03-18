@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LogIn, Mail, Lock, Eye, EyeOff, UserPlus, Check, ScanSearch, BarChart2, Bot, MessageCircle, ShieldCheck, KeyRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { ApiError } from "@/contexts/AuthContext";
 import { requestEmailCode, verifyEmailCode, setAccessToken, createReactivateCheckout, sendEmail2FACode } from "@/services/api";
 
 type Mode = "login" | "signup";
@@ -55,22 +56,6 @@ export default function Login() {
     setInactiveAccount(null);
     setLoading(true);
     try {
-      // Pre-check for inactive account (403 with inactive flag)
-      const preCheck = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
-      });
-      if (preCheck.status === 403) {
-        const data = await preCheck.json();
-        if (data.inactive) {
-          setInactiveAccount({ user_id: data.user_id, email: data.email });
-          setLoading(false);
-          return;
-        }
-      }
-      // Normal login flow
       const result = await login(email, password);
       if (result && result.requires_2fa) {
         setLoginToken(result.login_token);
@@ -88,7 +73,14 @@ export default function Login() {
         navigate("/dashboard");
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Erreur de connexion");
+      if (err instanceof ApiError && err.status === 403 && err.body.inactive) {
+        setInactiveAccount({
+          user_id: err.body.user_id as number,
+          email: err.body.email as string,
+        });
+      } else {
+        setError(err instanceof Error ? err.message : "Erreur de connexion");
+      }
     } finally {
       setLoading(false);
     }

@@ -301,6 +301,13 @@ class NBAFeatureBuilder:
 
 # ------------------------------------------------------------------
 # Feature columns used by the model
+#
+# IMPORTANT — features with NaN medians (always NaN in training data):
+#   - home_off_rtg_10, away_off_rtg_10 : offensive rating not in ESPN/Odds API feed
+#   - home_def_rtg_10, away_def_rtg_10 : defensive rating not in ESPN/Odds API feed
+#   - home_pace_10, away_pace_10 : pace (possessions/48min) not in ESPN/Odds API feed
+# These features are kept in the list to preserve the trained model's feature
+# order. Remove them at the NEXT full re-training once a real data source is wired.
 # ------------------------------------------------------------------
 
 NBA_FEATURE_COLUMNS = [
@@ -324,6 +331,21 @@ NBA_FEATURE_COLUMNS = [
     # none, so including them causes train/test distribution shift (NaN→median at test)
     # that makes the model predict ~50/50 for all test games → 0 edge → 0 bets.
 ]
+
+# Clean feature set: excludes features that are always NaN in the current DB.
+# Use this for the NEXT full NBA re-training once the data source for advanced
+# box scores is wired (off_rating, def_rating, pace require ESPN/NBA Stats API).
+#
+# Always-NaN features excluded:
+#   - home_off_rtg_10, away_off_rtg_10 (off_rating not in DB)
+#   - home_def_rtg_10, away_def_rtg_10 (def_rating not in DB)
+#   - home_pace_10, away_pace_10 (pace not in DB)
+_NBA_ALWAYS_NAN = {
+    "home_off_rtg_10", "away_off_rtg_10",
+    "home_def_rtg_10", "away_def_rtg_10",
+    "home_pace_10", "away_pace_10",
+}
+NBA_FEATURE_COLUMNS_CLEAN = [f for f in NBA_FEATURE_COLUMNS if f not in _NBA_ALWAYS_NAN]
 
 
 def _safe_float(val) -> float | None:

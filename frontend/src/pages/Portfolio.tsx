@@ -24,6 +24,7 @@ import { useTour } from "@/hooks/useTour";
 import SpotlightTour from "@/components/SpotlightTour";
 import { portfolioTour } from "@/tours/index";
 import { usePreferences } from "@/contexts/PreferencesContext";
+import { getCurrencySymbol } from "@/utils/currency";
 
 // ══════════════════════════════════════════════
 // DESIGN TOKENS
@@ -113,6 +114,7 @@ function ClvBadge({ clv }: { clv: number | null }) {
 export default function Portfolio() {
   const { showTour, completeTour } = useTour("portfolio");
   const { prefs } = usePreferences();
+  const currencySymbol = getCurrencySymbol(prefs.currency);
 
   // ── Data state ──
   const [stats, setStats] = useState<PortfolioStats | null>(null);
@@ -204,7 +206,38 @@ export default function Portfolio() {
   const [scanLoaded, setScanLoaded] = useState(false);
 
   // ── Load data ──
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      try {
+        const [s, b, c] = await Promise.all([
+          getPortfolioStats().catch(() => null),
+          getPortfolioBets().catch(() => []),
+          getCampaigns().catch(() => []),
+        ]);
+        if (cancelled) return;
+        if (s) setStats(s);
+        setBets(b);
+        setCampaigns(c);
+        const activeCamps = c.filter((camp) => camp.status === "active");
+        const recoResults: { campId: number; reco: CampaignRecommendation }[] = [];
+        for (const camp of activeCamps.slice(0, 5)) {
+          if (cancelled) return;
+          try {
+            const res = await getCampaignRecommendations(camp.id);
+            for (const r of res.recommendations) {
+              recoResults.push({ campId: camp.id, reco: r });
+            }
+          } catch { /* ignore */ }
+        }
+        if (!cancelled) setCampRecos(recoResults);
+      } catch { /* ignore */ }
+      if (!cancelled) setLoading(false);
+    };
+    run();
+    return () => { cancelled = true; };
+  }, []);
 
   async function loadAll() {
     setLoading(true);
@@ -237,9 +270,11 @@ export default function Portfolio() {
   // ── Campaign detail loader ──
   useEffect(() => {
     if (selectedCampId === null) { setCampDetail(null); setCampBets([]); return; }
-    getCampaignDetail(selectedCampId).then(setCampDetail).catch(() => {});
-    getCampaignHistory(selectedCampId).then(setCampHistory).catch(() => setCampHistory([]));
-    getPortfolioBets(selectedCampId).then(setCampBets).catch(() => setCampBets([]));
+    let cancelled = false;
+    getCampaignDetail(selectedCampId).then((d) => { if (!cancelled) setCampDetail(d); }).catch(() => {});
+    getCampaignHistory(selectedCampId).then((h) => { if (!cancelled) setCampHistory(h); }).catch(() => { if (!cancelled) setCampHistory([]); });
+    getPortfolioBets(selectedCampId).then((b) => { if (!cancelled) setCampBets(b); }).catch(() => { if (!cancelled) setCampBets([]); });
+    return () => { cancelled = true; };
   }, [selectedCampId]);
 
   // ── Helpers ──
@@ -551,11 +586,11 @@ export default function Portfolio() {
             );
           })()}
           <KpiCard label="En cours" value={`${stats.pending_bets}`}
-            sub={`${bets.filter((b) => b.result === "pending").reduce((s, b) => s + b.stake, 0).toFixed(0)}€ en jeu`} />
+            sub={`${bets.filter((b) => b.result === "pending").reduce((s, b) => s + b.stake, 0).toFixed(0)}${currencySymbol} en jeu`} />
           <KpiCard label="Proposés" value={`${campRecos.length}`}
             color={campRecos.length > 0 ? C.amber : undefined} sub="à traiter" />
           <KpiCard label="BK globale"
-            value={`${stats.total_staked > 0 ? (stats.total_staked + stats.total_pnl).toFixed(0) : "—"}€`}
+            value={`${stats.total_staked > 0 ? (stats.total_staked + stats.total_pnl).toFixed(0) : "—"}${currencySymbol}`}
             sub="hors campagnes" />
           <KpiCard label="Taux réussite"
             value={stats.won + stats.lost > 0 ? `${(stats.win_rate * 100).toFixed(1)}%` : "—"}
@@ -656,6 +691,7 @@ export default function Portfolio() {
           getCampaignName={getCampaignName}
           getCampaignColor={getCampaignColor}
           onOpenDetail={openDrawer}
+          currencySymbol={currencySymbol}
         />
       )}
 
@@ -667,8 +703,8 @@ export default function Portfolio() {
             <LKpi label="ROI période" value={`${listKpis.roi >= 0 ? "+" : ""}${listKpis.roi.toFixed(1)}%`} color={listKpis.roi >= 0 ? C.green : C.red} />
             <LKpi label="CLV moyen" value={listKpis.clv !== 0 ? `${listKpis.clv >= 0 ? "+" : ""}${(listKpis.clv * 100).toFixed(1)}%` : "—"} color={listKpis.clv >= 0 ? C.green : C.red} />
             <LKpi label="Taux réussite" value={`${listKpis.winRate.toFixed(1)}%`} />
-            <LKpi label="Mise totale" value={`${listKpis.staked.toFixed(0)}€`} />
-            <LKpi label="Gain net" value={`${listKpis.pnl >= 0 ? "+" : ""}${listKpis.pnl.toFixed(0)}€`} color={listKpis.pnl >= 0 ? C.green : C.red} />
+            <LKpi label="Mise totale" value={`${listKpis.staked.toFixed(0)}${currencySymbol}`} />
+            <LKpi label="Gain net" value={`${listKpis.pnl >= 0 ? "+" : ""}${listKpis.pnl.toFixed(0)}${currencySymbol}`} color={listKpis.pnl >= 0 ? C.green : C.red} />
             <LKpi label="Tickets" value={`${listKpis.count}`} />
           </div>
 
@@ -761,12 +797,12 @@ export default function Portfolio() {
                       <td className="px-3 py-2.5 text-[11px]">{b.sport === "tennis" ? "🎾" : "⚽"}</td>
                       <td className="px-3 py-2.5" style={{ color: "var(--text-secondary)" }}>{outcomeLabel(b.outcome_bet)}</td>
                       <td className="px-3 py-2.5 font-[var(--font-mono)] font-semibold">{b.odds_at_bet.toFixed(2)}</td>
-                      <td className="px-3 py-2.5 font-[var(--font-mono)] font-semibold">{b.stake.toFixed(0)}€</td>
+                      <td className="px-3 py-2.5 font-[var(--font-mono)] font-semibold">{b.stake.toFixed(0)}{currencySymbol}</td>
                       <td className="px-3 py-2.5"><StatusBadge result={b.result} /></td>
                       <td className={`px-3 py-2.5 font-[var(--font-mono)] font-bold ${
                         b.profit_loss == null ? "text-[#8a919e]" : b.profit_loss >= 0 ? "text-[#12b76a]" : "text-[#f04438]"
                       }`}>
-                        {b.profit_loss != null ? `${b.profit_loss >= 0 ? "+" : ""}${b.profit_loss.toFixed(2)}€` : "—"}
+                        {b.profit_loss != null ? `${b.profit_loss >= 0 ? "+" : ""}${b.profit_loss.toFixed(2)}${currencySymbol}` : "—"}
                       </td>
                       <td className="px-3 py-2.5">
                         {b.edge_at_bet != null ? (
@@ -900,7 +936,7 @@ export default function Portfolio() {
           {/* Campaign detail */}
           <div className="flex flex-col gap-3 min-w-0">
             {selectedCampId != null && selectedCampId > 0 && campDetail && (
-              <CampMiniDash detail={campDetail} history={campHistory} campBets={campBets} />
+              <CampMiniDash detail={campDetail} history={campHistory} campBets={campBets} currencySymbol={currencySymbol} />
             )}
             {selectedCampId === 0 && (
               <div className="border-[1.5px] rounded-xl p-4" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", boxShadow: SH_SM }}>
@@ -919,8 +955,8 @@ export default function Portfolio() {
                     return <>
                       <CmdStat label="ROI" value={`${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`} color={roi >= 0 ? C.green : C.red} />
                       <CmdStat label="Taux réussite" value={`${wr.toFixed(1)}%`} />
-                      <CmdStat label="Mise totale" value={`${stk.toFixed(0)}€`} />
-                      <CmdStat label="Gain net" value={`${pnl >= 0 ? "+" : ""}${pnl.toFixed(0)}€`} color={pnl >= 0 ? C.green : C.red} />
+                      <CmdStat label="Mise totale" value={`${stk.toFixed(0)}${currencySymbol}`} />
+                      <CmdStat label="Gain net" value={`${pnl >= 0 ? "+" : ""}${pnl.toFixed(0)}${currencySymbol}`} color={pnl >= 0 ? C.green : C.red} />
                       <CmdStat label="Tickets" value={`${hc.length}`} />
                       <CmdStat label="En cours" value={`${hc.filter((b) => b.result === "pending").length}`} />
                     </>;
@@ -941,6 +977,7 @@ export default function Portfolio() {
                 onDeleteBet={handleDeleteBet}
                 onExport={(data) => exportCsv(data, `tickets-camp-${selectedCampId}.csv`)}
                 onOpenDetail={openDrawer}
+                currencySymbol={currencySymbol}
               />
             )}
             {selectedCampId == null && (
@@ -1094,7 +1131,7 @@ export default function Portfolio() {
                       onChange={(e) => setAddForm({ ...addForm, odds_at_bet: e.target.value })} className={inputCls} />
                   </div>
                   <div>
-                    <label className="block text-[10px] text-slate-400 mb-1">Mise (€)</label>
+                    <label className="block text-[10px] text-slate-400 mb-1">Mise ({currencySymbol})</label>
                     <input type="number" step="0.01" placeholder="10" value={addForm.stake}
                       onChange={(e) => setAddForm({ ...addForm, stake: e.target.value })} className={inputCls} />
                   </div>
@@ -1277,7 +1314,7 @@ const TICKET_KANBAN_COLUMNS: KanbanColumn[] = [
 function TicketsKanban({
   bets, campRecos, statusFilter, acceptingReco,
   onAcceptReco, onIgnoreReco, onUpdateResult, onDeleteBet, onAddManual,
-  getCampaignName, getCampaignColor, onOpenDetail,
+  getCampaignName, getCampaignColor, onOpenDetail, currencySymbol,
 }: {
   bets: Bet[];
   campRecos: { campId: number; reco: CampaignRecommendation }[];
@@ -1291,6 +1328,7 @@ function TicketsKanban({
   getCampaignName: (id: number | null) => string;
   getCampaignColor: (id: number | null) => string;
   onOpenDetail: (bet: Bet) => void;
+  currencySymbol: string;
 }) {
   const today = new Date().toISOString().split("T")[0];
 
@@ -1373,7 +1411,7 @@ function TicketsKanban({
                   <span className="text-[10px] font-[var(--font-mono)] ml-auto" style={{ color: "var(--text-muted)" }}>{r.bookmaker}</span>
                 </div>
                 <div className="flex items-center mt-1">
-                  <span className="text-[11px] font-[var(--font-mono)] font-semibold" style={{ color: "var(--text-secondary)" }}>Mise : {r.suggested_stake.toFixed(0)}€</span>
+                  <span className="text-[11px] font-[var(--font-mono)] font-semibold" style={{ color: "var(--text-secondary)" }}>Mise : {r.suggested_stake.toFixed(0)}{currencySymbol}</span>
                 </div>
                 <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t" style={{ borderColor: "var(--border-color)" }}>
                   <div className="flex items-center gap-1 text-[10px]" style={{ color: "var(--text-muted2)" }}>
@@ -1437,15 +1475,15 @@ function TicketsKanban({
               <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t" style={{ borderColor: "var(--border-color)" }}>
                 {isPending ? (
                   <>
-                    <span className="text-[11px] font-[var(--font-mono)] font-semibold" style={{ color: "var(--text-secondary)" }}>Mise : {b.stake.toFixed(0)}€</span>
+                    <span className="text-[11px] font-[var(--font-mono)] font-semibold" style={{ color: "var(--text-secondary)" }}>Mise : {b.stake.toFixed(0)}{currencySymbol}</span>
                     <span className="text-[11px] font-[var(--font-mono)]" style={{ color: "var(--text-secondary)" }}>
-                      +{(b.stake * (b.odds_at_bet - 1)).toFixed(0)}€ potentiel
+                      +{(b.stake * (b.odds_at_bet - 1)).toFixed(0)}{currencySymbol} potentiel
                     </span>
                   </>
                 ) : (
                   <>
                     <span className={`text-[11px] font-[var(--font-mono)] font-bold ${isWon ? "text-[#12b76a]" : "text-[#f04438]"}`}>
-                      {b.profit_loss != null ? `${b.profit_loss >= 0 ? "+" : ""}${b.profit_loss.toFixed(2)}€` : "—"}
+                      {b.profit_loss != null ? `${b.profit_loss >= 0 ? "+" : ""}${b.profit_loss.toFixed(2)}${currencySymbol}` : "—"}
                     </span>
                     <ClvBadge clv={b.clv} />
                   </>
@@ -1461,7 +1499,7 @@ function TicketsKanban({
               {/* Hypothetical result for ignored tickets */}
               {isIgnored && b.profit_loss != null && (
                 <div className="mt-1.5 px-2 py-1 rounded border border-[rgba(138,145,158,.12)] text-[10.5px] italic" style={{ backgroundColor: "rgba(138,145,158,.06)", color: "var(--text-muted)" }}>
-                  Aurait rapporté {b.profit_loss >= 0 ? `+${b.profit_loss.toFixed(2)}€` : `${b.profit_loss.toFixed(2)}€`}
+                  Aurait rapporté {b.profit_loss >= 0 ? `+${b.profit_loss.toFixed(2)}${currencySymbol}` : `${b.profit_loss.toFixed(2)}${currencySymbol}`}
                 </div>
               )}
               {/* Actions */}
@@ -1501,10 +1539,11 @@ function TicketsKanban({
 // CAMPAIGN MINI DASHBOARD
 // ══════════════════════════════════════════════
 
-function CampMiniDash({ detail, history, campBets }: {
+function CampMiniDash({ detail, history, campBets, currencySymbol }: {
   detail: CampaignDetail;
   history: BankrollPoint[];
   campBets: Bet[];
+  currencySymbol: string;
 }) {
   const { campaign, stats } = detail;
   const statusLabel = campaign.status === "active" ? "Active" : campaign.status === "paused" ? "En pause" : "Archivée";
@@ -1549,9 +1588,9 @@ function CampMiniDash({ detail, history, campBets }: {
         <CmdStat label="ROI manuel" value={manuelStk > 0 ? `${manuelRoi >= 0 ? "+" : ""}${manuelRoi.toFixed(1)}%` : "—"} color={manuelRoi >= 0 ? C.green : C.red} />
         <CmdStat label="CLV moyen" value={withClv.length > 0 ? `${avgClv >= 0 ? "+" : ""}${(avgClv * 100).toFixed(1)}%` : "—"} color={avgClv >= 0 ? C.green : C.red} />
         <CmdStat label="Taux réussite" value={stats.won + stats.lost > 0 ? `${(stats.win_rate * 100).toFixed(1)}%` : "—"} />
-        <CmdStat label="BK courante" value={`${stats.current_bankroll.toFixed(0)}€`} />
+        <CmdStat label="BK courante" value={`${stats.current_bankroll.toFixed(0)}${currencySymbol}`} />
         <CmdStat label="Drawdown max" value={`${maxDrawdown.toFixed(1)}%`} color={maxDrawdown > 15 ? C.red : maxDrawdown > 5 ? C.amber : C.green} />
-        <CmdStat label="P&L" value={`${stats.total_pnl >= 0 ? "+" : ""}${stats.total_pnl.toFixed(0)}€`} color={stats.total_pnl >= 0 ? C.green : C.red} />
+        <CmdStat label="P&L" value={`${stats.total_pnl >= 0 ? "+" : ""}${stats.total_pnl.toFixed(0)}${currencySymbol}`} color={stats.total_pnl >= 0 ? C.green : C.red} />
         <CmdStat label="Tickets" value={`${stats.total_bets}`} />
       </div>
       {/* Mini bankroll chart */}
@@ -1585,13 +1624,14 @@ function CampMiniDash({ detail, history, campBets }: {
 // CAMPAIGN BETS TABLE (reused in Par Campagne view)
 // ══════════════════════════════════════════════
 
-function CampBetsTable({ bets, campaigns: _campaigns, onUpdateResult, onDeleteBet, onExport, onOpenDetail }: {
+function CampBetsTable({ bets, campaigns: _campaigns, onUpdateResult, onDeleteBet, onExport, onOpenDetail, currencySymbol }: {
   bets: Bet[];
   campaigns: Campaign[];
   onUpdateResult: (betId: number, result: string) => void;
   onDeleteBet: (betId: number) => void;
   onExport: (data: Bet[]) => void;
   onOpenDetail: (bet: Bet) => void;
+  currencySymbol: string;
 }) {
   const [filter, setFilter] = useState("all");
   const [tagF, setTagF] = useState("all");
@@ -1664,12 +1704,12 @@ function CampBetsTable({ bets, campaigns: _campaigns, onUpdateResult, onDeleteBe
                   <td className="px-3 py-2.5 font-semibold" style={{ color: "var(--text-primary)" }}>{b.home_team} vs {b.away_team}</td>
                   <td className="px-3 py-2.5" style={{ color: "var(--text-secondary)" }}>{outcomeLabel(b.outcome_bet)}</td>
                   <td className="px-3 py-2.5 font-[var(--font-mono)] font-semibold">{b.odds_at_bet.toFixed(2)}</td>
-                  <td className="px-3 py-2.5 font-[var(--font-mono)] font-semibold">{b.stake.toFixed(0)}€</td>
+                  <td className="px-3 py-2.5 font-[var(--font-mono)] font-semibold">{b.stake.toFixed(0)}{currencySymbol}</td>
                   <td className="px-3 py-2.5"><StatusBadge result={b.result} /></td>
                   <td className={`px-3 py-2.5 font-[var(--font-mono)] font-bold ${
                     b.profit_loss == null ? "text-[#8a919e]" : b.profit_loss >= 0 ? "text-[#12b76a]" : "text-[#f04438]"
                   }`}>
-                    {b.profit_loss != null ? `${b.profit_loss >= 0 ? "+" : ""}${b.profit_loss.toFixed(2)}€` : "—"}
+                    {b.profit_loss != null ? `${b.profit_loss >= 0 ? "+" : ""}${b.profit_loss.toFixed(2)}${currencySymbol}` : "—"}
                   </td>
                   <td className="px-3 py-2.5"><ClvBadge clv={b.clv} /></td>
                   <td className="px-3 py-2.5"><TagBadge tag={getTag(b)} /></td>

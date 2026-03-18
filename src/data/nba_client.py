@@ -55,7 +55,7 @@ class NBAClient:
         self,
         timeframe: str = "48h",
         markets: str = "h2h,totals,spreads",
-        regions: str = "eu,uk,us,us2,au",
+        regions: str = "eu,uk,us",
     ) -> list[dict]:
         """Return NBA games with multi-bookmaker odds for the next timeframe.
 

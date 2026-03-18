@@ -1,6 +1,9 @@
 """Campaign management: autopilot-assisted betting strategy."""
 
+import logging
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func as sa_func
@@ -487,6 +490,6 @@ def _fill_clv(bet: Bet, db: Session) -> None:
 
         bet.odds_at_close = close_odds
         bet.clv = round(close_odds / bet.odds_at_bet - 1.0, 4)
-    except Exception:
+    except Exception as exc:
         # Non-blocking: CLV is a nice-to-have, not critical
-        pass
+        logger.debug("CLV calculation skipped for bet %s: %s", bet.id, exc)

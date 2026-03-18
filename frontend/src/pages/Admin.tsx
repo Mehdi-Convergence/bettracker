@@ -81,9 +81,9 @@ function SectionCard({ title, icon, children, action }: {
   action?: React.ReactNode;
 }) {
   return (
-    <div className="border border-[#e3e6eb] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden" style={{ background: "var(--bg-card)" }}>
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#e3e6eb]">
-        <div className="flex items-center gap-2 text-[13px] font-bold text-[#111318]">
+    <div className="border border-[var(--border-color)] rounded-xl shadow-[0_1px_3px_rgba(16,24,40,0.06)] overflow-hidden" style={{ background: "var(--bg-card)" }}>
+      <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-color)]">
+        <div className="flex items-center gap-2 text-[13px] font-bold text-[var(--text-primary)]">
           {icon}
           {title}
         </div>
@@ -163,7 +163,7 @@ function AdminDashboard() {
     });
   }
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (cancelled?: { value: boolean }) => {
     const [sys, sc, q, an, al, er, us, ai, st] = await Promise.allSettled([
       getAdminSystem(),
       getAdminScans(),
@@ -175,6 +175,7 @@ function AdminDashboard() {
       getAdminAI(),
       getAdminStripe(),
     ]);
+    if (cancelled?.value) return;
     if (sys.status === "fulfilled") setSystem(sys.value);
     if (sc.status === "fulfilled") setScans(sc.value);
     if (q.status === "fulfilled") setQuota(q.value);
@@ -189,9 +190,10 @@ function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    load();
-    const interval = setInterval(load, 60_000);
-    return () => clearInterval(interval);
+    const cancelled = { value: false };
+    load(cancelled);
+    const interval = setInterval(() => { if (!cancelled.value) load(cancelled); }, 60_000);
+    return () => { cancelled.value = true; clearInterval(interval); };
   }, [load]);
 
   async function handleForceScan(sport: string) {
@@ -230,14 +232,14 @@ function AdminDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[20px] font-extrabold tracking-tight text-[#111318]">Admin Dashboard</h1>
-          <p className="text-[12.5px] text-[#8a919e] mt-0.5">
+          <h1 className="text-[20px] font-extrabold tracking-tight text-[var(--text-primary)]">Admin Dashboard</h1>
+          <p className="text-[12.5px] text-[var(--text-muted)] mt-0.5">
             Derniere actualisation : {lastRefresh.toLocaleTimeString("fr-FR")} — rafraichissement auto toutes les 60s
           </p>
         </div>
         <button
           onClick={() => { setLoading(true); load(); }}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e3e6eb] text-[13px] font-medium text-[#3c4149] transition-all cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--border-color)] text-[13px] font-medium text-[var(--text-secondary)] transition-all cursor-pointer"
           style={{ background: "var(--bg-surface)" }}
         >
           <RefreshCw size={13} />
@@ -249,17 +251,17 @@ function AdminDashboard() {
       <SectionCard title="Etat du systeme" icon={<Activity size={14} className="text-[#3b5bdb]" />}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {/* Redis */}
-          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb]" style={{ background: "var(--bg-surface)" }}>
+          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[var(--border-color)]" style={{ background: "var(--bg-surface)" }}>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#3c4149]">
+              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">
                 <Zap size={13} className="text-[#f79009]" />
                 Redis
               </div>
               <StatusDot ok={system?.redis.ok ?? false} />
             </div>
-            <div className="font-mono text-[11px] text-[#8a919e]">
+            <div className="font-mono text-[11px] text-[var(--text-muted)]">
               {system?.redis.ok ? (
-                <>latence : <span className="text-[#111318] font-bold">{system.redis.latency_ms ?? "—"} ms</span></>
+                <>latence : <span className="text-[var(--text-primary)] font-bold">{system.redis.latency_ms ?? "—"} ms</span></>
               ) : (
                 <span className="text-[#f04438]">Hors ligne</span>
               )}
@@ -267,17 +269,17 @@ function AdminDashboard() {
           </div>
 
           {/* DB */}
-          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb]" style={{ background: "var(--bg-surface)" }}>
+          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[var(--border-color)]" style={{ background: "var(--bg-surface)" }}>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#3c4149]">
+              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">
                 <Database size={13} className="text-[#3b5bdb]" />
                 Base de donnees
               </div>
               <StatusDot ok={system?.db.ok ?? false} />
             </div>
-            <div className="font-mono text-[11px] text-[#8a919e]">
+            <div className="font-mono text-[11px] text-[var(--text-muted)]">
               {system?.db.ok ? (
-                <>taille : <span className="text-[#111318] font-bold">{system.db.size_mb != null ? `${system.db.size_mb.toFixed(1)} Mo` : "—"}</span></>
+                <>taille : <span className="text-[var(--text-primary)] font-bold">{system.db.size_mb != null ? `${system.db.size_mb.toFixed(1)} Mo` : "—"}</span></>
               ) : (
                 <span className="text-[#f04438]">Indisponible</span>
               )}
@@ -285,17 +287,17 @@ function AdminDashboard() {
           </div>
 
           {/* Worker */}
-          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb]" style={{ background: "var(--bg-surface)" }}>
+          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[var(--border-color)]" style={{ background: "var(--bg-surface)" }}>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#3c4149]">
+              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">
                 <Cpu size={13} className="text-[#7c3aed]" />
                 Worker
               </div>
               <StatusDot ok={system?.worker.ok ?? false} />
             </div>
-            <div className="font-mono text-[11px] text-[#8a919e]">
+            <div className="font-mono text-[11px] text-[var(--text-muted)]">
               {system?.worker.last_heartbeat ? (
-                <>derniere activite : <span className="text-[#111318] font-bold">{fmtTs(system.worker.last_heartbeat)}</span></>
+                <>derniere activite : <span className="text-[var(--text-primary)] font-bold">{fmtTs(system.worker.last_heartbeat)}</span></>
               ) : (
                 <span className="text-[#f04438]">Aucune activite</span>
               )}
@@ -303,13 +305,13 @@ function AdminDashboard() {
           </div>
 
           {/* Last deploy */}
-          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[#e3e6eb]" style={{ background: "var(--bg-surface)" }}>
-            <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#3c4149]">
+          <div className="flex flex-col gap-2 p-3 rounded-xl border border-[var(--border-color)]" style={{ background: "var(--bg-surface)" }}>
+            <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-secondary)]">
               <Clock size={13} className="text-[#12b76a]" />
               Dernier deploy
             </div>
-            <div className="font-mono text-[11px] text-[#8a919e]">
-              <span className="text-[#111318] font-bold">{fmtTs(system?.last_deploy ?? null)}</span>
+            <div className="font-mono text-[11px] text-[var(--text-muted)]">
+              <span className="text-[var(--text-primary)] font-bold">{fmtTs(system?.last_deploy ?? null)}</span>
             </div>
           </div>
         </div>
@@ -318,14 +320,14 @@ function AdminDashboard() {
       {/* ── Section 2: Scans par sport ── */}
       <SectionCard title="Scans par sport" icon={<RefreshCw size={14} className="text-[#3b5bdb]" />}>
         {scans.length === 0 ? (
-          <p className="text-[12px] text-[#b0b7c3] text-center py-4">Aucune donnee de scan disponible</p>
+          <p className="text-[12px] text-[var(--text-muted2)] text-center py-4">Aucune donnee de scan disponible</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-[12.5px]">
               <thead>
-                <tr className="border-b border-[#e3e6eb]">
+                <tr className="border-b border-[var(--border-color)]">
                   {["Sport", "Dernier scan", "Age cache", "Matchs", "Erreurs 24h", "Statut", "Action"].map((h) => (
-                    <th key={h} className="text-left py-2 px-3 text-[11px] font-semibold text-[#8a919e] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    <th key={h} className="text-left py-2 px-3 text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -335,11 +337,11 @@ function AdminDashboard() {
                   const forcing = forcingScans[scan.sport];
                   const msg = forceMessages[scan.sport];
                   return (
-                    <tr key={scan.sport} className="border-b border-[#f0f1f3] last:border-0 hover:bg-[#fafbfc] transition-colors">
-                      <td className="py-2.5 px-3 font-semibold text-[#111318] capitalize">{scan.sport}</td>
-                      <td className="py-2.5 px-3 font-mono text-[#3c4149]">{fmtTs(scan.last_scan)}</td>
-                      <td className="py-2.5 px-3 font-mono text-[#3c4149]">{fmtAge(scan.cache_age_minutes)}</td>
-                      <td className="py-2.5 px-3 font-mono text-[#3c4149]">{scan.match_count ?? "—"}</td>
+                    <tr key={scan.sport} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-surface)] transition-colors">
+                      <td className="py-2.5 px-3 font-semibold text-[var(--text-primary)] capitalize">{scan.sport}</td>
+                      <td className="py-2.5 px-3 font-mono text-[var(--text-secondary)]">{fmtTs(scan.last_scan)}</td>
+                      <td className="py-2.5 px-3 font-mono text-[var(--text-secondary)]">{fmtAge(scan.cache_age_minutes)}</td>
+                      <td className="py-2.5 px-3 font-mono text-[var(--text-secondary)]">{scan.match_count ?? "—"}</td>
                       <td className="py-2.5 px-3 font-mono">
                         <span style={{ color: scan.errors_24h > 0 ? "var(--red)" : "var(--green)" }}>
                           {scan.errors_24h}
@@ -364,7 +366,7 @@ function AdminDashboard() {
                             {forcing ? "..." : "Forcer scan"}
                           </button>
                           {msg && (
-                            <span className="text-[10px] text-[#8a919e] max-w-[120px] truncate" title={msg}>{msg}</span>
+                            <span className="text-[10px] text-[var(--text-muted)] max-w-[120px] truncate" title={msg}>{msg}</span>
                           )}
                         </div>
                       </td>
@@ -385,42 +387,42 @@ function AdminDashboard() {
               {/* Daily */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[12px] font-semibold text-[#3c4149]">Aujourd'hui</span>
+                  <span className="text-[12px] font-semibold text-[var(--text-secondary)]">Aujourd'hui</span>
                   <span className="font-mono text-[12px] font-bold" style={{ color: quotaColor }}>
                     {quota.used_today} / {quota.limit_daily}
                   </span>
                 </div>
-                <div className="h-2.5 bg-[#f4f5f7] rounded-full overflow-hidden">
+                <div className="h-2.5 bg-[var(--bg-surface)] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{ width: `${Math.min(quotaPct, 100)}%`, background: quotaColor }}
                   />
                 </div>
-                <div className="text-[10.5px] text-[#8a919e] mt-1">{quotaPct}% utilise</div>
+                <div className="text-[10.5px] text-[var(--text-muted)] mt-1">{quotaPct}% utilise</div>
               </div>
 
               {/* Monthly */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[12px] font-semibold text-[#3c4149]">Ce mois</span>
+                  <span className="text-[12px] font-semibold text-[var(--text-secondary)]">Ce mois</span>
                   <span className="font-mono text-[12px] font-bold" style={{ color: quotaMonthPct >= 90 ? "var(--red)" : "var(--accent)" }}>
                     {quota.used_month} / {quota.limit_month}
                   </span>
                 </div>
-                <div className="h-2.5 bg-[#f4f5f7] rounded-full overflow-hidden">
+                <div className="h-2.5 bg-[var(--bg-surface)] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{ width: `${Math.min(quotaMonthPct, 100)}%`, background: quotaMonthPct >= 90 ? "var(--red)" : "var(--accent)" }}
                   />
                 </div>
-                <div className="text-[10.5px] text-[#8a919e] mt-1">{quotaMonthPct}% utilise</div>
+                <div className="text-[10.5px] text-[var(--text-muted)] mt-1">{quotaMonthPct}% utilise</div>
               </div>
             </div>
 
             {/* Per-sport breakdown */}
             {quota.by_sport.length > 0 && (
               <div>
-                <p className="text-[11px] font-semibold text-[#8a919e] uppercase tracking-wide mb-2">Repartition par sport</p>
+                <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">Repartition par sport</p>
                 <div className="flex flex-col gap-2">
                   {quota.by_sport.map((s) => {
                     const pct = quota.used_today > 0 ? Math.round((s.calls / quota.used_today) * 100) : 0;
@@ -435,14 +437,14 @@ function AdminDashboard() {
                     const color = SPORT_COLORS[s.sport] || "#8a919e";
                     return (
                       <div key={s.sport} className="flex items-center gap-3">
-                        <span className="text-[11.5px] capitalize text-[#3c4149] font-medium w-20 shrink-0">{s.sport}</span>
-                        <div className="flex-1 h-2 bg-[#f4f5f7] rounded-full overflow-hidden">
+                        <span className="text-[11.5px] capitalize text-[var(--text-secondary)] font-medium w-20 shrink-0">{s.sport}</span>
+                        <div className="flex-1 h-2 bg-[var(--bg-surface)] rounded-full overflow-hidden">
                           <div
                             className="h-full rounded-full"
                             style={{ width: `${Math.max(pct, 2)}%`, background: color }}
                           />
                         </div>
-                        <span className="font-mono text-[11px] text-[#8a919e] w-16 text-right">{s.calls} appels</span>
+                        <span className="font-mono text-[11px] text-[var(--text-muted)] w-16 text-right">{s.calls} appels</span>
                       </div>
                     );
                   })}
@@ -451,40 +453,40 @@ function AdminDashboard() {
             )}
           </div>
         ) : (
-          <p className="text-[12px] text-[#b0b7c3] text-center py-4">Donnees de quota indisponibles</p>
+          <p className="text-[12px] text-[var(--text-muted2)] text-center py-4">Donnees de quota indisponibles</p>
         )}
       </SectionCard>
 
       {/* ── Section 4: Betting Analytics ── */}
       <SectionCard title="Analytique paris par sport" icon={<TrendingUp size={14} className="text-[#3b5bdb]" />}>
         {analytics.length === 0 ? (
-          <p className="text-[12px] text-[#b0b7c3] text-center py-4">Aucune donnee disponible</p>
+          <p className="text-[12px] text-[var(--text-muted2)] text-center py-4">Aucune donnee disponible</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-[12.5px]">
               <thead>
-                <tr className="border-b border-[#e3e6eb]">
+                <tr className="border-b border-[var(--border-color)]">
                   {["Sport", "Paris 7j", "Paris 30j", "ROI", "CLV moyen", "Utilisateurs actifs"].map((h) => (
-                    <th key={h} className="text-left py-2 px-3 text-[11px] font-semibold text-[#8a919e] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    <th key={h} className="text-left py-2 px-3 text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {analytics.map((row) => (
-                  <tr key={row.sport} className="border-b border-[#f0f1f3] last:border-0 hover:bg-[#fafbfc] transition-colors">
-                    <td className="py-2.5 px-3 font-semibold text-[#111318] capitalize">{row.sport}</td>
-                    <td className="py-2.5 px-3 font-mono text-[#3c4149]">{row.bets_7d}</td>
-                    <td className="py-2.5 px-3 font-mono text-[#3c4149]">{row.bets_30d}</td>
+                  <tr key={row.sport} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-surface)] transition-colors">
+                    <td className="py-2.5 px-3 font-semibold text-[var(--text-primary)] capitalize">{row.sport}</td>
+                    <td className="py-2.5 px-3 font-mono text-[var(--text-secondary)]">{row.bets_7d}</td>
+                    <td className="py-2.5 px-3 font-mono text-[var(--text-secondary)]">{row.bets_30d}</td>
                     <td className="py-2.5 px-3 font-mono font-bold" style={{ color: row.roi_pct == null ? "var(--text-muted)" : row.roi_pct >= 0 ? "var(--green)" : "var(--red)" }}>
                       {row.roi_pct != null ? `${row.roi_pct >= 0 ? "+" : ""}${row.roi_pct.toFixed(1)}%` : "—"}
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-[#3c4149]">
+                    <td className="py-2.5 px-3 font-mono text-[var(--text-secondary)]">
                       {row.avg_clv != null ? `${row.avg_clv >= 0 ? "+" : ""}${(row.avg_clv * 100).toFixed(1)}%` : "—"}
                     </td>
                     <td className="py-2.5 px-3">
                       <div className="flex items-center gap-1.5">
-                        <Users size={11} className="text-[#8a919e]" />
-                        <span className="font-mono text-[#3c4149]">{row.active_users}</span>
+                        <Users size={11} className="text-[var(--text-muted)]" />
+                        <span className="font-mono text-[var(--text-secondary)]">{row.active_users}</span>
                       </div>
                     </td>
                   </tr>
@@ -501,26 +503,26 @@ function AdminDashboard() {
         icon={<Users size={14} className="text-[#3b5bdb]" />}
         action={
           users.length > 0 ? (
-            <span className="font-mono text-[11px] text-[#8a919e]">{users.length} compte{users.length > 1 ? "s" : ""}</span>
+            <span className="font-mono text-[11px] text-[var(--text-muted)]">{users.length} compte{users.length > 1 ? "s" : ""}</span>
           ) : undefined
         }
       >
         {users.length === 0 ? (
-          <p className="text-[12px] text-[#b0b7c3] text-center py-4">Aucun utilisateur</p>
+          <p className="text-[12px] text-[var(--text-muted2)] text-center py-4">Aucun utilisateur</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-[12.5px]">
               <thead>
-                <tr className="border-b border-[#e3e6eb]">
+                <tr className="border-b border-[var(--border-color)]">
                   {["Email", "Tier", "Paris", "Settled", "ROI", "P&L", "Sports", "Derniere activite", "Inscription"].map((h) => (
-                    <th key={h} className="text-left py-2 px-3 text-[11px] font-semibold text-[#8a919e] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    <th key={h} className="text-left py-2 px-3 text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <tr key={u.id} className="border-b border-[#f0f1f3] last:border-0 hover:bg-[#fafbfc] transition-colors">
-                    <td className="py-2.5 px-3 text-[#111318] font-medium">
+                  <tr key={u.id} className="border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-surface)] transition-colors">
+                    <td className="py-2.5 px-3 text-[var(--text-primary)] font-medium">
                       <div className="flex items-center gap-1.5">
                         {u.email}
                         {u.is_admin && (
@@ -532,13 +534,13 @@ function AdminDashboard() {
                       <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${
                         u.tier === "premium" ? "bg-[#7c3aed]/10 text-[#7c3aed]" :
                         u.tier === "pro" ? "bg-[#3b5bdb]/10 text-[#3b5bdb]" :
-                        "bg-[#f4f5f7] text-[#8a919e]"
+                        "bg-[var(--bg-surface)] text-[var(--text-muted)]"
                       }`}>
                         {u.tier}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-[#3c4149]">{u.total_bets}</td>
-                    <td className="py-2.5 px-3 font-mono text-[#3c4149]">{u.settled_bets}</td>
+                    <td className="py-2.5 px-3 font-mono text-[var(--text-secondary)]">{u.total_bets}</td>
+                    <td className="py-2.5 px-3 font-mono text-[var(--text-secondary)]">{u.settled_bets}</td>
                     <td className="py-2.5 px-3 font-mono font-bold" style={{
                       color: u.roi_pct == null ? "var(--text-muted)" : u.roi_pct >= 0 ? "var(--green)" : "var(--red)"
                     }}>
@@ -549,13 +551,13 @@ function AdminDashboard() {
                     }}>
                       {u.pnl !== 0 ? `${u.pnl >= 0 ? "+" : ""}${u.pnl.toFixed(2)}` : "—"}
                     </td>
-                    <td className="py-2.5 px-3 text-[#3c4149]">
+                    <td className="py-2.5 px-3 text-[var(--text-secondary)]">
                       {u.favorite_sports.length > 0 ? u.favorite_sports.map((s) => (
-                        <span key={s} className="inline-block px-1.5 py-0.5 rounded text-[9.5px] font-medium bg-[#f4f5f7] text-[#3c4149] mr-1 capitalize">{s}</span>
+                        <span key={s} className="inline-block px-1.5 py-0.5 rounded text-[9.5px] font-medium bg-[var(--bg-surface)] text-[var(--text-secondary)] mr-1 capitalize">{s}</span>
                       )) : "—"}
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-[11px] text-[#8a919e]">{fmtTs(u.last_bet_at)}</td>
-                    <td className="py-2.5 px-3 font-mono text-[11px] text-[#8a919e]">{fmtTs(u.created_at)}</td>
+                    <td className="py-2.5 px-3 font-mono text-[11px] text-[var(--text-muted)]">{fmtTs(u.last_bet_at)}</td>
+                    <td className="py-2.5 px-3 font-mono text-[11px] text-[var(--text-muted)]">{fmtTs(u.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -576,10 +578,10 @@ function AdminDashboard() {
                 { label: "Utilisateurs actifs", value: String(aiStats.active_ai_users), sub: "7 derniers jours", color: "#12b76a" },
                 { label: "Moy. msg/conv", value: String(aiStats.avg_msgs_per_conv), sub: `${aiStats.user_messages} user / ${aiStats.assistant_messages} IA`, color: "#f79009" },
               ].map((kpi) => (
-                <div key={kpi.label} className="flex flex-col gap-1 p-3 rounded-xl border border-[#e3e6eb] bg-[#fafbfc]">
-                  <span className="text-[10.5px] font-semibold text-[#8a919e] uppercase tracking-wide">{kpi.label}</span>
+                <div key={kpi.label} className="flex flex-col gap-1 p-3 rounded-xl border border-[var(--border-color)]" style={{ background: "var(--bg-surface)" }}>
+                  <span className="text-[10.5px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">{kpi.label}</span>
                   <span className="text-[22px] font-extrabold font-mono" style={{ color: kpi.color }}>{kpi.value}</span>
-                  <span className="text-[10.5px] text-[#b0b7c3]">{kpi.sub}</span>
+                  <span className="text-[10.5px] text-[var(--text-muted2)]">{kpi.sub}</span>
                 </div>
               ))}
             </div>
@@ -587,15 +589,15 @@ function AdminDashboard() {
             {/* Per-user usage today */}
             {aiStats.per_user_usage.length > 0 && (
               <div>
-                <p className="text-[11px] font-semibold text-[#8a919e] uppercase tracking-wide mb-2">Usage quotidien par utilisateur</p>
+                <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">Usage quotidien par utilisateur</p>
                 <div className="flex flex-col gap-1.5">
                   {aiStats.per_user_usage.map((u) => (
-                    <div key={u.user_id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#fafbfc] border border-[#e3e6eb]">
-                      <span className="text-[12px] text-[#111318] font-medium flex-1 min-w-0 truncate">{u.email}</span>
+                    <div key={u.user_id} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-[var(--border-color)]" style={{ background: "var(--bg-surface)" }}>
+                      <span className="text-[12px] text-[var(--text-primary)] font-medium flex-1 min-w-0 truncate">{u.email}</span>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                         u.tier === "premium" ? "bg-[#7c3aed]/10 text-[#7c3aed]" :
                         u.tier === "pro" ? "bg-[#3b5bdb]/10 text-[#3b5bdb]" :
-                        "bg-[#f4f5f7] text-[#8a919e]"
+                        "bg-[var(--bg-surface)] text-[var(--text-muted)]"
                       }`}>
                         {u.tier}
                       </span>
@@ -607,7 +609,7 @@ function AdminDashboard() {
             )}
           </div>
         ) : (
-          <p className="text-[12px] text-[#b0b7c3] text-center py-4">Donnees IA indisponibles</p>
+          <p className="text-[12px] text-[var(--text-muted2)] text-center py-4">Donnees IA indisponibles</p>
         )}
       </SectionCard>
 
@@ -633,8 +635,8 @@ function AdminDashboard() {
                 { label: "Premium", value: String(stripeStats.subscribers.premium), color: "#7c3aed" },
                 { label: "Free", value: String(stripeStats.subscribers.free), color: "#8a919e" },
               ].map((kpi) => (
-                <div key={kpi.label} className="flex flex-col gap-1 p-3 rounded-xl border border-[#e3e6eb] bg-[#fafbfc]">
-                  <span className="text-[10.5px] font-semibold text-[#8a919e] uppercase tracking-wide">{kpi.label}</span>
+                <div key={kpi.label} className="flex flex-col gap-1 p-3 rounded-xl border border-[var(--border-color)]" style={{ background: "var(--bg-surface)" }}>
+                  <span className="text-[10.5px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">{kpi.label}</span>
                   <span className="text-[22px] font-extrabold font-mono" style={{ color: kpi.color }}>{kpi.value}</span>
                 </div>
               ))}
@@ -642,16 +644,16 @@ function AdminDashboard() {
 
             {/* Config status */}
             <div>
-              <p className="text-[11px] font-semibold text-[#8a919e] uppercase tracking-wide mb-2">Configuration</p>
+              <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-2">Configuration</p>
               <div className="flex items-center gap-3 flex-wrap">
                 {[
                   { label: "Cle secrete", ok: stripeStats.config.has_secret_key },
                   { label: "Webhook secret", ok: stripeStats.config.has_webhook_secret },
                   { label: "Price IDs", ok: stripeStats.config.has_price_ids },
                 ].map((c) => (
-                  <div key={c.label} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e3e6eb] bg-[#fafbfc]">
+                  <div key={c.label} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border-color)]" style={{ background: "var(--bg-surface)" }}>
                     <StatusDot ok={c.ok} />
-                    <span className="text-[11.5px] font-medium text-[#3c4149]">{c.label}</span>
+                    <span className="text-[11.5px] font-medium text-[var(--text-secondary)]">{c.label}</span>
                   </div>
                 ))}
               </div>
@@ -665,21 +667,21 @@ function AdminDashboard() {
                 </p>
                 <div className="flex flex-col gap-1.5 max-h-[250px] overflow-y-auto rounded-lg border border-[#f04438]/20 bg-[#f04438]/5 p-3">
                   {stripeStats.errors_24h.map((err, i) => (
-                    <div key={i} className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-white/80 border border-[#e3e6eb]">
+                    <div key={i} className="flex items-start gap-2.5 px-3 py-2 rounded-lg bg-[var(--bg-card)]/80 border border-[var(--border-color)]">
                       <XCircle size={13} className="text-[#f04438] shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-[#f04438]/10 text-[#f04438]">
                             {err.type}
                           </span>
-                          <span className="font-mono text-[10px] text-[#8a919e]">
+                          <span className="font-mono text-[10px] text-[var(--text-muted)]">
                             {fmtTs(err.timestamp)}
                           </span>
                           {err.user_id && (
-                            <span className="text-[10px] text-[#8a919e]">User #{err.user_id}</span>
+                            <span className="text-[10px] text-[var(--text-muted)]">User #{err.user_id}</span>
                           )}
                         </div>
-                        <p className="text-[11.5px] text-[#3c4149] font-mono break-all leading-snug">{err.detail}</p>
+                        <p className="text-[11.5px] text-[var(--text-secondary)] font-mono break-all leading-snug">{err.detail}</p>
                       </div>
                     </div>
                   ))}
@@ -693,7 +695,7 @@ function AdminDashboard() {
             )}
           </div>
         ) : (
-          <p className="text-[12px] text-[#b0b7c3] text-center py-4">Donnees Stripe indisponibles</p>
+          <p className="text-[12px] text-[var(--text-muted2)] text-center py-4">Donnees Stripe indisponibles</p>
         )}
       </SectionCard>
 
@@ -750,16 +752,16 @@ function AdminDashboard() {
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11.5px] font-semibold border transition-all cursor-pointer"
                           style={{
                             background: isActive ? `${color}12` : "transparent",
-                            borderColor: isActive ? `${color}33` : "#e3e6eb",
-                            color: isActive ? color : "#8a919e",
+                            borderColor: isActive ? `${color}33` : "var(--border-color)",
+                            color: isActive ? color : "var(--text-muted)",
                           }}
                         >
                           {f.label}
                           <span
                             className="px-1.5 py-0.5 rounded-full text-[9.5px] font-bold"
                             style={{
-                              background: isActive ? `${color}20` : "#f4f5f7",
-                              color: isActive ? color : "#8a919e",
+                              background: isActive ? `${color}20` : "var(--bg-surface)",
+                              color: isActive ? color : "var(--text-muted)",
                             }}
                           >
                             {f.count}
@@ -776,8 +778,8 @@ function AdminDashboard() {
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer"
                       style={{
                         background: showUnreadOnly ? "#3b5bdb12" : "transparent",
-                        borderColor: showUnreadOnly ? "#3b5bdb33" : "#e3e6eb",
-                        color: showUnreadOnly ? "#3b5bdb" : "#8a919e",
+                        borderColor: showUnreadOnly ? "#3b5bdb33" : "var(--border-color)",
+                        color: showUnreadOnly ? "#3b5bdb" : "var(--text-muted)",
                       }}
                     >
                       {showUnreadOnly ? <EyeOff size={12} /> : <Eye size={12} />}
@@ -788,7 +790,7 @@ function AdminDashboard() {
                     {unreadCount > 0 && (
                       <button
                         onClick={markAllAlertsRead}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-[#e3e6eb] text-[#8a919e] hover:text-[#3b5bdb] hover:border-[#3b5bdb33] transition-all cursor-pointer bg-transparent"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[#3b5bdb] hover:border-[#3b5bdb33] transition-all cursor-pointer bg-transparent"
                       >
                         <CheckCheck size={12} />
                         Tout marquer lu
@@ -799,7 +801,7 @@ function AdminDashboard() {
 
                 {/* Alert list */}
                 {filteredAlerts.length === 0 ? (
-                  <div className="flex items-center gap-2.5 py-4 text-[12.5px] text-[#8a919e] justify-center">
+                  <div className="flex items-center gap-2.5 py-4 text-[12.5px] text-[var(--text-muted)] justify-center">
                     <CheckCircle size={15} />
                     Aucune alerte pour ce filtre
                   </div>
@@ -815,13 +817,13 @@ function AdminDashboard() {
                           className="flex items-start gap-3 p-3 rounded-xl border transition-all"
                           style={{
                             background: isRead ? "var(--bg-surface)" : cfg.bg,
-                            borderColor: isRead ? "#e3e6eb" : `${cfg.text}22`,
+                            borderColor: isRead ? "var(--border-color)" : `${cfg.text}22`,
                             opacity: isRead ? 0.6 : 1,
                           }}
                         >
                           {/* Unread dot */}
                           <div className="flex flex-col items-center gap-1.5 shrink-0 mt-0.5">
-                            <Icon size={14} style={{ color: isRead ? "#b0b7c3" : cfg.text }} />
+                            <Icon size={14} style={{ color: isRead ? "var(--text-muted2)" : cfg.text }} />
                             {!isRead && (
                               <span className="w-2 h-2 rounded-full bg-[#3b5bdb] shrink-0" />
                             )}
@@ -831,32 +833,32 @@ function AdminDashboard() {
                               <span
                                 className="text-[10px] font-bold px-1.5 py-0.5 rounded"
                                 style={{
-                                  background: isRead ? "#f4f5f7" : cfg.bg,
-                                  color: isRead ? "#8a919e" : cfg.text,
-                                  border: `1px solid ${isRead ? "#e3e6eb" : cfg.text + "33"}`,
+                                  background: isRead ? "var(--bg-surface)" : cfg.bg,
+                                  color: isRead ? "var(--text-muted)" : cfg.text,
+                                  border: `1px solid ${isRead ? "var(--border-color)" : cfg.text + "33"}`,
                                 }}
                               >
                                 {cfg.label}
                               </span>
                               {alert.sport && (
-                                <span className="text-[10px] text-[#8a919e] capitalize">{alert.sport}</span>
+                                <span className="text-[10px] text-[var(--text-muted)] capitalize">{alert.sport}</span>
                               )}
-                              <span className="text-[10px] text-[#b0b7c3] ml-auto shrink-0">{fmtTs(alert.timestamp)}</span>
+                              <span className="text-[10px] text-[var(--text-muted2)] ml-auto shrink-0">{fmtTs(alert.timestamp)}</span>
                             </div>
-                            <p className="text-[12px] leading-snug" style={{ color: isRead ? "#8a919e" : "#3c4149" }}>
+                            <p className="text-[12px] leading-snug" style={{ color: isRead ? "var(--text-muted)" : "var(--text-secondary)" }}>
                               {alert.message}
                             </p>
                           </div>
                           {/* Toggle read/unread button */}
                           <button
                             onClick={() => toggleAlertRead(alert.id)}
-                            className="shrink-0 mt-0.5 p-1.5 rounded-lg border border-transparent hover:border-[#e3e6eb] hover:bg-[#f4f5f7] transition-all cursor-pointer bg-transparent"
+                            className="shrink-0 mt-0.5 p-1.5 rounded-lg border border-transparent hover:border-[var(--border-color)] hover:bg-[var(--bg-surface)] transition-all cursor-pointer bg-transparent"
                             title={isRead ? "Marquer non lu" : "Marquer lu"}
                           >
                             {isRead ? (
-                              <EyeOff size={12} className="text-[#b0b7c3]" />
+                              <EyeOff size={12} className="text-[var(--text-muted2)]" />
                             ) : (
-                              <Eye size={12} className="text-[#8a919e]" />
+                              <Eye size={12} className="text-[var(--text-muted)]" />
                             )}
                           </button>
                         </div>
@@ -888,7 +890,7 @@ function AdminDashboard() {
         >
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[12px] font-semibold text-[#3c4149]">Emails envoyes aujourd'hui</span>
+              <span className="text-[12px] font-semibold text-[var(--text-secondary)]">Emails envoyes aujourd'hui</span>
               <span className="font-mono text-[13px] font-bold" style={{
                 color: system.email_quota.used_today >= system.email_quota.limit * 0.95 ? "var(--red)"
                   : system.email_quota.used_today >= system.email_quota.limit * 0.8 ? "var(--amber)"
@@ -897,7 +899,7 @@ function AdminDashboard() {
                 {system.email_quota.used_today} / {system.email_quota.limit}
               </span>
             </div>
-            <div className="h-2.5 bg-[#f4f5f7] rounded-full overflow-hidden">
+            <div className="h-2.5 bg-[var(--bg-surface)] rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-500"
                 style={{
@@ -908,7 +910,7 @@ function AdminDashboard() {
                 }}
               />
             </div>
-            <div className="text-[10.5px] text-[#8a919e]">
+            <div className="text-[10.5px] text-[var(--text-muted)]">
               {Math.round((system.email_quota.used_today / system.email_quota.limit) * 100)}% utilise — Resend free tier (100/jour)
             </div>
           </div>
@@ -921,7 +923,7 @@ function AdminDashboard() {
         icon={<XCircle size={14} className="text-[#f04438]" />}
         action={
           errors.length > 0 ? (
-            <span className="font-mono text-[11px] text-[#8a919e]">{errors.length} entree{errors.length > 1 ? "s" : ""}</span>
+            <span className="font-mono text-[11px] text-[var(--text-muted)]">{errors.length} entree{errors.length > 1 ? "s" : ""}</span>
           ) : undefined
         }
       >
@@ -932,27 +934,27 @@ function AdminDashboard() {
           </div>
         ) : (
           <div className="flex flex-col gap-0">
-            <div className="max-h-[340px] overflow-y-auto rounded-lg border border-[#e3e6eb] bg-[#fafbfc]">
+            <div className="max-h-[340px] overflow-y-auto rounded-lg border border-[var(--border-color)]" style={{ background: "var(--bg-surface)" }}>
               {visibleErrors.map((err, i) => (
                 <div
                   key={i}
-                  className="flex gap-3 px-4 py-2.5 border-b border-[#f0f1f3] last:border-0 hover:bg-[#f4f5f7] transition-colors"
+                  className="flex gap-3 px-4 py-2.5 border-b border-[var(--border-light)] last:border-0 hover:bg-[var(--bg-elevated)] transition-colors"
                 >
                   <div className="shrink-0 mt-0.5">
                     <XCircle size={12} className="text-[#f04438] opacity-60" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-mono text-[10.5px] text-[#8a919e]">{fmtTs(err.timestamp)}</span>
+                      <span className="font-mono text-[10.5px] text-[var(--text-muted)]">{fmtTs(err.timestamp)}</span>
                       {err.sport && (
                         <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-[rgba(59,91,219,0.08)] text-[#3b5bdb] capitalize">{err.sport}</span>
                       )}
                     </div>
-                    <p className="text-[11.5px] text-[#3c4149] leading-snug font-mono break-all">{err.message}</p>
+                    <p className="text-[11.5px] text-[var(--text-secondary)] leading-snug font-mono break-all">{err.message}</p>
                     {err.traceback && (
                       <details className="mt-1">
-                        <summary className="text-[10px] text-[#8a919e] cursor-pointer hover:text-[#3c4149]">Traceback</summary>
-                        <pre className="text-[9.5px] text-[#8a919e] mt-1 overflow-x-auto whitespace-pre-wrap leading-relaxed">{err.traceback}</pre>
+                        <summary className="text-[10px] text-[var(--text-muted)] cursor-pointer hover:text-[var(--text-secondary)]">Traceback</summary>
+                        <pre className="text-[9.5px] text-[var(--text-muted)] mt-1 overflow-x-auto whitespace-pre-wrap leading-relaxed">{err.traceback}</pre>
                       </details>
                     )}
                   </div>

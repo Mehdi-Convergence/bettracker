@@ -46,8 +46,8 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5">
-      <h2 className="text-sm font-semibold text-slate-700 mb-3">{title}</h2>
+    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)] p-5">
+      <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-3">{title}</h2>
       {children}
     </div>
   );
@@ -70,13 +70,13 @@ interface BreakdownTableProps {
 
 function BreakdownTable({ rows, labelHeader }: BreakdownTableProps) {
   if (rows.length === 0) {
-    return <p className="text-sm text-slate-400 text-center py-6">Aucune donnée</p>;
+    return <p className="text-sm text-[var(--text-muted)] text-center py-6">Aucune donnée</p>;
   }
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs text-slate-400 border-b border-slate-100">
+          <tr className="text-left text-xs text-[var(--text-muted)] border-b border-[var(--border-color)]">
             <th className="pb-2 font-medium">{labelHeader}</th>
             <th className="pb-2 font-medium text-right">Paris</th>
             <th className="pb-2 font-medium text-right">Gagnés</th>
@@ -87,9 +87,9 @@ function BreakdownTable({ rows, labelHeader }: BreakdownTableProps) {
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-              <td className="py-2 font-medium text-slate-700 max-w-[160px] truncate">{row.label}</td>
-              <td className="py-2 text-right text-slate-600 tabular-nums">{row.total_bets}</td>
+            <tr key={i} className="border-b border-[var(--border-light)] hover:bg-[var(--bg-surface)] transition-colors">
+              <td className="py-2 font-medium text-[var(--text-secondary)] max-w-[160px] truncate">{row.label}</td>
+              <td className="py-2 text-right text-[var(--text-secondary)] tabular-nums">{row.total_bets}</td>
               <td className="py-2 text-right text-emerald-600 tabular-nums">{row.won}</td>
               <td className="py-2 text-right text-red-500 tabular-nums">{row.lost}</td>
               <td className="py-2 text-right"><RoiCell value={row.roi_pct} /></td>
@@ -118,15 +118,18 @@ export default function Analytics() {
   }, [period]);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     Promise.all([
       getPortfolioStats(fromDate, toDate).catch(() => null),
       getPortfolioHistory(fromDate, toDate).catch(() => []),
     ]).then(([s, h]) => {
+      if (cancelled) return;
       setStats(s as PortfolioStats | null);
       setHistory((h as PortfolioHistoryPoint[]) || []);
       setLoading(false);
     });
+    return () => { cancelled = true; };
   }, [fromDate, toDate]);
 
   /* ── derived data ── */
@@ -184,19 +187,19 @@ export default function Analytics() {
       {/* ── Header ── */}
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-[20px] font-extrabold tracking-tight text-[#111318]">Analytique</h1>
-          <p className="text-[12.5px] text-[#8a919e] mt-0.5">Performance historique detaillee</p>
+          <h1 className="text-[20px] font-extrabold tracking-tight text-[var(--text-primary)]">Analytique</h1>
+          <p className="text-[12.5px] text-[var(--text-muted)] mt-0.5">Performance historique detaillee</p>
         </div>
         {/* Period selector */}
-        <div className="flex gap-1 bg-[#f4f5f7] border border-[#e3e6eb] rounded-[9px] p-[3px]">
+        <div className="flex gap-1 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-[9px] p-[3px]">
           {PERIODS.map((p) => (
             <button
               key={p.key}
               onClick={() => setPeriod(p.key)}
               className={`px-3.5 py-[5px] rounded-[7px] text-[12px] font-medium cursor-pointer transition-all border-none whitespace-nowrap ${
                 period === p.key
-                  ? "bg-white text-[#111318] font-semibold shadow-[0_1px_3px_rgba(16,24,40,0.06)]"
-                  : "bg-transparent text-[#8a919e] hover:text-[#3c4149]"
+                  ? "bg-[var(--bg-card)] text-[var(--text-primary)] font-semibold shadow-[0_1px_3px_rgba(16,24,40,0.06)]"
+                  : "bg-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
               }`}
             >
               {p.label}
@@ -216,14 +219,14 @@ export default function Analytics() {
           {/* ── Section 1 : Evolution P&L ── */}
           <SectionCard title="Evolution P&L">
             {history.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-6">Aucune donnee sur cette periode</p>
+              <p className="text-sm text-[var(--text-muted)] text-center py-6">Aucune donnee sur cette periode</p>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={history} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 11, fill: "#94a3b8" }}
+                    tick={{ fontSize: 11, fill: "var(--text-muted)" }}
                     tickFormatter={fmtDate}
                     minTickGap={40}
                   />
@@ -234,7 +237,7 @@ export default function Analytics() {
                       return [`${value.toFixed(2)}€`, "P&L cumulatif"];
                     }}
                     labelFormatter={(d: unknown) => fmtDate(String(d))}
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-elevated)", color: "var(--text-primary)" }}
                   />
                   <Line
                     type="monotone"
@@ -252,7 +255,7 @@ export default function Analytics() {
           {/* ── Section 2 : ROI par sport ── */}
           <SectionCard title="ROI par sport">
             {sportRows.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-6">Aucune donnee</p>
+              <p className="text-sm text-[var(--text-muted)] text-center py-6">Aucune donnee</p>
             ) : (
               <ResponsiveContainer width="100%" height={Math.max(60, sportRows.length * 48)}>
                 <BarChart
@@ -262,13 +265,13 @@ export default function Analytics() {
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                   <XAxis type="number" tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => `${v}%`} />
-                  <YAxis dataKey="label" type="category" tick={{ fontSize: 12, fill: "#475569" }} width={80} />
+                  <YAxis dataKey="label" type="category" tick={{ fontSize: 12, fill: "var(--text-secondary)" }} width={80} />
                   <Tooltip
                     formatter={(value: number | undefined, _name: string | undefined, entry: { payload?: typeof sportRows[0] }) => {
                       if (value == null) return ["", "ROI"];
                       return [`${value.toFixed(2)}% (${entry.payload?.total_bets ?? 0} paris)`, "ROI"];
                     }}
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-elevated)", color: "var(--text-primary)" }}
                   />
                   <Bar dataKey="roi_pct" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 11, formatter: (v: unknown) => typeof v === "number" ? `${v.toFixed(1)}%` : "" }}>
                     {sportRows.map((entry, index) => (
@@ -293,19 +296,19 @@ export default function Analytics() {
           {/* ── Section 5 : Performance par marche ── */}
           <SectionCard title="Performance par marche">
             {marketChartData.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-6">Aucune donnee</p>
+              <p className="text-sm text-[var(--text-muted)] text-center py-6">Aucune donnee</p>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={marketChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="market" tick={{ fontSize: 12, fill: "#475569" }} />
+                  <XAxis dataKey="market" tick={{ fontSize: 12, fill: "var(--text-secondary)" }} />
                   <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => `${v}%`} />
                   <Tooltip
                     formatter={(value: number | undefined, _name: string | undefined, entry: { payload?: typeof marketChartData[0] }) => {
                       if (value == null) return ["", "ROI"];
                       return [`${value.toFixed(2)}% (${entry.payload?.total_bets ?? 0} paris)`, "ROI"];
                     }}
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-elevated)", color: "var(--text-primary)" }}
                   />
                   <Bar dataKey="roi_pct" radius={[4, 4, 0, 0]}>
                     {marketChartData.map((entry, index) => (

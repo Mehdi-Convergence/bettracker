@@ -43,13 +43,26 @@ class FootballFeatureBuilder:
         total = len(matches_sorted)
         log_interval = total // 20 if total > 20 else 1
 
+        # Track season changes for ELO decay
+        _current_season: str | None = None
+
         for idx, match in matches_sorted.iterrows():
             if progress and idx % log_interval == 0:
                 logger.info("  Processing match %d/%d (%d%%)", idx, total, idx * 100 // total)
 
             home = match["home_team"]
             away = match["away_team"]
-            league_season = f"{match['league']}_{match['season']}"
+            match_season = match.get("season")
+            league_season = f"{match['league']}_{match_season}"
+
+            # ELO season decay: regression-to-mean at each season transition.
+            # Applied BEFORE the first match of the new season is processed.
+            # Formula: new_rating = rating + 0.33 * (1500 - rating)
+            if match_season is not None and match_season != _current_season:
+                if _current_season is not None:
+                    self.elo.apply_season_decay()
+                    logger.debug("ELO decay applied: season %s -> %s", _current_season, match_season)
+                _current_season = match_season
 
             # Skip first matches (not enough history)
             if len(team_history[home]) < 3 or len(team_history[away]) < 3:
@@ -628,6 +641,13 @@ class FootballFeatureBuilder:
 
 
 # Feature columns used by the model (excluding metadata columns)
+#
+# IMPORTANT — features with NaN medians (always NaN in training data):
+#   - home_possession, away_possession : not available in football-data.co.uk CSVs
+#   - home_xg_avg_5, away_xg_avg_5, home_xg_diff_5, away_xg_diff_5,
+#     home_xg_overperformance, away_xg_overperformance : only available post-FBref enrichment
+# These features are kept in the list to preserve the trained model's feature
+# order. Remove them at the NEXT full re-training (run enrich_xg.py first for xG).
 FEATURE_COLUMNS = [
     "elo_diff", "home_elo", "away_elo",
     "home_form_3", "away_form_3",

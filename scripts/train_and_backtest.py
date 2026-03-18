@@ -16,6 +16,23 @@ from src.ml.football_model import FootballModel, MODEL_FEATURES, LABEL_MAP
 
 console = Console()
 
+# ---------------------------------------------------------------------------
+# Feature selection flag
+# ---------------------------------------------------------------------------
+# Set to True to exclude features that are always NaN in football-data.co.uk
+# CSVs (home_possession, away_possession). This produces a cleaner model and
+# avoids wasting a tree split budget on constant-NaN columns.
+#
+# IMPORTANT: switching this flag changes the feature set → the resulting model
+# is NOT compatible with the existing production model weights. Only enable
+# when doing a full re-training cycle and plan to deploy the new model.
+USE_CLEAN_FEATURES = False
+
+if USE_CLEAN_FEATURES:
+    from src.ml.football_model import MODEL_FEATURES_CLEAN as _FEATURES_OVERRIDE  # noqa: F401
+else:
+    _FEATURES_OVERRIDE = None  # Use FootballModel.select_features() as usual
+
 
 def main():
     features_path = Path("data/processed/football_features.parquet")
@@ -25,7 +42,11 @@ def main():
 
     console.print("[bold]Loading feature dataset...[/bold]")
     df = pd.read_parquet(features_path)
-    console.print(f"Loaded {len(df)} matches, {len(MODEL_FEATURES)} features")
+    n_feats = len(_FEATURES_OVERRIDE) if USE_CLEAN_FEATURES else len(MODEL_FEATURES)
+    feat_label = "clean features" if USE_CLEAN_FEATURES else "features"
+    console.print(f"Loaded {len(df)} matches, {n_feats} {feat_label}")
+    if USE_CLEAN_FEATURES:
+        console.print("[yellow]USE_CLEAN_FEATURES=True: home_possession + away_possession excluded[/yellow]")
     console.print(f"Seasons: {sorted(df['season'].unique())}")
     console.print(f"Target: H={sum(df['ftr']=='H')}, D={sum(df['ftr']=='D')}, A={sum(df['ftr']=='A')}")
 
@@ -35,6 +56,14 @@ def main():
     console.print("=" * 60)
 
     model = FootballModel()
+    # When USE_CLEAN_FEATURES is active, pre-set active_features so that
+    # walk_forward_train uses the clean list instead of auto-detecting via
+    # select_features(). The select_features() call inside walk_forward_train
+    # reads self.active_features only when it is already set.
+    if USE_CLEAN_FEATURES and _FEATURES_OVERRIDE is not None:
+        clean_feats = [f for f in _FEATURES_OVERRIDE if f in df.columns]
+        model.active_features = clean_feats
+        console.print(f"[yellow]Override: using {len(clean_feats)} clean features for walk-forward[/yellow]")
     results = model.walk_forward_train(df)
 
     console.print("\n[bold]Aggregated Walk-Forward Results:[/bold]")
@@ -121,17 +150,34 @@ def main():
     console.print("\n" + "=" * 60)
     console.print("[bold]PHASE 3: Production Model (train on ALL seasons)[/bold]")
     console.print("=" * 60)
-    X_all = df[MODEL_FEATURES].fillna(0).values
+
+    # Re-use the feature set determined during walk-forward (respects USE_CLEAN_FEATURES)
+    active_feats = model.active_features
+    X_all = df[active_feats].values
     y_all = df["ftr"].map(LABEL_MAP).values
     console.print(f"  Training on {len(X_all)} matches ({sorted(df['season'].unique())})")
-    model.train(X_all, y_all)
-    console.print("  [green]Done.[/green]")
+
+    # Reserve 20% for isotonic calibration (no shuffle: keep chronological order)
+    cal_start = int(len(X_all) * 0.80)
+    X_train_full = X_all[:cal_start]
+    y_train_full = y_all[:cal_start]
+    X_cal = X_all[cal_start:]
+    y_cal = y_all[cal_start:]
+    console.print(f"  Train: {len(X_train_full)}, Calibration: {len(X_cal)}")
+
+    model.train_with_calibration(X_train_full, y_train_full, X_cal, y_cal)
+    console.print("  [green]Done (calibrated).[/green]")
+
+    # Compute training medians for NaN imputation at inference time
+    import numpy as np
+    col_medians = np.nanmedian(X_train_full, axis=0).tolist()
 
     # --- Save model ---
     model_path = Path("models/football")
     model_path.mkdir(parents=True, exist_ok=True)
     model.save(model_path, {
-        "features": MODEL_FEATURES,
+        "features": active_feats,
+        "col_medians": col_medians,
         "results": results["average"],
         "trained_on": "all_seasons",
         "n_samples": len(X_all),

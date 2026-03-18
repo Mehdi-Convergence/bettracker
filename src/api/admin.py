@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from src.api.deps import require_admin
@@ -246,66 +246,82 @@ def get_sports_analytics(
     cutoff_7d = now - timedelta(days=7)
     cutoff_30d = now - timedelta(days=30)
 
+    # Single aggregated query for settled stats per sport
+    try:
+        sport_stats_rows = (
+            db.query(
+                Bet.sport,
+                func.sum(
+                    case((Bet.result.in_(["won", "lost"]), Bet.stake), else_=0)
+                ).label("total_stake"),
+                func.sum(
+                    case((Bet.result.in_(["won", "lost"]), Bet.profit_loss), else_=0)
+                ).label("total_pnl"),
+                func.avg(
+                    case((Bet.result.in_(["won", "lost"]), Bet.clv), else_=None)
+                ).label("avg_clv"),
+            )
+            .filter(Bet.is_backtest == False)  # noqa: E712
+            .group_by(Bet.sport)
+            .all()
+        )
+        settled_stats_map = {row.sport: row for row in sport_stats_rows}
+
+        # Aggregated query for bets_7d per sport
+        bets_7d_rows = (
+            db.query(
+                Bet.sport,
+                func.count(Bet.id).label("cnt"),
+            )
+            .filter(
+                Bet.is_backtest == False,  # noqa: E712
+                Bet.created_at >= cutoff_7d,
+            )
+            .group_by(Bet.sport)
+            .all()
+        )
+        bets_7d_map = {row.sport: row.cnt for row in bets_7d_rows}
+
+        # Aggregated query for bets_30d and active_users per sport
+        bets_30d_rows = (
+            db.query(
+                Bet.sport,
+                func.count(Bet.id).label("cnt"),
+                func.count(func.distinct(Bet.user_id)).label("active_users"),
+            )
+            .filter(
+                Bet.is_backtest == False,  # noqa: E712
+                Bet.created_at >= cutoff_30d,
+            )
+            .group_by(Bet.sport)
+            .all()
+        )
+        bets_30d_map = {row.sport: row for row in bets_30d_rows}
+
+    except Exception as exc:
+        logger.warning("analytics aggregation error: %s", exc)
+        settled_stats_map = {}
+        bets_7d_map = {}
+        bets_30d_map = {}
+
     analytics = []
     for sport in SPORTS:
-        try:
-            base_q = db.query(Bet).filter(
-                Bet.sport == sport,
-                Bet.is_backtest == False,  # noqa: E712
-            )
+        s = settled_stats_map.get(sport)
+        r30 = bets_30d_map.get(sport)
 
-            bets_7d = (
-                db.query(Bet)
-                .filter(
-                    Bet.sport == sport,
-                    Bet.is_backtest == False,  # noqa: E712
-                    Bet.created_at >= cutoff_7d,
-                )
-                .count()
-            )
-            bets_30d = (
-                db.query(Bet)
-                .filter(
-                    Bet.sport == sport,
-                    Bet.is_backtest == False,  # noqa: E712
-                    Bet.created_at >= cutoff_30d,
-                )
-                .count()
-            )
-
-            settled = base_q.filter(Bet.result.in_(["won", "lost"])).all()
-            staked = sum(b.stake for b in settled) if settled else 0.0
-            pnl = sum(b.profit_loss or 0.0 for b in settled) if settled else 0.0
-            avg_roi = round(pnl / staked * 100, 2) if staked > 0 else None
-
-            clv_values = [b.clv for b in settled if b.clv is not None]
-            avg_clv = round(sum(clv_values) / len(clv_values), 4) if clv_values else None
-
-            active_users = (
-                db.query(func.count(func.distinct(Bet.user_id)))
-                .filter(
-                    Bet.sport == sport,
-                    Bet.is_backtest == False,  # noqa: E712
-                    Bet.created_at >= cutoff_30d,
-                )
-                .scalar()
-                or 0
-            )
-
-        except Exception as exc:
-            logger.warning("analytics error for sport %s: %s", sport, exc)
-            bets_7d = bets_30d = 0
-            avg_roi = avg_clv = None
-            active_users = 0
+        staked = float(s.total_stake or 0.0) if s else 0.0
+        pnl = float(s.total_pnl or 0.0) if s else 0.0
+        avg_roi = round(pnl / staked * 100, 2) if staked > 0 else None
+        avg_clv = round(float(s.avg_clv), 4) if s and s.avg_clv is not None else None
 
         analytics.append(
             {
                 "sport": sport,
-                "bets_7d": bets_7d,
-                "bets_30d": bets_30d,
+                "bets_7d": bets_7d_map.get(sport, 0),
+                "bets_30d": r30.cnt if r30 else 0,
                 "roi_pct": avg_roi,
                 "avg_clv": avg_clv,
-                "active_users": active_users,
+                "active_users": r30.active_users if r30 else 0,
             }
         )
 
@@ -494,26 +510,67 @@ def get_users_details(
     users = db.query(User).all()
     results = []
 
+    # Single aggregated query for all user bet stats (replaces N+1)
+    bet_stats_rows = (
+        db.query(
+            Bet.user_id,
+            func.count(Bet.id).label("total_bets"),
+            func.sum(
+                case((Bet.result == "won", 1), else_=0)
+            ).label("won"),
+            func.sum(
+                case((Bet.result == "lost", 1), else_=0)
+            ).label("lost"),
+            func.sum(
+                case(
+                    (Bet.result.in_(["won", "lost"]), Bet.stake),
+                    else_=0,
+                )
+            ).label("settled_stake"),
+            func.sum(
+                case(
+                    (Bet.result.in_(["won", "lost"]), Bet.profit_loss),
+                    else_=0,
+                )
+            ).label("settled_pnl"),
+            func.max(Bet.created_at).label("last_bet_at"),
+        )
+        .filter(Bet.is_backtest == False)  # noqa: E712
+        .group_by(Bet.user_id)
+        .all()
+    )
+    stats_map = {row.user_id: row for row in bet_stats_rows}
+
+    # Aggregated query for sport counts per user (for favorite_sports)
+    sport_rows = (
+        db.query(
+            Bet.user_id,
+            Bet.sport,
+            func.count(Bet.id).label("cnt"),
+        )
+        .filter(Bet.is_backtest == False)  # noqa: E712
+        .group_by(Bet.user_id, Bet.sport)
+        .all()
+    )
+    # Build {user_id: [(sport, cnt), ...]} sorted by cnt desc
+    sports_by_user: dict[int, list[tuple[str, int]]] = {}
+    for row in sport_rows:
+        sports_by_user.setdefault(row.user_id, []).append((row.sport, row.cnt))
+    for uid in sports_by_user:
+        sports_by_user[uid].sort(key=lambda x: x[1], reverse=True)
+
     for u in users:
-        bets = db.query(Bet).filter(
-            Bet.user_id == u.id,
-            Bet.is_backtest == False,  # noqa: E712
-        ).all()
-
-        total_bets = len(bets)
-        settled = [b for b in bets if b.result in ("won", "lost")]
-        staked = sum(b.stake for b in settled) if settled else 0.0
-        pnl = sum(b.profit_loss or 0.0 for b in settled) if settled else 0.0
+        s = stats_map.get(u.id)
+        total_bets = s.total_bets if s else 0
+        won = int(s.won or 0) if s else 0
+        lost = int(s.lost or 0) if s else 0
+        settled_count = won + lost
+        staked = float(s.settled_stake or 0.0) if s else 0.0
+        pnl = float(s.settled_pnl or 0.0) if s else 0.0
         roi = round(pnl / staked * 100, 2) if staked > 0 else None
+        last_bet_at = s.last_bet_at if s else None
 
-        # Sports preferes
-        sport_counts: dict[str, int] = {}
-        for b in bets:
-            sport_counts[b.sport] = sport_counts.get(b.sport, 0) + 1
-        fav_sports = sorted(sport_counts.keys(), key=lambda s: sport_counts[s], reverse=True)[:3]
-
-        # Derniere activite
-        last_bet = max((b.created_at for b in bets), default=None)
+        fav_sports = [sport for sport, _ in sports_by_user.get(u.id, [])[:3]]
 
         results.append({
             "id": u.id,
@@ -521,11 +578,11 @@ def get_users_details(
             "tier": getattr(u, "tier", "free"),
             "is_admin": getattr(u, "is_admin", False),
             "total_bets": total_bets,
-            "settled_bets": len(settled),
+            "settled_bets": settled_count,
             "roi_pct": roi,
             "pnl": round(pnl, 2),
             "favorite_sports": fav_sports,
-            "last_bet_at": last_bet.isoformat() if last_bet else None,
+            "last_bet_at": last_bet_at.isoformat() if last_bet_at else None,
             "created_at": u.created_at.isoformat() if u.created_at else None,
         })
 

@@ -46,6 +46,17 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const BASE = "/api";
 
+export class ApiError extends Error {
+  status: number;
+  body: Record<string, unknown>;
+  constructor(message: string, status: number, body: Record<string, unknown>) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
 async function apiPost<T>(path: string, body: unknown, token?: string | null): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -57,7 +68,8 @@ async function apiPost<T>(path: string, body: unknown, token?: string | null): P
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(typeof err.detail === "string" ? err.detail : res.statusText);
+    const message = typeof err.detail === "string" ? err.detail : res.statusText;
+    throw new ApiError(message, res.status, err as Record<string, unknown>);
   }
   return res.json();
 }

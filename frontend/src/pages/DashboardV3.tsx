@@ -13,6 +13,8 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePreferences } from "@/contexts/PreferencesContext";
+import { getCurrencySymbol } from "@/utils/currency";
 import { useTour } from "@/hooks/useTour";
 import SpotlightTour from "@/components/SpotlightTour";
 import { dashboardTour } from "@/tours/index";
@@ -148,6 +150,8 @@ const DEFAULT_V3_WIDGETS: DashboardWidget[] = [
 export default function DashboardV3() {
   const { user } = useAuth();
   const { showTour, completeTour } = useTour("dashboard");
+  const { prefs: contextPrefs } = usePreferences();
+  const currencySymbol = getCurrencySymbol(contextPrefs.currency);
   const firstName = user?.display_name?.split(" ")[0] || "Bettor";
 
   const [period, setPeriod] = useState<string>("30d");
@@ -181,6 +185,7 @@ export default function DashboardV3() {
 
   /* ── Data + presets loading ── */
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     Promise.all([
       getPortfolioStats(fromDate, toDate).catch(() => null),
@@ -191,6 +196,7 @@ export default function DashboardV3() {
       listDashboardPresets().catch(() => null),
       getWidgetData().catch(() => null),
     ]).then(([s, h, bets, sum, p, presetsData, wd]) => {
+      if (cancelled) return;
       setStats(s as PortfolioStats | null);
       setHistory((h as HistoryPoint[]) || []);
       setRecentBets(((bets as Bet[]) || []).slice(0, 20));
@@ -215,6 +221,7 @@ export default function DashboardV3() {
       } else {
         createDashboardPreset({ name: "Mon Dashboard", widgets: DEFAULT_V3_WIDGETS as never[] })
           .then((created) => {
+            if (cancelled) return;
             setPresets([{ id: created.id, name: created.name }]);
             setActivePresetId(created.id);
             setDefaultPresetId(created.id);
@@ -224,6 +231,7 @@ export default function DashboardV3() {
 
       setLoading(false);
     });
+    return () => { cancelled = true; };
   }, [fromDate, toDate]);
 
   /* ── Derived stats ── */
@@ -499,7 +507,7 @@ export default function DashboardV3() {
             <div className="w-full h-full rounded-xl px-3 py-2 shadow-[0_1px_3px_rgba(16,24,40,0.06)] flex flex-col items-center justify-center text-center overflow-hidden" style={{ background: "#fff", border: "1px solid #e3e6eb" }}>
               <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide truncate max-w-full">Bankroll initiale</span>
               <span className="text-[clamp(14px,2vw,20px)] font-extrabold tracking-tight text-[#111318] leading-none mt-1 truncate max-w-full">
-                {(prefs?.initial_bankroll ?? 0).toLocaleString("fr-FR")}€
+                {(prefs?.initial_bankroll ?? 0).toLocaleString("fr-FR")}{currencySymbol}
               </span>
               <span className="text-[10px] text-[#b0b7c3] mt-0.5">mise de depart</span>
             </div>
@@ -515,7 +523,7 @@ export default function DashboardV3() {
             <div className="w-full h-full rounded-xl px-3 py-2 shadow-[0_1px_3px_rgba(16,24,40,0.06)] flex flex-col items-center justify-center text-center overflow-hidden" style={{ background: "#fff", border: "1px solid #e3e6eb" }}>
               <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide truncate max-w-full">Solde actuel</span>
               <span className="text-[clamp(14px,2vw,20px)] font-extrabold tracking-tight leading-none mt-1 truncate max-w-full" style={{ color: pnlVal >= 0 ? "var(--green)" : "var(--red)" }}>
-                {currentBR.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                {currentBR.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{currencySymbol}
               </span>
               <span className="text-[10px] text-[#b0b7c3] mt-0.5 truncate max-w-full">
                 {pending > 0 ? `${pending} pari${pending > 1 ? "s" : ""} en cours` : "aucun pari en cours"}
@@ -534,7 +542,7 @@ export default function DashboardV3() {
             <div className="w-full h-full rounded-xl px-3 py-2 shadow-[0_1px_3px_rgba(16,24,40,0.06)] flex flex-col items-center justify-center text-center overflow-hidden" style={{ background: "#fff", border: "1px solid #e3e6eb" }}>
               <span className="text-[10.5px] font-medium text-[#8a919e] uppercase tracking-wide truncate max-w-full">Variation P&L</span>
               <span className="text-[clamp(14px,2vw,20px)] font-extrabold tracking-tight leading-none mt-1 truncate max-w-full" style={{ color: pnlPos ? "var(--green)" : "var(--red)" }}>
-                {pnlPos ? "+" : ""}{pnl.toFixed(2)}€
+                {pnlPos ? "+" : ""}{pnl.toFixed(2)}{currencySymbol}
               </span>
               <span className="text-[10px] text-[#b0b7c3] mt-0.5 truncate max-w-full">
                 {initBR > 0 ? `${pnlPos ? "+" : ""}${((pnl / initBR) * 100).toFixed(1)}% vs initial` : "—"}
@@ -555,7 +563,7 @@ export default function DashboardV3() {
         return loading ? (
           <div className="h-full bg-white border border-[#e3e6eb] rounded-xl p-[14px_16px] shadow-[0_1px_3px_rgba(16,24,40,0.06)] animate-pulse"><div className="h-3 w-16 bg-[#e3e6eb] rounded mb-3" /><div className="h-6 w-20 bg-[#e3e6eb] rounded" /></div>
         ) : (
-          <KPICard dataTour="kpi-staked" label={`Mise (${periodLabel})`} value={`${totalStaked.toLocaleString("fr-FR")}€`} icon={<DollarSign size={14} />} iconBg="var(--accent-bg)" iconColor="var(--accent)" delta={stakedDelta != null ? `${stakedDelta >= 0 ? "+" : ""}${Math.round(stakedDelta)}€ vs mois dernier` : undefined} deltaUp={stakedDelta != null ? stakedDelta >= 0 : undefined} />
+          <KPICard dataTour="kpi-staked" label={`Mise (${periodLabel})`} value={`${totalStaked.toLocaleString("fr-FR")}${currencySymbol}`} icon={<DollarSign size={14} />} iconBg="var(--accent-bg)" iconColor="var(--accent)" delta={stakedDelta != null ? `${stakedDelta >= 0 ? "+" : ""}${Math.round(stakedDelta)}${currencySymbol} vs mois dernier` : undefined} deltaUp={stakedDelta != null ? stakedDelta >= 0 : undefined} />
         );
 
       case "kpi-tickets":
@@ -581,7 +589,7 @@ export default function DashboardV3() {
               </div>
             </div>
             <div className="px-3 py-2 flex-1 flex items-center min-h-0">
-              <ROIChart data={history} />
+              <ROIChart data={history} currencySymbol={currencySymbol} />
             </div>
           </div>
         );
@@ -597,13 +605,13 @@ export default function DashboardV3() {
             <div className="px-4 pt-3 pb-2 flex-1 flex flex-col min-h-0 overflow-hidden">
               <div className="shrink-0 overflow-hidden">
                 <div className="text-[clamp(16px,2.5vw,26px)] font-extrabold tracking-tight leading-none truncate" style={{ color: (stats?.total_pnl ?? 0) >= 0 ? "var(--green)" : "var(--red)" }}>
-                  {(stats?.total_pnl ?? 0) >= 0 ? "+" : ""}{(stats?.total_pnl ?? 0).toFixed(2)}€
+                  {(stats?.total_pnl ?? 0) >= 0 ? "+" : ""}{(stats?.total_pnl ?? 0).toFixed(2)}{currencySymbol}
                 </div>
-                <div className="text-[11px] text-[#8a919e] mt-0.5 truncate">sur {totalStaked.toLocaleString("fr-FR")}€ misés</div>
+                <div className="text-[11px] text-[#8a919e] mt-0.5 truncate">sur {totalStaked.toLocaleString("fr-FR")}{currencySymbol} misés</div>
               </div>
               {history.length >= 2 && (
                 <div className="flex-1 min-h-0 mt-1">
-                  <PnLSparkline data={history} />
+                  <PnLSparkline data={history} currencySymbol={currencySymbol} />
                 </div>
               )}
             </div>
@@ -623,7 +631,7 @@ export default function DashboardV3() {
               {betGroups.length === 0 ? (
                 <div className="py-6 text-center text-[12px] text-[#b0b7c3]">Aucun ticket</div>
               ) : (
-                betGroups.map((group, i) => <TicketCard key={i} group={group} />)
+                betGroups.map((group, i) => <TicketCard key={i} group={group} currencySymbol={currencySymbol} />)
               )}
             </div>
           </div>
@@ -640,7 +648,7 @@ export default function DashboardV3() {
             </div>
             <div className="p-3 flex-1 flex items-center gap-3 min-w-0 min-h-0 overflow-hidden">
               <div className="flex-1 min-w-0 overflow-y-auto min-h-0">
-                <SportBarsCompact data={sportBreakdown} />
+                <SportBarsCompact data={sportBreakdown} currencySymbol={currencySymbol} />
               </div>
               <div className="shrink-0 min-h-0 flex items-center">
                 <DonutMini won={won} lost={lost} pending={pendingBets} total={totalBets} />
@@ -660,7 +668,7 @@ export default function DashboardV3() {
             <div className="p-3 flex-1 flex flex-col justify-center gap-1.5 min-h-0 overflow-y-auto">
               <StreakRow icon={<Flame size={13} className="text-[#12b76a]" />} label="Meilleure série" value={`${stats?.longest_winning_streak ?? 0} victoires`} color="var(--green)" />
               <StreakRow icon={<Flame size={13} className="text-[#f04438]" />} label="Pire série" value={`${stats?.longest_losing_streak ?? 0} défaites`} color="var(--red)" />
-              <StreakRow icon={<DollarSign size={13} className="text-[#3b5bdb]" />} label="P&L total" value={`${(stats?.total_pnl ?? 0) >= 0 ? "+" : ""}${(stats?.total_pnl ?? 0).toFixed(2)}€`} color={(stats?.total_pnl ?? 0) >= 0 ? "var(--green)" : "var(--red)"} />
+              <StreakRow icon={<DollarSign size={13} className="text-[#3b5bdb]" />} label="P&L total" value={`${(stats?.total_pnl ?? 0) >= 0 ? "+" : ""}${(stats?.total_pnl ?? 0).toFixed(2)}${currencySymbol}`} color={(stats?.total_pnl ?? 0) >= 0 ? "var(--green)" : "var(--red)"} />
               <StreakRow icon={<TrendingUp size={13} className="text-[#f79009]" />} label="Cote moyenne" value={recentBets.length > 0 ? `x${(recentBets.reduce((a, b) => a + b.odds_at_bet, 0) / recentBets.length).toFixed(2)}` : "—"} color="var(--text-secondary)" />
             </div>
           </div>
@@ -811,7 +819,7 @@ function KPICard({ label, value, valueColor, icon, iconBg, iconColor, delta, del
 }
 
 /* ── Ticket Card ── */
-function TicketCard({ group }: { group: BetGroup }) {
+function TicketCard({ group, currencySymbol }: { group: BetGroup; currencySymbol: string }) {
   const [expanded, setExpanded] = useState(false);
   const isCombo = group.type === "combo";
   const bet = group.bets[0];
@@ -892,10 +900,10 @@ function TicketCard({ group }: { group: BetGroup }) {
             </div>
           )}
           <div className={`flex items-center gap-3 ${!isCombo ? "w-full justify-between" : "ml-auto"}`}>
-            <span className="text-[10px] text-[#8a919e]">Mise <strong className="text-[#3c4149]">{group.stake.toFixed(0)}€</strong></span>
+            <span className="text-[10px] text-[#8a919e]">Mise <strong className="text-[#3c4149]">{group.stake.toFixed(0)}{currencySymbol}</strong></span>
             {group.gains != null && (
               <span className="text-[10px] text-[#8a919e]">Gains <strong style={{ color: group.gains > 0 ? "var(--green)" : "var(--red)" }}>
-                {group.gains > 0 ? `${group.gains.toFixed(2)}€` : "0€"}
+                {group.gains > 0 ? `${group.gains.toFixed(2)}${currencySymbol}` : `0${currencySymbol}`}
               </strong></span>
             )}
           </div>
@@ -906,7 +914,7 @@ function TicketCard({ group }: { group: BetGroup }) {
 }
 
 /* ── ROI Chart ── */
-function ROIChart({ data }: { data: HistoryPoint[] }) {
+function ROIChart({ data, currencySymbol }: { data: HistoryPoint[]; currencySymbol: string }) {
   const [hover, setHover] = useState<{ x: number; y: number; point: HistoryPoint } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -962,7 +970,7 @@ function ROIChart({ data }: { data: HistoryPoint[] }) {
           <div className="font-semibold">{fmtDate(hover.point.date)}</div>
           <div className="flex gap-2 mt-0.5">
             <span>ROI: <strong className={hover.point.roi_pct >= 0 ? "text-[#12b76a]" : "text-[#f04438]"}>{hover.point.roi_pct.toFixed(1)}%</strong></span>
-            <span>P&L: <strong className={hover.point.cumulative_pnl >= 0 ? "text-[#12b76a]" : "text-[#f04438]"}>{hover.point.cumulative_pnl >= 0 ? "+" : ""}{hover.point.cumulative_pnl.toFixed(0)}€</strong></span>
+            <span>P&L: <strong className={hover.point.cumulative_pnl >= 0 ? "text-[#12b76a]" : "text-[#f04438]"}>{hover.point.cumulative_pnl >= 0 ? "+" : ""}{hover.point.cumulative_pnl.toFixed(0)}{currencySymbol}</strong></span>
           </div>
         </div>
       )}
@@ -971,7 +979,7 @@ function ROIChart({ data }: { data: HistoryPoint[] }) {
 }
 
 /* ── P&L Sparkline ── */
-function PnLSparkline({ data }: { data: HistoryPoint[] }) {
+function PnLSparkline({ data, currencySymbol }: { data: HistoryPoint[]; currencySymbol: string }) {
   const W = 280, H = 120, padL = 35, padR = 6, padT = 8, padB = 18;
   const chartW = W - padL - padR, chartH = H - padT - padB;
   const vals = data.map((d) => d.cumulative_pnl);
@@ -1006,7 +1014,7 @@ function PnLSparkline({ data }: { data: HistoryPoint[] }) {
         </linearGradient>
       </defs>
       {yTicks.map((t) => <line key={t.val} x1={padL} y1={t.y} x2={W - padR} y2={t.y} stroke="#e3e6eb" strokeWidth="0.6" />)}
-      {yTicks.map((t) => <text key={`yl-${t.val}`} x={padL - 4} y={t.y + 3} textAnchor="end" className="text-[7.5px] fill-[#8a919e]">{t.val}€</text>)}
+      {yTicks.map((t) => <text key={`yl-${t.val}`} x={padL - 4} y={t.y + 3} textAnchor="end" className="text-[7.5px] fill-[#8a919e]">{t.val}{currencySymbol}</text>)}
       {xLabels.map((l, i) => <text key={i} x={l.x} y={H - 3} textAnchor="middle" className="text-[7.5px] fill-[#8a919e]">{l.label}</text>)}
       <path d={area} fill="url(#pnlFillV3)" />
       <path d={line} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
@@ -1016,7 +1024,7 @@ function PnLSparkline({ data }: { data: HistoryPoint[] }) {
 }
 
 /* ── Sport Bars Compact ── */
-function SportBarsCompact({ data }: { data: SportBreakdown[] }) {
+function SportBarsCompact({ data, currencySymbol }: { data: SportBreakdown[]; currencySymbol: string }) {
   if (data.length === 0) {
     return <div className="h-[80px] flex items-center justify-center text-[11px] text-[#b0b7c3]">Aucune donnée</div>;
   }
@@ -1040,7 +1048,7 @@ function SportBarsCompact({ data }: { data: SportBreakdown[] }) {
             <div className="h-[14px] bg-[#f4f5f7] rounded-[4px] overflow-hidden">
               <div className="h-full rounded-[4px]" style={{ width: `${barPct}%`, background: isNeg ? "#f04438" : color, opacity: 0.85 }} />
             </div>
-            <div className="text-[9px] text-[#8a919e] mt-0.5">{s.won}W-{s.lost}L · {s.pnl >= 0 ? "+" : ""}{s.pnl.toFixed(0)}€</div>
+            <div className="text-[9px] text-[#8a919e] mt-0.5">{s.won}W-{s.lost}L · {s.pnl >= 0 ? "+" : ""}{s.pnl.toFixed(0)}{currencySymbol}</div>
           </div>
         );
       })}

@@ -57,13 +57,51 @@ class EloRatingSystem:
         self.ratings[home_team] = home_r + self.k * margin_mult * (result - expected_home)
         self.ratings[away_team] = away_r + self.k * margin_mult * ((1 - result) - (1 - expected_home))
 
-    def build_from_matches(self, matches_df: pd.DataFrame):
-        """Process all historical matches chronologically to build ratings."""
+    def apply_season_decay(self, decay: float = 0.33):
+        """Regression-to-mean between seasons.
+
+        Each rating is pulled 33% toward 1500 to reflect squad changes,
+        transfers, and coaching changes over the summer break.
+
+        Formula: new_rating = rating + decay * (1500 - rating)
+
+        This is applied once per season transition, BEFORE the first match
+        of the new season is processed.
+        """
+        for team in self.ratings:
+            self.ratings[team] = self.ratings[team] + decay * (self.initial - self.ratings[team])
+
+    def build_from_matches(self, matches_df: pd.DataFrame, apply_season_decay: bool = True):
+        """Process all historical matches chronologically to build ratings.
+
+        Parameters
+        ----------
+        matches_df:
+            DataFrame with at least columns: date, home_team, away_team,
+            ftr (H/D/A), fthg, ftag. If the column 'season' is present,
+            a regression-to-mean decay is applied at each season transition.
+        apply_season_decay:
+            When True (default), retract all ratings toward 1500 by 33%
+            at the start of each new season. Set to False to reproduce
+            the old behavior without decay.
+        """
         result_map = {"H": 1.0, "D": 0.5, "A": 0.0}
 
         matches_sorted = matches_df.sort_values("date").reset_index(drop=True)
 
+        has_season = "season" in matches_sorted.columns
+        current_season = None
+
         for _, match in matches_sorted.iterrows():
+            # Season decay: apply when season changes (football only)
+            if apply_season_decay and has_season:
+                match_season = match.get("season")
+                if match_season is not None and match_season != current_season:
+                    if current_season is not None:
+                        # New season detected — pull all ratings toward 1500
+                        self.apply_season_decay()
+                    current_season = match_season
+
             result = result_map.get(match["ftr"], 0.5)
             goal_diff = abs(int(match["fthg"]) - int(match["ftag"]))
             self.update(match["home_team"], match["away_team"], result, goal_diff)

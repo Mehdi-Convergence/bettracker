@@ -1,6 +1,6 @@
 """In-app notification model."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import ForeignKey, String, JSON
@@ -19,4 +19,4 @@ class Notification(Base):
     message: Mapped[str] = mapped_column(String(500))
     is_read: Mapped[bool] = mapped_column(default=False)
     metadata_json: Mapped[Optional[dict]] = mapped_column("metadata", JSON, nullable=True)
-    created_at: Mapped[Optional[datetime]] = mapped_column(default=datetime.utcnow)
+    created_at: Mapped[Optional[datetime]] = mapped_column(default=lambda: datetime.now(timezone.utc))
