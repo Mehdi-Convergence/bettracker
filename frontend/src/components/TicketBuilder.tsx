@@ -262,10 +262,10 @@ export default function TicketBuilder({
                       <span className="text-slate-900 font-medium text-[11px] truncate">{leg.away_team}</span>
                     </div>
                     <button
-                      onClick={() => onRemoveLeg(activeTicketIdx, leg.id)}
-                      className="text-slate-400 hover:text-red-500 shrink-0 p-0.5 rounded hover:bg-red-50 transition-colors"
+                      onClick={(e) => { e.stopPropagation(); onRemoveLeg(activeTicketIdx, leg.id); }}
+                      className="text-slate-400 hover:text-red-500 shrink-0 p-1.5 -m-1 rounded hover:bg-red-50 transition-colors touch-manipulation"
                     >
-                      <X size={14} />
+                      <X size={16} />
                     </button>
                   </div>
 
