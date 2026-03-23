@@ -35,12 +35,40 @@ def _load_pmu_models():
         return None, None
 
 
+def _collect_today_pmu():
+    """Collecte les courses PMU du jour si pas deja en base."""
+    try:
+        import datetime as _dt
+        from src.database import SessionLocal
+        from src.models.pmu_race import PMURace
+        from src.data.pmu_collector import PMUCollector
+
+        db = SessionLocal()
+        today = _dt.date.today()
+        existing = db.query(PMURace).filter(PMURace.race_date == today).count()
+        db.close()
+
+        if existing > 0:
+            logger.debug("PMU: %d courses deja en base pour %s — skip collect", existing, today)
+            return
+
+        logger.info("PMU: collecte du programme du jour %s...", today)
+        collector = PMUCollector(request_delay=1.0)
+        result = collector.collect_range(today, today)
+        logger.info("PMU: collecte terminee — %d courses, %d partants", result["total_races"], result["total_runners"])
+    except Exception as exc:
+        logger.error("PMU collect error: %s", exc)
+
+
 async def run_pmu_scan():
     """Run PMU scan — recupere le programme du jour et calcule les edges."""
     from src.services.probability_calculator import calculate_pmu
     from src.api.schemas import PMURaceCard, PMURunnerCard
 
     t0 = time.time()
+
+    # Collecte auto du programme du jour si pas en base
+    _collect_today_pmu()
 
     # Charger les modeles PMU si disponibles
     win_model, place_model = _load_pmu_models()

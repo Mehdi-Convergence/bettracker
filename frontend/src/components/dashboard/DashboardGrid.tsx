@@ -28,31 +28,83 @@ interface DashboardGridProps {
 }
 
 function getResponsiveCols(width: number): number {
-  if (width < 400) return 1;
-  if (width < 600) return 2;
-  if (width < 768) return 4;
+  if (width < 768) return 0; // mobile: use CSS layout
   if (width < 1024) return 6;
   return 12;
 }
 
-function adaptLayoutForCols(widgets: DashboardWidget[], cols: number): DashboardWidget[] {
-  if (cols >= 12) return widgets;
-  return widgets.map((w) => {
-    const clampedW = Math.min(w.w, cols);
-    let h = w.h;
-    // On single-column mobile, reduce tall widgets to avoid endless scrolling
-    if (cols <= 2) {
-      if (w.type === "activity-feed") h = Math.min(h, 6);
-      else if (w.type === "line-chart" || w.type === "bar-chart") h = Math.min(h, 4);
-      else if (w.h >= 3) h = Math.min(h, 2);
-    }
-    return {
-      ...w,
-      w: clampedW,
-      h,
-      x: Math.min(w.x, Math.max(0, cols - clampedW)),
-    };
-  });
+/* ── Mobile layout heights by widget type / id ── */
+const MOBILE_HEIGHTS: Record<string, string> = {
+  "campaign-banner": "auto",
+  "bankroll-initial": "80px",
+  "bankroll-current": "80px",
+  "bankroll-pnl": "80px",
+  "kpi-roi": "90px",
+  "kpi-staked": "90px",
+  "kpi-tickets": "90px",
+  "kpi-winrate": "90px",
+  "roi-chart": "200px",
+  "pnl-chart": "220px",
+  "recent-tickets": "300px",
+  "sport-breakdown": "200px",
+  "streaks": "180px",
+};
+
+/* ── Mobile: which widgets go side-by-side ── */
+const MOBILE_LAYOUT_ORDER: Array<string | [string, string]> = [
+  "campaign-banner",                          // full width
+  ["bankroll-initial", "bankroll-current"],    // side by side
+  "bankroll-pnl",                             // full width (P&L variation stands out)
+  ["kpi-roi", "kpi-winrate"],                 // side by side
+  ["kpi-staked", "kpi-tickets"],              // side by side
+  "roi-chart",                                // full width chart
+  "pnl-chart",                                // full width chart
+  "sport-breakdown",                          // full width
+  "streaks",                                  // full width
+  "recent-tickets",                           // full width (scrollable)
+];
+
+function MobileLayout({ widgets, renderWidget }: { widgets: DashboardWidget[]; renderWidget: (w: DashboardWidget) => React.ReactNode }) {
+  const widgetMap = new Map(widgets.map((w) => [w.id, w]));
+
+  return (
+    <div className="flex flex-col gap-2">
+      {MOBILE_LAYOUT_ORDER.map((entry, i) => {
+        if (typeof entry === "string") {
+          const w = widgetMap.get(entry);
+          if (!w) return null;
+          const h = MOBILE_HEIGHTS[entry] ?? "auto";
+          return (
+            <div key={i} style={{ height: h, minHeight: h === "auto" ? undefined : h }}>
+              <WidgetErrorBoundary widgetId={w.id} widgetType={w.type}>
+                {renderWidget(w)}
+              </WidgetErrorBoundary>
+            </div>
+          );
+        }
+        // Pair: side by side
+        const [leftId, rightId] = entry;
+        const left = widgetMap.get(leftId);
+        const right = widgetMap.get(rightId);
+        if (!left && !right) return null;
+        const h = MOBILE_HEIGHTS[leftId] ?? MOBILE_HEIGHTS[rightId] ?? "90px";
+        return (
+          <div key={i} className="grid grid-cols-2 gap-2" style={{ height: h, minHeight: h }}>
+            {left && (
+              <WidgetErrorBoundary widgetId={left.id} widgetType={left.type}>
+                {renderWidget(left)}
+              </WidgetErrorBoundary>
+            )}
+            {right && (
+              <WidgetErrorBoundary widgetId={right.id} widgetType={right.type}>
+                {renderWidget(right)}
+              </WidgetErrorBoundary>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export function DashboardGrid({
@@ -76,8 +128,7 @@ export function DashboardGrid({
   }, []);
 
   const cols = getResponsiveCols(containerWidth);
-  const isMobile = containerWidth < 768;
-  const adaptedWidgets = adaptLayoutForCols(widgets, cols);
+  const isMobile = cols === 0;
 
   const handleLayoutChange = useCallback(
     (newLayout: Layout) => {
@@ -94,6 +145,22 @@ export function DashboardGrid({
     [isEditMode, widgets, onLayoutChange]
   );
 
+  /* ── MOBILE: CSS-based layout ── */
+  if (isMobile) {
+    return (
+      <div className="dashboard-grid-container">
+        <MobileLayout widgets={widgets} renderWidget={renderWidget} />
+      </div>
+    );
+  }
+
+  /* ── DESKTOP / TABLET: react-grid-layout ── */
+  const adaptedWidgets = widgets.map((w) => ({
+    ...w,
+    w: Math.min(w.w, cols),
+    x: Math.min(w.x, Math.max(0, cols - Math.min(w.w, cols))),
+  }));
+
   return (
     <div className="dashboard-grid-container overflow-x-hidden">
       <GridLayout
@@ -108,25 +175,25 @@ export function DashboardGrid({
             h: w.h,
             minW: Math.min(def?.minSize.w ?? 2, cols),
             minH: def?.minSize.h ?? 2,
-            static: !isEditMode || isMobile,
+            static: !isEditMode,
           };
         })}
         gridConfig={{
           cols,
-          rowHeight: cols <= 2 ? 45 : isMobile ? 50 : 60,
-          margin: cols <= 2 ? [6, 6] as [number, number] : isMobile ? [8, 8] as [number, number] : [16, 16] as [number, number],
+          rowHeight: 60,
+          margin: [16, 16] as [number, number],
           containerPadding: [0, 0] as [number, number],
           maxRows: Infinity,
         }}
         width={containerWidth}
         dragConfig={{
-          enabled: isEditMode && !isMobile,
+          enabled: isEditMode,
           handle: ".widget-drag-handle",
           bounded: false,
           threshold: 3,
         }}
         resizeConfig={{
-          enabled: isEditMode && !isMobile,
+          enabled: isEditMode,
           handles: ["se"] as const,
         }}
         onLayoutChange={handleLayoutChange}
