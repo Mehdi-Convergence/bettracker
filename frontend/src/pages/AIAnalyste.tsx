@@ -179,11 +179,15 @@ function Sparkline({ data, color = "#12b76a", w = 120, h = 32 }: { data: number[
 
 function ContextPanel({
   context,
+  contextError,
+  onRetryContext,
   onSendMessage,
   ctxSettings,
   onCtxSettingsChange,
 }: {
   context: AIContext | null;
+  contextError?: boolean;
+  onRetryContext?: () => void;
   onSendMessage: (text: string) => void;
   ctxSettings: CtxSettings;
   onCtxSettingsChange: (s: CtxSettings, skipReload?: boolean) => void;
@@ -206,6 +210,13 @@ function ContextPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3">
+
+        {/* Context error */}
+        {contextError && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-[11px] text-red-600">
+            Impossible de charger le contexte. {onRetryContext && <button onClick={onRetryContext} className="underline font-semibold bg-transparent border-none text-red-600 cursor-pointer p-0">Reessayer</button>}
+          </div>
+        )}
 
         {/* ── QUOTA ── */}
         {rl && (
@@ -488,6 +499,7 @@ export default function AIAnalyste() {
   // Sidebar state
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [context, setContext] = useState<AIContext | null>(null);
+  const [contextError, setContextError] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [ctxSettings, setCtxSettings] = useState<CtxSettings>(loadCtxSettings);
@@ -541,6 +553,7 @@ export default function AIAnalyste() {
 
   async function loadContext(settings?: CtxSettings) {
     try {
+      setContextError(false);
       const s = settings || ctxSettings;
       const data = await getAIContext({
         period: s.period,
@@ -550,7 +563,7 @@ export default function AIAnalyste() {
       });
       setContext(data);
     } catch {
-      // silent
+      setContextError(true);
     }
   }
 
@@ -898,6 +911,8 @@ export default function AIAnalyste() {
         {/* ── CONTEXT PANEL (desktop) ── */}
         <ContextPanel
           context={context}
+          contextError={contextError}
+          onRetryContext={() => loadContext()}
           onSendMessage={handleSend}
           ctxSettings={ctxSettings}
           onCtxSettingsChange={handleCtxSettingsChange}
@@ -925,6 +940,12 @@ export default function AIAnalyste() {
                 )}
               </div>
               <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3">
+                {/* Context load error */}
+                {contextError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-[11px] text-red-600">
+                    Impossible de charger le contexte. <button onClick={() => loadContext()} className="underline font-semibold bg-transparent border-none text-red-600 cursor-pointer p-0">Reessayer</button>
+                  </div>
+                )}
                 {/* Quota */}
                 {context?.rate_limit && (
                   <div className="rounded-xl border border-[#e3e6eb] p-3" style={{ background: "var(--bg-card)" }}>

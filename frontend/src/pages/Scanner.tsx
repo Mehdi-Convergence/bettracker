@@ -802,12 +802,12 @@ export default function Scanner() {
           <ChevronDown size={14} className={`transition-transform ${filtersCollapsed ? "" : "rotate-180"}`} />
         </button>
         {/* Row 1: Sport + Search + Period + Time + Edge + Odds */}
-        <div className={`px-3 md:px-5 py-2.5 border-b border-[#f0f1f3] overflow-x-hidden ${filtersCollapsed ? "hidden" : ""}`}>
+        <div className={`px-3 md:px-5 py-2.5 border-b border-[#f0f1f3] ${filtersCollapsed ? "hidden" : ""}`}>
           <div className="flex gap-2.5 items-end flex-wrap">
             {/* Sport pills */}
             <div data-tour="sport-toggle">
               <label className="block text-[9.5px] text-[#8a919e] uppercase tracking-[0.08em] font-semibold mb-1">Sport</label>
-              <div className="flex gap-1">
+              <div className="flex gap-1 flex-wrap">
                 {(["football", "tennis", "nba", "rugby", "mlb", "pmu"] as const).map((s) => (
                   <button key={s} onClick={() => toggleSport(s)}
                     className={`px-3 py-[5px] rounded-full text-[11.5px] font-semibold transition-all ${

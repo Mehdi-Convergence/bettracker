@@ -28,7 +28,8 @@ interface DashboardGridProps {
 }
 
 function getResponsiveCols(width: number): number {
-  if (width < 480) return 2;
+  if (width < 400) return 1;
+  if (width < 600) return 2;
   if (width < 768) return 4;
   if (width < 1024) return 6;
   return 12;
@@ -36,11 +37,22 @@ function getResponsiveCols(width: number): number {
 
 function adaptLayoutForCols(widgets: DashboardWidget[], cols: number): DashboardWidget[] {
   if (cols >= 12) return widgets;
-  return widgets.map((w) => ({
-    ...w,
-    w: Math.min(w.w, cols),
-    x: Math.min(w.x, Math.max(0, cols - Math.min(w.w, cols))),
-  }));
+  return widgets.map((w) => {
+    const clampedW = Math.min(w.w, cols);
+    let h = w.h;
+    // On single-column mobile, reduce tall widgets to avoid endless scrolling
+    if (cols <= 2) {
+      if (w.type === "activity-feed") h = Math.min(h, 6);
+      else if (w.type === "line-chart" || w.type === "bar-chart") h = Math.min(h, 4);
+      else if (w.h >= 3) h = Math.min(h, 2);
+    }
+    return {
+      ...w,
+      w: clampedW,
+      h,
+      x: Math.min(w.x, Math.max(0, cols - clampedW)),
+    };
+  });
 }
 
 export function DashboardGrid({
@@ -101,8 +113,8 @@ export function DashboardGrid({
         })}
         gridConfig={{
           cols,
-          rowHeight: isMobile ? 50 : 60,
-          margin: isMobile ? [8, 8] as [number, number] : [16, 16] as [number, number],
+          rowHeight: cols <= 2 ? 45 : isMobile ? 50 : 60,
+          margin: cols <= 2 ? [6, 6] as [number, number] : isMobile ? [8, 8] as [number, number] : [16, 16] as [number, number],
           containerPadding: [0, 0] as [number, number],
           maxRows: Infinity,
         }}
