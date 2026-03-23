@@ -44,6 +44,8 @@ class PMUFeatureBuilder:
         self.trainer_history: dict[str, list[dict]] = defaultdict(list)
         # Combo cache: (horse, jockey) -> list of run dicts
         self.combo_history: dict[tuple[str, str], list[dict]] = defaultdict(list)
+        # Jockey-Trainer combo: (jockey, trainer) -> list of run dicts
+        self.jockey_trainer_history: dict[tuple[str, str], list[dict]] = defaultdict(list)
 
     def build_dataset(
         self,
@@ -69,6 +71,7 @@ class PMUFeatureBuilder:
         self.jockey_history = defaultdict(list)
         self.trainer_history = defaultdict(list)
         self.combo_history = defaultdict(list)
+        self.jockey_trainer_history = defaultdict(list)
 
         # Merge runners with race metadata
         # Drop race_id from races_df to avoid duplicate column after merge
@@ -221,6 +224,14 @@ class PMUFeatureBuilder:
         f["horse_place_rate_10"] = self._place_rate(h_hist, 10)
         f["horse_avg_position_5"] = self._avg_position(h_hist, 5)
 
+        # ---- Last 5 average position (from form string) ----
+        last5 = runner.get("last_5_positions")
+        if last5 and isinstance(last5, list):
+            valid = [p for p in last5 if isinstance(p, (int, float)) and p > 0]
+            f["last_5_avg_pos"] = float(np.mean(valid)) if valid else np.nan
+        else:
+            f["last_5_avg_pos"] = self._avg_position(h_hist, 5)
+
         # ---- Distance affinity ----
         dist_hist = [r for r in h_hist if abs(r.get("distance", 0) - distance) <= _DISTANCE_TOLERANCE]
         f["horse_win_rate_distance"] = self._win_rate(dist_hist, len(dist_hist))
@@ -260,6 +271,12 @@ class PMUFeatureBuilder:
         f["trainer_win_rate_20"] = self._win_rate(t_hist, 20)
         f["trainer_place_rate_20"] = self._place_rate(t_hist, 20)
 
+        # ---- Jockey-Trainer combo (recent synergy) ----
+        jt_key = (jockey, trainer)
+        jt_hist = self.jockey_trainer_history.get(jt_key, [])
+        f["jockey_trainer_combo_runs"] = float(len(jt_hist))
+        f["jockey_trainer_combo_win_rate"] = self._win_rate(jt_hist, min(len(jt_hist), 20))
+
         # ---- Race context ----
         f["num_runners"] = float(num_runners_race)
         f["age"] = float(_safe_float(runner.get("age")) or np.nan)
@@ -270,9 +287,29 @@ class PMUFeatureBuilder:
 
         f["class_level"] = float(prize_pool) if prize_pool else np.nan
 
+        # ---- Class delta (horse stepping up/down in class) ----
+        past_prizes = [r.get("prize_pool") for r in h_hist if r.get("prize_pool")]
+        if past_prizes and prize_pool:
+            avg_past_class = float(np.mean(past_prizes))
+            f["class_delta"] = (prize_pool - avg_past_class) / max(avg_past_class, 1.0)
+        else:
+            f["class_delta"] = np.nan
+
+        # ---- Horse run count (experience) ----
+        f["horse_runs"] = float(len(h_hist))
+
         # ---- Market implied probability ----
         odds = _safe_float(runner.get("odds_final"))
         f["odds_implied_prob"] = (1.0 / odds) if (odds and odds > 1.0) else np.nan
+
+        # ---- Morning odds implied probability + drift ----
+        odds_morning = _safe_float(runner.get("odds_morning"))
+        f["odds_morning_implied"] = (1.0 / odds_morning) if (odds_morning and odds_morning > 1.0) else np.nan
+        if odds and odds > 1.0 and odds_morning and odds_morning > 1.0:
+            # Positive drift = odds dropped (more money bet) = market confidence increasing
+            f["odds_drift"] = (odds_morning - odds) / odds_morning
+        else:
+            f["odds_drift"] = np.nan
 
         f["is_quinteplus"] = float(is_quinteplus)
 
@@ -318,9 +355,17 @@ class PMUFeatureBuilder:
         if trainer:
             self.trainer_history[trainer].append(jockey_entry.copy())
 
-        # Combo
+        # Combo horse-jockey
         if horse and jockey:
             self.combo_history[(horse, jockey)].append({
+                "date": race_date,
+                "won": finish == 1,
+                "placed": finish <= 3,
+            })
+
+        # Combo jockey-trainer
+        if jockey and trainer:
+            self.jockey_trainer_history[(jockey, trainer)].append({
                 "date": race_date,
                 "won": finish == 1,
                 "placed": finish <= 3,
@@ -409,6 +454,7 @@ PMU_FEATURE_COLUMNS: list[str] = [
     "horse_place_rate_5",
     "horse_place_rate_10",
     "horse_avg_position_5",
+    "last_5_avg_pos",
     # Distance affinity
     "horse_win_rate_distance",
     "horse_avg_pos_distance",
@@ -429,13 +475,21 @@ PMU_FEATURE_COLUMNS: list[str] = [
     # Trainer
     "trainer_win_rate_20",
     "trainer_place_rate_20",
+    # Jockey-Trainer synergy
+    "jockey_trainer_combo_runs",
+    "jockey_trainer_combo_win_rate",
     # Race context
     "num_runners",
     "age",
     "post_position",
     "rest_days",
     "class_level",
+    "class_delta",
+    "horse_runs",
+    # Market odds
     "odds_implied_prob",
+    "odds_morning_implied",
+    "odds_drift",
     "is_quinteplus",
 ]
 

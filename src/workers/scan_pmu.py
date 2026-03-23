@@ -57,11 +57,29 @@ def _build_recommendations(runners: list[dict], is_quinteplus: bool) -> list:
             role=role,
         )
 
-    def _confidence(picks: list[dict]) -> float:
-        """Confiance = produit des probas individuelles normalise."""
-        probs = [r.get("model_prob_win") or 0.01 for r in picks]
-        # Somme des probas top-N / N comme indicateur de confiance
-        return min(round(sum(probs) / len(probs), 3), 0.99)
+    def _confidence_simple(runner: dict, key: str = "model_prob_win") -> float:
+        """Confiance pour un pari simple = proba du cheval."""
+        return min(round(runner.get(key) or 0.01, 3), 0.99)
+
+    def _confidence_multi(picks: list[dict], n_needed: int, in_order: bool = False) -> float:
+        """Confiance pour un pari multi (tierce/quarte/quinte/2sur4).
+
+        - in_order=False: P(au moins n_needed parmi les picks dans le top-N) — combinatoire
+        - in_order=True: produit des probas (approximation pessimiste pour l'ordre)
+        On utilise la moyenne des probas place comme proxy de "dans le top-N".
+        """
+        probs = [r.get("model_prob_place") or r.get("model_prob_win") or 0.01 for r in picks]
+        if in_order:
+            # Approximation: produit des probas win (tres faible, realiste pour l'ordre exact)
+            win_probs = [r.get("model_prob_win") or 0.01 for r in picks]
+            import math
+            conf = math.prod(win_probs) * math.factorial(len(win_probs))
+            return min(round(conf, 4), 0.50)
+        else:
+            # Desordre: moyenne geometrique des probas place * facteur N/total
+            import math
+            geo_mean = math.exp(sum(math.log(max(p, 0.001)) for p in probs) / len(probs))
+            return min(round(geo_mean, 3), 0.80)
 
     recommendations = []
 
@@ -78,7 +96,7 @@ def _build_recommendations(runners: list[dict], is_quinteplus: bool) -> list:
             label="Simple Gagnant",
             picks=[_pick(fav, "base")],
             reserves=[_pick(by_win[1], "reserve")] if len(by_win) > 1 else [],
-            confidence=round(fav_prob, 3),
+            confidence=_confidence_simple(fav, "model_prob_win"),
             expected_value=round(fav_prob * (fav.get("odds") or 1), 2) if fav.get("odds") else None,
             comment=comment,
         ))
@@ -99,7 +117,7 @@ def _build_recommendations(runners: list[dict], is_quinteplus: bool) -> list:
                 prob=round(by_place[1].get("model_prob_place") or 0, 4),
                 odds=by_place[1].get("odds"), edge=by_place[1].get("edge_place"), role="reserve",
             )] if len(by_place) > 1 else [],
-            confidence=round(plc_prob, 3),
+            confidence=_confidence_simple(plc, "model_prob_place"),
             comment=f"{plc['horse_name']} a {plc_prob*100:.1f}% de chances d'etre dans les 3 premiers.",
         ))
 
@@ -107,7 +125,7 @@ def _build_recommendations(runners: list[dict], is_quinteplus: bool) -> list:
     if len(by_place) >= 4:
         top4 = by_place[:4]
         reserves_2s4 = by_place[4:6] if len(by_place) > 4 else []
-        conf = _confidence(top4)
+        conf = _confidence_multi(top4, n_needed=2, in_order=False)
         nums = ", ".join([f"n{r['number']}" for r in top4])
         recommendations.append(PMUTicketRecommendation(
             ticket_type="2sur4",
@@ -130,50 +148,53 @@ def _build_recommendations(runners: list[dict], is_quinteplus: bool) -> list:
     if len(by_win) >= 3:
         top3 = by_win[:3]
         reserves_t = by_win[3:5] if len(by_win) > 3 else []
-        conf = _confidence(top3)
-        order = " > ".join([f"{r['horse_name']}(n{r['number']})" for r in top3])
+        conf_order = _confidence_multi(top3, n_needed=3, in_order=True)
+        conf_desordre = _confidence_multi(top3, n_needed=3, in_order=False)
+        names = " - ".join([f"{r['horse_name']}(n{r['number']})" for r in top3])
         recommendations.append(PMUTicketRecommendation(
             ticket_type="tierce",
             label="Tierce",
             picks=[_pick(r, "base") for r in top3],
             reserves=[_pick(r, "reserve") for r in reserves_t],
-            confidence=conf,
-            comment=f"Ordre predit : {order}. Confiance {conf*100:.0f}%.",
+            confidence=conf_desordre,
+            comment=f"Selection : {names}. Desordre {conf_desordre*100:.0f}%, ordre {conf_order*100:.1f}%.",
         ))
 
     # ── Quarte : top 4 par victoire ──
     if len(by_win) >= 4:
         top4w = by_win[:4]
         reserves_q = by_win[4:6] if len(by_win) > 4 else []
-        conf = _confidence(top4w)
-        order = " > ".join([f"n{r['number']}" for r in top4w])
+        conf_order = _confidence_multi(top4w, n_needed=4, in_order=True)
+        conf_desordre = _confidence_multi(top4w, n_needed=4, in_order=False)
+        names = " - ".join([f"n{r['number']}" for r in top4w])
         recommendations.append(PMUTicketRecommendation(
             ticket_type="quarte",
             label="Quarte+",
             picks=[_pick(r, "base") for r in top4w],
             reserves=[_pick(r, "reserve") for r in reserves_q],
-            confidence=conf,
-            comment=f"Ordre predit : {order}. Confiance {conf*100:.0f}%.",
+            confidence=conf_desordre,
+            comment=f"Selection : {names}. Desordre {conf_desordre*100:.0f}%, ordre {conf_order*100:.1f}%.",
         ))
 
     # ── Quinte+ : top 5 par victoire (seulement pour courses Quinte+) ──
     if is_quinteplus and len(by_win) >= 5:
         top5 = by_win[:5]
         reserves_qn = by_win[5:7] if len(by_win) > 5 else []
-        conf = _confidence(top5)
-        order = " > ".join([f"n{r['number']}" for r in top5])
+        conf_order = _confidence_multi(top5, n_needed=5, in_order=True)
+        conf_desordre = _confidence_multi(top5, n_needed=5, in_order=False)
         # Classifier base/outsider : top 2 = base, 3-4 = complements, 5 = outsider
         picks_qn = []
         for i, r in enumerate(top5):
             role = "base" if i < 2 else ("complement" if i < 4 else "outsider")
             picks_qn.append(_pick(r, role))
+        names = " - ".join([f"n{r['number']}" for r in top5])
         recommendations.append(PMUTicketRecommendation(
             ticket_type="quinte",
             label="Quinte+",
             picks=picks_qn,
             reserves=[_pick(r, "reserve") for r in reserves_qn],
-            confidence=conf,
-            comment=f"Ordre predit : {order}. Bases : n{top5[0]['number']}, n{top5[1]['number']}. Outsider : n{top5[4]['number']}.",
+            confidence=conf_desordre,
+            comment=f"Selection : {names}. Bases : n{top5[0]['number']}, n{top5[1]['number']}. Outsider : n{top5[4]['number']}. Desordre {conf_desordre*100:.0f}%, ordre {conf_order*100:.1f}%.",
         ))
 
     return recommendations
@@ -368,6 +389,8 @@ async def run_pmu_scan():
                                     "age": None,  # pas dispo en live
                                     "number": rd.get("number"),
                                     "odds_final": rd.get("odds"),
+                                    "odds_morning": rd.get("odds_morning"),
+                                    "last_5_positions": rd.get("last_5"),
                                 },
                                 horse=horse,
                                 jockey=jockey,
@@ -385,21 +408,46 @@ async def run_pmu_scan():
                                 num_runners_race=len(runner_dicts),
                                 is_quinteplus=int(bool(race.is_quinteplus)),
                             )
-                        else:  # pas d'historique - features minimales
+                        else:  # pas d'historique - bayesian prior imputation
+                            n_runners = len(runner_dicts)
+                            base_win = 1.0 / max(n_runners, 1)  # prior: 1/N chance of winning
+                            base_place = min(3, n_runners) / max(n_runners, 1)  # prior: ~3/N chance of placing
+
                             odds_val = rd.get("odds")
                             implied = (1.0 / float(odds_val)) if odds_val and float(odds_val) > 1.0 else np.nan
+                            odds_morning_val = rd.get("odds_morning")
+                            morning_implied = (1.0 / float(odds_morning_val)) if odds_morning_val and float(odds_morning_val) > 1.0 else np.nan
+
                             f = {col: np.nan for col in PMU_FEATURE_COLUMNS}
+                            # Bayesian priors instead of 0 for form features
+                            f["horse_win_rate_5"] = base_win
+                            f["horse_win_rate_10"] = base_win
+                            f["horse_win_rate_20"] = base_win
+                            f["horse_place_rate_5"] = base_place
+                            f["horse_place_rate_10"] = base_place
+                            f["horse_avg_position_5"] = float(n_runners) / 2.0  # middle of pack
+                            f["last_5_avg_pos"] = float(n_runners) / 2.0
+                            f["horse_runs"] = 0.0
                             f["odds_implied_prob"] = implied
-                            f["num_runners"] = float(len(runner_dicts))
+                            f["odds_morning_implied"] = morning_implied
+                            if odds_val and float(odds_val) > 1.0 and odds_morning_val and float(odds_morning_val) > 1.0:
+                                f["odds_drift"] = (float(odds_morning_val) - float(odds_val)) / float(odds_morning_val)
+                            f["num_runners"] = float(n_runners)
                             f["post_position"] = float(rd.get("number", 0))
                             f["is_quinteplus"] = float(int(bool(race.is_quinteplus)))
-                            # Remplir jockey/trainer stats meme sans historique cheval
+                            f["class_level"] = float(race.prize_pool) if race.prize_pool else np.nan
+                            # Jockey/trainer stats even without horse history
                             if j_hist:
                                 f["jockey_win_rate_20"] = builder._win_rate(j_hist, 20)
                                 f["jockey_place_rate_20"] = builder._place_rate(j_hist, 20)
                             if t_hist:
                                 f["trainer_win_rate_20"] = builder._win_rate(t_hist, 20)
                                 f["trainer_place_rate_20"] = builder._place_rate(t_hist, 20)
+                            # Jockey-trainer combo
+                            jt_hist = builder.jockey_trainer_history.get((jockey, trainer), [])
+                            if jt_hist:
+                                f["jockey_trainer_combo_runs"] = float(len(jt_hist))
+                                f["jockey_trainer_combo_win_rate"] = builder._win_rate(jt_hist, min(len(jt_hist), 20))
 
                         feat_rows.append(f)
 
@@ -415,6 +463,19 @@ async def run_pmu_scan():
 
                     proba_win = win_model.predict_proba(X)
                     proba_place = place_model.predict_proba(X)
+
+                    # Normalize probabilities per race: sum(P_win) = 1.0
+                    total_win = float(proba_win.sum())
+                    if total_win > 0:
+                        proba_win = proba_win / total_win
+
+                    # Normalize P_place: sum should equal ~place_count/total
+                    place_count = min(3, max(1, len(runner_dicts) // 4))
+                    target_place_sum = float(place_count)
+                    total_place = float(proba_place.sum())
+                    if total_place > 0:
+                        proba_place = proba_place * (target_place_sum / total_place)
+                        proba_place = np.clip(proba_place, 0.001, 0.999)
 
                     for i, rd in enumerate(runner_dicts):
                         rd["model_prob_win"] = round(float(proba_win[i]), 4)

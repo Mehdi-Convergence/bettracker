@@ -52,6 +52,14 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
         runners_rows = db.query(PMURunner).all()
         runners_data = []
         for rn in runners_rows:
+            # Parse last_5_positions JSON
+            last5 = None
+            if rn.last_5_positions:
+                try:
+                    import json as _json
+                    last5 = _json.loads(rn.last_5_positions)
+                except Exception:
+                    pass
             runners_data.append({
                 "race_id": rn.race_id,
                 "number": rn.number,
@@ -64,6 +72,7 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
                 "odds_morning": rn.odds_morning,
                 "finish_position": rn.finish_position,
                 "is_scratched": rn.is_scratched,
+                "last_5_positions": last5,
             })
     finally:
         db.close()
@@ -207,6 +216,50 @@ def main() -> None:
     _evaluate(y_place_test, p_place_test, "Place model — TEST")
 
     # ------------------------------------------------------------------
+    # ROI Backtest on test set
+    # ------------------------------------------------------------------
+    print("\n" + "=" * 60)
+    print("ROI Backtest (test set)...")
+    print("=" * 60)
+
+    # Normalize probas per race in test set
+    test_race_ids = test_df["race_id"].values
+    p_win_norm = p_win_test.copy()
+    for rid in np.unique(test_race_ids):
+        mask = test_race_ids == rid
+        total = p_win_norm[mask].sum()
+        if total > 0:
+            p_win_norm[mask] = p_win_norm[mask] / total
+
+    test_odds = test_df["_odds_final"].values
+    PMU_COMMISSION = 0.15  # PMU takes ~15% on simple bets
+
+    # Strategy: bet on horses where model_prob > implied_prob (positive edge)
+    for min_edge in [0.0, 0.02, 0.05, 0.10]:
+        pnl = 0.0
+        n_bets = 0
+        n_wins = 0
+        stakes = 0.0
+        for i in range(len(p_win_norm)):
+            odds = test_odds[i]
+            if odds is None or np.isnan(odds) or odds <= 1.0:
+                continue
+            implied = 1.0 / odds
+            edge = p_win_norm[i] - implied
+            if edge >= min_edge:
+                n_bets += 1
+                stakes += 1.0  # flat 1 unit
+                if y_win_test[i] == 1:
+                    n_wins += 1
+                    pnl += (odds * (1 - PMU_COMMISSION)) - 1.0
+                else:
+                    pnl -= 1.0
+
+        roi = (pnl / stakes * 100) if stakes > 0 else 0
+        win_rate = (n_wins / n_bets * 100) if n_bets > 0 else 0
+        print(f"  Edge >= {min_edge*100:.0f}%: {n_bets} bets, {n_wins} wins ({win_rate:.1f}%), PnL={pnl:+.1f}u, ROI={roi:+.1f}%")
+
+    # ------------------------------------------------------------------
     # Production models: train on ALL data
     # ------------------------------------------------------------------
     print("\n" + "=" * 60)
@@ -242,6 +295,23 @@ def main() -> None:
     p_win_test_2d = np.column_stack([1 - p_win_test, p_win_test])
     p_place_test_2d = np.column_stack([1 - p_place_test, p_place_test])
 
+    # Compute ROI for metadata (edge >= 0.02 strategy)
+    _roi_pnl = 0.0
+    _roi_bets = 0
+    _roi_wins = 0
+    for i in range(len(p_win_norm)):
+        odds = test_odds[i]
+        if odds is None or np.isnan(odds) or odds <= 1.0:
+            continue
+        implied = 1.0 / odds
+        if (p_win_norm[i] - implied) >= 0.02:
+            _roi_bets += 1
+            if y_win_test[i] == 1:
+                _roi_wins += 1
+                _roi_pnl += (odds * 0.85) - 1.0
+            else:
+                _roi_pnl -= 1.0
+
     win_metadata = {
         "model": "PMUWinModel",
         "n_total": len(features_df),
@@ -251,6 +321,10 @@ def main() -> None:
         "scale_pos_weight": float(win_spw_all),
         "log_loss": float(log_loss(y_win_test, p_win_test_2d)),
         "roc_auc": float(roc_auc_score(y_win_test, p_win_test)),
+        "backtest_roi_pct": round(_roi_pnl / max(_roi_bets, 1) * 100, 2),
+        "backtest_n_bets": _roi_bets,
+        "backtest_win_rate_pct": round(_roi_wins / max(_roi_bets, 1) * 100, 2),
+        "backtest_pnl_units": round(_roi_pnl, 2),
         "col_medians": col_medians_all.tolist(),
         "feature_columns": PMU_FEATURE_COLUMNS,
         "train_date_min": train_dates[0],
