@@ -432,13 +432,18 @@ async def pmu_scan(
 ):
     """Retourne les courses PMU du jour avec probas et edges pre-calcules."""
     if force and _acquire_scan_lock("pmu"):
-        try:
-            from src.workers.scan_worker import run_pmu_scan
-            await run_pmu_scan()
-        except Exception as exc:
-            logger.error("Inline PMU scan failed: %s", exc)
-        finally:
-            _release_scan_lock("pmu")
+        import asyncio
+
+        async def _bg_pmu():
+            try:
+                from src.workers.scan_worker import run_pmu_scan
+                await run_pmu_scan()
+            except Exception as exc:
+                logger.error("Background PMU scan failed: %s", exc)
+            finally:
+                _release_scan_lock("pmu")
+
+        asyncio.create_task(_bg_pmu())
     return _read_pmu_scan()
 
 
