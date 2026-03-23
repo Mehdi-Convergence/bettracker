@@ -855,6 +855,27 @@ class PMURunnerCard(BaseModel):
     trainer_runs: int | None = None
 
 
+class PMUTicketPick(BaseModel):
+    """Un cheval selectionne pour un ticket PMU."""
+    number: int
+    horse_name: str
+    prob: float  # probabilite modele (win ou place selon le type)
+    odds: float | None = None
+    edge: float | None = None
+    role: str = "base"  # base / outsider / reserve
+
+
+class PMUTicketRecommendation(BaseModel):
+    """Recommandation de ticket pour une course PMU."""
+    ticket_type: str  # "quinte" | "quarte" | "tierce" | "2sur4" | "simple_gagnant" | "simple_place"
+    label: str  # "Quinte+" | "Quarte+" | "Tierce" | "2 sur 4" | "Simple Gagnant" | "Simple Place"
+    picks: list[PMUTicketPick]
+    reserves: list[PMUTicketPick] = []
+    confidence: float  # 0-1 confiance globale du pronostic
+    expected_value: float | None = None  # EV estimee
+    comment: str = ""  # explication du choix
+
+
 class PMURaceCard(BaseModel):
     """Une course PMU avec ses partants."""
     race_id: str
@@ -868,6 +889,8 @@ class PMURaceCard(BaseModel):
     num_runners: int
     is_quinteplus: bool = False
     runners: list[PMURunnerCard] = []
+    recommendations: list[PMUTicketRecommendation] = []
+    analysis_summary: str | None = None  # resume textuel de l'analyse
 
 
 class PMUScanResponse(BaseModel):

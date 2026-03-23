@@ -35,6 +35,150 @@ def _load_pmu_models():
         return None, None
 
 
+def _build_recommendations(runners: list[dict], is_quinteplus: bool) -> list:
+    """Genere les recommandations de tickets (Quinte, Quarte, Tierce, 2/4, Simple) a partir des probas ML."""
+    from src.api.schemas import PMUTicketRecommendation, PMUTicketPick
+
+    if len(runners) < 3:
+        return []
+
+    # Trier par probabilite de victoire ML (desc)
+    by_win = sorted(runners, key=lambda r: r.get("model_prob_win") or 0, reverse=True)
+    # Trier par probabilite de place ML (desc)
+    by_place = sorted(runners, key=lambda r: r.get("model_prob_place") or 0, reverse=True)
+
+    def _pick(r: dict, role: str = "base") -> PMUTicketPick:
+        return PMUTicketPick(
+            number=r["number"],
+            horse_name=r["horse_name"],
+            prob=round(r.get("model_prob_win") or 0, 4),
+            odds=r.get("odds"),
+            edge=r.get("edge_win"),
+            role=role,
+        )
+
+    def _confidence(picks: list[dict]) -> float:
+        """Confiance = produit des probas individuelles normalise."""
+        probs = [r.get("model_prob_win") or 0.01 for r in picks]
+        # Somme des probas top-N / N comme indicateur de confiance
+        return min(round(sum(probs) / len(probs), 3), 0.99)
+
+    recommendations = []
+
+    # ── Simple Gagnant : le favori ML ──
+    if by_win:
+        fav = by_win[0]
+        fav_prob = fav.get("model_prob_win") or 0
+        fav_edge = fav.get("edge_win") or 0
+        comment = f"{fav['horse_name']} est le favori du modele a {fav_prob*100:.1f}%."
+        if fav_edge > 0.03:
+            comment += f" Edge de +{fav_edge*100:.1f}% vs la cote."
+        recommendations.append(PMUTicketRecommendation(
+            ticket_type="simple_gagnant",
+            label="Simple Gagnant",
+            picks=[_pick(fav, "base")],
+            reserves=[_pick(by_win[1], "reserve")] if len(by_win) > 1 else [],
+            confidence=round(fav_prob, 3),
+            expected_value=round(fav_prob * (fav.get("odds") or 1), 2) if fav.get("odds") else None,
+            comment=comment,
+        ))
+
+    # ── Simple Place : meilleur cheval en place ──
+    if by_place:
+        plc = by_place[0]
+        plc_prob = plc.get("model_prob_place") or 0
+        recommendations.append(PMUTicketRecommendation(
+            ticket_type="simple_place",
+            label="Simple Place",
+            picks=[PMUTicketPick(
+                number=plc["number"], horse_name=plc["horse_name"],
+                prob=round(plc_prob, 4), odds=plc.get("odds"), edge=plc.get("edge_place"), role="base",
+            )],
+            reserves=[PMUTicketPick(
+                number=by_place[1]["number"], horse_name=by_place[1]["horse_name"],
+                prob=round(by_place[1].get("model_prob_place") or 0, 4),
+                odds=by_place[1].get("odds"), edge=by_place[1].get("edge_place"), role="reserve",
+            )] if len(by_place) > 1 else [],
+            confidence=round(plc_prob, 3),
+            comment=f"{plc['horse_name']} a {plc_prob*100:.1f}% de chances d'etre dans les 3 premiers.",
+        ))
+
+    # ── 2 sur 4 : les 4 meilleurs par place_prob ──
+    if len(by_place) >= 4:
+        top4 = by_place[:4]
+        reserves_2s4 = by_place[4:6] if len(by_place) > 4 else []
+        conf = _confidence(top4)
+        nums = ", ".join([f"n{r['number']}" for r in top4])
+        recommendations.append(PMUTicketRecommendation(
+            ticket_type="2sur4",
+            label="2 sur 4",
+            picks=[PMUTicketPick(
+                number=r["number"], horse_name=r["horse_name"],
+                prob=round(r.get("model_prob_place") or 0, 4), odds=r.get("odds"),
+                edge=r.get("edge_place"), role="base",
+            ) for r in top4],
+            reserves=[PMUTicketPick(
+                number=r["number"], horse_name=r["horse_name"],
+                prob=round(r.get("model_prob_place") or 0, 4), odds=r.get("odds"),
+                edge=r.get("edge_place"), role="reserve",
+            ) for r in reserves_2s4],
+            confidence=conf,
+            comment=f"Selection {nums} — les 4 chevaux avec la meilleure probabilite de place.",
+        ))
+
+    # ── Tierce : top 3 par victoire ──
+    if len(by_win) >= 3:
+        top3 = by_win[:3]
+        reserves_t = by_win[3:5] if len(by_win) > 3 else []
+        conf = _confidence(top3)
+        order = " > ".join([f"{r['horse_name']}(n{r['number']})" for r in top3])
+        recommendations.append(PMUTicketRecommendation(
+            ticket_type="tierce",
+            label="Tierce",
+            picks=[_pick(r, "base") for r in top3],
+            reserves=[_pick(r, "reserve") for r in reserves_t],
+            confidence=conf,
+            comment=f"Ordre predit : {order}. Confiance {conf*100:.0f}%.",
+        ))
+
+    # ── Quarte : top 4 par victoire ──
+    if len(by_win) >= 4:
+        top4w = by_win[:4]
+        reserves_q = by_win[4:6] if len(by_win) > 4 else []
+        conf = _confidence(top4w)
+        order = " > ".join([f"n{r['number']}" for r in top4w])
+        recommendations.append(PMUTicketRecommendation(
+            ticket_type="quarte",
+            label="Quarte+",
+            picks=[_pick(r, "base") for r in top4w],
+            reserves=[_pick(r, "reserve") for r in reserves_q],
+            confidence=conf,
+            comment=f"Ordre predit : {order}. Confiance {conf*100:.0f}%.",
+        ))
+
+    # ── Quinte+ : top 5 par victoire (seulement pour courses Quinte+) ──
+    if is_quinteplus and len(by_win) >= 5:
+        top5 = by_win[:5]
+        reserves_qn = by_win[5:7] if len(by_win) > 5 else []
+        conf = _confidence(top5)
+        order = " > ".join([f"n{r['number']}" for r in top5])
+        # Classifier base/outsider : top 2 = base, 3-4 = complements, 5 = outsider
+        picks_qn = []
+        for i, r in enumerate(top5):
+            role = "base" if i < 2 else ("complement" if i < 4 else "outsider")
+            picks_qn.append(_pick(r, role))
+        recommendations.append(PMUTicketRecommendation(
+            ticket_type="quinte",
+            label="Quinte+",
+            picks=picks_qn,
+            reserves=[_pick(r, "reserve") for r in reserves_qn],
+            confidence=conf,
+            comment=f"Ordre predit : {order}. Bases : n{top5[0]['number']}, n{top5[1]['number']}. Outsider : n{top5[4]['number']}.",
+        ))
+
+    return recommendations
+
+
 def _collect_today_pmu():
     """Collecte les courses PMU du jour si pas deja en base."""
     try:
@@ -308,6 +452,9 @@ async def run_pmu_scan():
             # Calculer edges via probability_calculator
             enriched = calculate_pmu(runner_dicts)
 
+            # ── Generer les recommandations de tickets ──
+            recommendations = _build_recommendations(enriched, race.is_quinteplus)
+
             runner_cards = []
             for rd in enriched:
                 try:
@@ -325,6 +472,16 @@ async def run_pmu_scan():
                         edge_place=rd.get("edge_place"),
                         form=rd.get("form"),
                         last_5=rd.get("last_5"),
+                        horse_win_rate=rd.get("horse_win_rate"),
+                        horse_place_rate=rd.get("horse_place_rate"),
+                        horse_runs=rd.get("horse_runs"),
+                        rest_days=rd.get("rest_days"),
+                        jockey_win_rate=rd.get("jockey_win_rate"),
+                        jockey_place_rate=rd.get("jockey_place_rate"),
+                        jockey_runs=rd.get("jockey_runs"),
+                        trainer_win_rate=rd.get("trainer_win_rate"),
+                        trainer_place_rate=rd.get("trainer_place_rate"),
+                        trainer_runs=rd.get("trainer_runs"),
                     ))
                 except Exception:
                     continue
@@ -340,6 +497,13 @@ async def run_pmu_scan():
                 except Exception:
                     _post_time = race.race_time
 
+            # Resume analytique
+            value_count = sum(1 for r in enriched if (r.get("edge_win") or 0) > 0.02)
+            top = sorted(enriched, key=lambda r: r.get("model_prob_win") or 0, reverse=True)
+            fav_name = top[0]["horse_name"] if top else "?"
+            fav_prob = round((top[0].get("model_prob_win") or 0) * 100, 1) if top else 0
+            summary = f"{value_count} chevaux avec edge positif. Favori modele : {fav_name} ({fav_prob}% de chance de victoire)."
+
             races_out.append(PMURaceCard(
                 race_id=race.race_id,
                 hippodrome=race.hippodrome,
@@ -352,6 +516,8 @@ async def run_pmu_scan():
                 num_runners=race.num_runners or len(runner_cards),
                 is_quinteplus=race.is_quinteplus,
                 runners=runner_cards,
+                recommendations=recommendations,
+                analysis_summary=summary,
             ))
 
     except Exception as exc:

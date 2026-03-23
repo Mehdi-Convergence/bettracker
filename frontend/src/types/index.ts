@@ -726,6 +726,25 @@ export interface PMURunnerCard {
   trainer_runs: number | null;
 }
 
+export interface PMUTicketPick {
+  number: number;
+  horse_name: string;
+  prob: number;
+  odds: number | null;
+  edge: number | null;
+  role: string; // "base" | "outsider" | "complement" | "reserve"
+}
+
+export interface PMUTicketRecommendation {
+  ticket_type: string; // "quinte" | "quarte" | "tierce" | "2sur4" | "simple_gagnant" | "simple_place"
+  label: string;
+  picks: PMUTicketPick[];
+  reserves: PMUTicketPick[];
+  confidence: number;
+  expected_value: number | null;
+  comment: string;
+}
+
 export interface PMURaceCard {
   race_id: string;
   hippodrome: string;
@@ -738,6 +757,8 @@ export interface PMURaceCard {
   num_runners: number;
   is_quinteplus: boolean;
   runners: PMURunnerCard[];
+  recommendations: PMUTicketRecommendation[];
+  analysis_summary: string | null;
 }
 
 export interface PMUScanResponse {
